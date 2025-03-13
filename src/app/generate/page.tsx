@@ -158,22 +158,36 @@ export default function GenerateRecipes() {
       return;
     }
     
+    if (!currentUser) {
+      setError('You must be logged in to generate recipes');
+      router.push('/signin');
+      return;
+    }
+    
     setGenerating(true);
     setError('');
     
     try {
       // Update user stats
-      if (currentUser) {
-        await incrementRecipesGenerated(currentUser.uid);
-      }
+      await incrementRecipesGenerated(currentUser.uid);
+      
+      // Get the user's ID token for authentication
+      const token = await currentUser.getIdToken();
       
       // Call the API to generate recipes
-      const response = await axios.post('/api/generate-recipes', {
-        ingredients,
-        equipment,
-        staples,
-        dietaryPrefs
-      });
+      const response = await axios.post('/api/generate-recipes', 
+        {
+          ingredients,
+          equipment,
+          staples,
+          dietaryPrefs
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       
       // Store the recipes in session storage to access them on the results page
       sessionStorage.setItem('generatedRecipes', JSON.stringify(response.data.recipes));
@@ -182,7 +196,16 @@ export default function GenerateRecipes() {
       router.push('/recipes/results');
     } catch (error: any) {
       console.error('Error generating recipes:', error);
-      setError(error.response?.data?.error || 'Failed to generate recipes');
+      
+      // Check for specific error responses
+      if (error.response?.status === 401) {
+        setError('Authentication error. Please sign in again.');
+        setTimeout(() => router.push('/signin'), 2000);
+      } else if (error.response?.status === 403 && error.response?.data?.limitExceeded) {
+        setError('You have reached your free tier limit. Please upgrade to continue.');
+      } else {
+        setError(error.response?.data?.error || 'Failed to generate recipes');
+      }
     } finally {
       setGenerating(false);
     }

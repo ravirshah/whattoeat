@@ -4,17 +4,16 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/ge
 import { checkUserUsage } from '@/lib/db';
 import { getAuth } from 'firebase-admin/auth';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { ServiceAccount } from 'firebase-admin';
 
 // Firebase Admin SDK initialization for server-side auth
 if (!getApps().length) {
   try {
-    const serviceAccount: ServiceAccount = JSON.parse(
+    const serviceAccount = JSON.parse(
       Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '', 'base64').toString()
     );
     
     initializeApp({
-      credential: cert(serviceAccount),
+      credential: cert(serviceAccount)
     });
   } catch (error) {
     console.error('Error initializing Firebase Admin:', error);
@@ -35,7 +34,7 @@ type RecipeResponse = {
 // Helper function to clean array input
 const cleanArrayInput = (arr: string[] | undefined): string[] => {
   if (!arr || !Array.isArray(arr)) return [];
-  return arr.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+  return arr.filter(item => typeof item === 'string' && item.trim() !== '');
 };
 
 export default async function handler(
@@ -91,7 +90,7 @@ export default async function handler(
     const genAI = new GoogleGenerativeAI(apiKey);
     
     // Use gemini-pro as fallback if gemini-2.0-flash is not available
-    const modelName = "gemini-pro"; // Changed to gemini-pro as gemini-2.0-flash may not be accessible
+    const modelName = "gemini-2.0-flash";
     const model = genAI.getGenerativeModel({ model: modelName });
 
     // Construct the prompt
@@ -153,13 +152,7 @@ export default async function handler(
       ],
     });
 
-    const response = result.response;
-
-    if (!response) {
-        console.error("Gemini API returned an empty response.");
-        return res.status(500).json({ error: 'Failed to generate recipes - Gemini API returned empty response' });
-    }
-
+    const response = await result.response;
     const text = response.text();
 
     // Parse the response
@@ -190,7 +183,7 @@ export default async function handler(
   }
 }
 
-// Enhanced recipe parser with validation
+// Enhanced recipe parser with validation - FIXED REGEX without 's' flag
 function parseRecipes(text: string) {
   if (!text || typeof text !== 'string') {
     console.warn('Invalid input to parseRecipes:', text);
@@ -199,8 +192,8 @@ function parseRecipes(text: string) {
 
   const recipes = [];
   
-  // Split the text into recipe blocks
-  const recipeBlocks = text.split(/Recipe Name:|RECIPE \d+:/i)
+  // Split the text into recipe blocks - removed 'i' flag and using ignore case in regex
+  const recipeBlocks = text.split(/Recipe Name:|RECIPE \d+:/)
     .filter(block => block && block.trim().length > 0);
   
   if (recipeBlocks.length === 0) {
@@ -210,13 +203,13 @@ function parseRecipes(text: string) {
 
   for (const block of recipeBlocks) {
     try {
-      // Extract recipe components with safer pattern matching
-      const nameMatch = block.match(/^(.*?)(?=\s*\n\s*Ingredients:|\s*\n\s*INGREDIENTS:)/s);
-      const ingredientsMatch = block.match(/(?:Ingredients:|INGREDIENTS:)(.*?)(?=\s*\n\s*Instructions:|\s*\n\s*INSTRUCTIONS:)/s);
-      const instructionsMatch = block.match(/(?:Instructions:|INSTRUCTIONS:)(.*?)(?=\s*\n\s*Nutritional Facts:|\s*\n\s*NUTRITIONAL FACTS:)/s);
-      const nutritionalMatch = block.match(/(?:Nutritional Facts:|NUTRITIONAL FACTS:)(.*?)(?=\s*\n\s*Servings:|\s*\n\s*SERVINGS:)/s);
-      const servingsMatch = block.match(/(?:Servings:|SERVINGS:)(.*?)(?=\s*\n\s*Prep\/Cook Times:|\s*\n\s*PREP\/COOK TIMES:)/s);
-      const timesMatch = block.match(/(?:Prep\/Cook Times:|PREP\/COOK TIMES:)(.*?)(?=\s*$)/s);
+      // Extract recipe components with safer pattern matching - replaced "s" flag with [\s\S]
+      const nameMatch = block.match(/^([\s\S]*?)(?=\s*\n\s*Ingredients:|\s*\n\s*INGREDIENTS:)/);
+      const ingredientsMatch = block.match(/(?:Ingredients:|INGREDIENTS:)([\s\S]*?)(?=\s*\n\s*Instructions:|\s*\n\s*INSTRUCTIONS:)/);
+      const instructionsMatch = block.match(/(?:Instructions:|INSTRUCTIONS:)([\s\S]*?)(?=\s*\n\s*Nutritional Facts:|\s*\n\s*NUTRITIONAL FACTS:)/);
+      const nutritionalMatch = block.match(/(?:Nutritional Facts:|NUTRITIONAL FACTS:)([\s\S]*?)(?=\s*\n\s*Servings:|\s*\n\s*SERVINGS:)/);
+      const servingsMatch = block.match(/(?:Servings:|SERVINGS:)([\s\S]*?)(?=\s*\n\s*Prep\/Cook Times:|\s*\n\s*PREP\/COOK TIMES:)/);
+      const timesMatch = block.match(/(?:Prep\/Cook Times:|PREP\/COOK TIMES:)([\s\S]*?)(?=\s*$)/);
 
       // Process ingredients with proper null handling
       let ingredients: string[] = [];
