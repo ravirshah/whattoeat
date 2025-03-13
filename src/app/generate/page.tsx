@@ -49,6 +49,13 @@ export default function GenerateRecipes() {
         }
       }
     };
+    useEffect(() => {
+        console.log("Generate page loaded, auth state:", { currentUser, loading });
+        if (!loading && !currentUser) {
+          console.log("Redirecting to signin because no user is logged in");
+          router.push('/signin');
+        }
+      }, [currentUser, loading, router]);
     
     loadUserPreferences();
   }, [currentUser]);

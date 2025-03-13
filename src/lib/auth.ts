@@ -1,3 +1,4 @@
+// src/lib/auth.ts
 import { 
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
@@ -26,11 +27,13 @@ import {
   
   // Sign in with email and password
   export const signInWithEmail = async (email: string, password: string) => {
+    console.log("Starting email sign in attempt");
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log("Sign in successful, user:", userCredential.user.uid);
       return userCredential.user;
     } catch (error) {
-      console.error("Error signing in:", error);
+      console.error("Error details:", error);
       throw error;
     }
   };

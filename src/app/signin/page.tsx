@@ -18,11 +18,15 @@ export default function SignIn() {
     e.preventDefault();
     setError('');
     setLoading(true);
-
+    console.log("Attempting to sign in with:", email);
+  
     try {
-      await signInWithEmail(email, password);
+      const user = await signInWithEmail(email, password);
+      console.log("Sign in successful:", user);
       router.push('/generate');
     } catch (error: any) {
+      console.error("Sign in error:", error);
+  
       // Try to provide a more user-friendly error message
       const errorCode = error.code;
       let errorMessage = error.message || 'Failed to sign in';
