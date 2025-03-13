@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { getUserPreferences, updateUserPreferences, incrementRecipesGenerated } from '@/lib/db';
@@ -21,10 +21,6 @@ import {
   AlertDescription,
   Badge,
   Progress,
-  Tabs,
-  TabsList,
-  TabsTrigger, 
-  TabsContent
 } from '@/components/ui';
 import { 
   Loader2, 
@@ -78,7 +74,11 @@ export default function GenerateRecipesPage() {
 function GenerateRecipes() {
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [recognitionInstance, setRecognitionInstance] = useState<any>(null);
+  
+  // Speech recognition ref
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  
+  // Input states
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [newIngredient, setNewIngredient] = useState('');
   const [equipment, setEquipment] = useState<string[]>([]);
@@ -88,41 +88,60 @@ function GenerateRecipes() {
   const [dietaryPrefs, setDietaryPrefs] = useState<string[]>([]);
   const [newDietaryPref, setNewDietaryPref] = useState('');
   
+  // UI states
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
-  
-  // State to track preferences loading
   const [loadingPreferences, setLoadingPreferences] = useState(true);
   const [preferencesError, setPreferencesError] = useState(false);
   
-  // Voice recognition state
+  // Voice recognition states
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [speechSupported, setSpeechSupported] = useState(false);
+  
+  // Check if speech recognition is supported
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isSupported = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+      setSpeechSupported(isSupported);
+    }
+  }, []);
+  
+  // Clean up speech recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current && listening) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          console.error("Error stopping speech recognition:", e);
+        }
+      }
+    };
+  }, [listening]);
   
   // Load user preferences
   useEffect(() => {
     const loadUserPreferences = async () => {
-      if (currentUser) {
-        setLoadingPreferences(true);
-        try {
-          const prefs = await getUserPreferences(currentUser.uid);
-          if (prefs) {
-            console.log("Loaded user preferences:", prefs);
-            setIngredients(prefs.ingredients || []);
-            setEquipment(prefs.equipment || []);
-            setStaples(prefs.staples || []);
-            setDietaryPrefs(prefs.dietaryPrefs || []);
-          } else {
-            console.log("No user preferences found");
-          }
-        } catch (error) {
-          console.error('Error loading preferences:', error);
-          setPreferencesError(true);
-        } finally {
-          setLoadingPreferences(false);
+      if (!currentUser) {
+        setLoadingPreferences(false);
+        return;
+      }
+      
+      setLoadingPreferences(true);
+      try {
+        const prefs = await getUserPreferences(currentUser.uid);
+        if (prefs) {
+          setIngredients(prefs.ingredients || []);
+          setEquipment(prefs.equipment || []);
+          setStaples(prefs.staples || []);
+          setDietaryPrefs(prefs.dietaryPrefs || []);
         }
-      } else {
+      } catch (error) {
+        console.error('Error loading preferences:', error);
+        setPreferencesError(true);
+      } finally {
         setLoadingPreferences(false);
       }
     };
@@ -132,6 +151,7 @@ function GenerateRecipes() {
     }
   }, [currentUser, authLoading]);
   
+  // Add/remove functions for ingredients
   const addIngredient = () => {
     if (newIngredient.trim() !== '' && !ingredients.includes(newIngredient.trim())) {
       setIngredients([...ingredients, newIngredient.trim()]);
@@ -143,6 +163,7 @@ function GenerateRecipes() {
     setIngredients(ingredients.filter((_, i) => i !== index));
   };
   
+  // Add/remove functions for equipment
   const addEquipment = () => {
     if (newEquipment.trim() !== '' && !equipment.includes(newEquipment.trim())) {
       setEquipment([...equipment, newEquipment.trim()]);
@@ -154,6 +175,7 @@ function GenerateRecipes() {
     setEquipment(equipment.filter((_, i) => i !== index));
   };
   
+  // Add/remove functions for staples
   const addStaple = () => {
     if (newStaple.trim() !== '' && !staples.includes(newStaple.trim())) {
       setStaples([...staples, newStaple.trim()]);
@@ -165,6 +187,7 @@ function GenerateRecipes() {
     setStaples(staples.filter((_, i) => i !== index));
   };
   
+  // Add/remove functions for dietary preferences
   const addDietaryPref = () => {
     if (newDietaryPref.trim() !== '' && !dietaryPrefs.includes(newDietaryPref.trim())) {
       setDietaryPrefs([...dietaryPrefs, newDietaryPref.trim()]);
@@ -176,214 +199,240 @@ function GenerateRecipes() {
     setDietaryPrefs(dietaryPrefs.filter((_, i) => i !== index));
   };
 
-  // Modified function to start voice recognition for any category
+  // Helper function to capitalize first letter of each word
+  const capitalizeFirstLetter = (string: string): string => {
+    return string.split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+  
+  // Speech recognition functions
   const startVoiceRecognition = () => {
+    if (typeof window === 'undefined') return;
+    
     // Check browser compatibility
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    if (!speechSupported) {
       toast.error('Voice recognition is not supported in your browser');
       return;
     }
     
-    // Create speech recognition instance
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    
-    // Configure recognition settings
-    recognition.lang = 'en-US';
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    
-    // Store the recognition instance so we can stop it later
-    setRecognitionInstance(recognition);
-    
-    // Set listening state
-    setListening(true);
-    setTranscript('');
-    
-    // Get the current category based on step
-    let category: 'ingredients' | 'equipment' | 'staples' = 'ingredients';
-    if (step === 2) category = 'equipment';
-    if (step === 3) category = 'staples';
-    
-    // Get category-specific display name for toast messages
-    const categoryDisplayName = 
-      category === 'ingredients' ? 'ingredient' : 
-      category === 'equipment' ? 'equipment item' : 'staple item';
-    
-    // Handle recognition results
-    recognition.onresult = (event: any) => {
-      // Get the last result (most recent utterance)
-      const lastResultIndex = event.results.length - 1;
-      const transcript = event.results[lastResultIndex][0].transcript;
-      
-      setTranscript(transcript);
-      
-      // Parse items from transcript based on current category
-      const parsedItems = parseItemsFromText(transcript, category);
-      
-      if (parsedItems.length > 0) {
-        // Add unique items to the appropriate list based on category
-        if (category === 'ingredients') {
-          setIngredients((prevItems) => {
-            const existingItemsSet = new Set(prevItems.map(i => i.toLowerCase()));
-            const newItems = parsedItems.filter(
-              item => !existingItemsSet.has(item.toLowerCase())
-            );
-            return [...prevItems, ...newItems.map(capitalizeFirstLetter)];
-          });
-        } else if (category === 'equipment') {
-          setEquipment((prevItems) => {
-            const existingItemsSet = new Set(prevItems.map(i => i.toLowerCase()));
-            const newItems = parsedItems.filter(
-              item => !existingItemsSet.has(item.toLowerCase())
-            );
-            return [...prevItems, ...newItems.map(capitalizeFirstLetter)];
-          });
-        } else if (category === 'staples') {
-          setStaples((prevItems) => {
-            const existingItemsSet = new Set(prevItems.map(i => i.toLowerCase()));
-            const newItems = parsedItems.filter(
-              item => !existingItemsSet.has(item.toLowerCase())
-            );
-            return [...prevItems, ...newItems.map(capitalizeFirstLetter)];
-          });
-        }
-        
-        // Show success message with the items that were added
-        if (parsedItems.length > 0) {
-          toast.success(
-            `Added ${parsedItems.length} ${categoryDisplayName}${parsedItems.length === 1 ? '' : 's'}: ${parsedItems.join(', ')}`,
-            { duration: 4000 }
-          );
-        }
-      } else {
-        toast.error(`No ${categoryDisplayName}s detected. Please try again.`);
-      }
-    };
-    
-    // Handle errors
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error', event.error);
-      setListening(false);
-      
-      // Provide helpful error messages based on the error type
-      if (event.error === 'not-allowed') {
-        toast.error('Microphone access denied. Please allow microphone permissions.');
-      } else if (event.error === 'no-speech') {
-        toast.error('No speech detected. Please try again.');
-      } else {
-        toast.error('Voice recognition error. Please try again.');
-      }
-    };
-    
-    // Handle end of recognition
-    recognition.onend = () => {
-      setListening(false);
-      setRecognitionInstance(null);
-    };
-    
-    // Start recognition with error handling
     try {
+      // Create speech recognition instance
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      
+      if (!SpeechRecognition) {
+        toast.error('Voice recognition is not available');
+        return;
+      }
+      
+      const recognition = new SpeechRecognition();
+      
+      // Store in ref for cleanup
+      recognitionRef.current = recognition;
+      
+      // Configure recognition settings
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      
+      // Set listening state
+      setListening(true);
+      setTranscript('');
+      
+      // Get the current category based on step
+      let category: 'ingredients' | 'equipment' | 'staples' = 'ingredients';
+      if (step === 2) category = 'equipment';
+      if (step === 3) category = 'staples';
+      
+      // Get category-specific display name for toast messages
+      const categoryDisplayName = 
+        category === 'ingredients' ? 'ingredient' : 
+        category === 'equipment' ? 'equipment item' : 'staple item';
+      
+      // Handle recognition results
+      recognition.onresult = (event) => {
+        // Get the last result (most recent utterance)
+        const lastResultIndex = event.results.length - 1;
+        const transcriptText = event.results[lastResultIndex][0].transcript;
+        
+        setTranscript(transcriptText);
+        
+        // Parse items from transcript based on current category
+        const parsedItems = parseItemsFromText(transcriptText, category);
+        
+        if (parsedItems.length > 0) {
+          // Add unique items to the appropriate list based on category
+          if (category === 'ingredients') {
+            setIngredients((prevItems) => {
+              const existingItemsSet = new Set(prevItems.map(i => i.toLowerCase()));
+              const newItems = parsedItems.filter(
+                item => !existingItemsSet.has(item.toLowerCase())
+              );
+              return [...prevItems, ...newItems.map(capitalizeFirstLetter)];
+            });
+          } else if (category === 'equipment') {
+            setEquipment((prevItems) => {
+              const existingItemsSet = new Set(prevItems.map(i => i.toLowerCase()));
+              const newItems = parsedItems.filter(
+                item => !existingItemsSet.has(item.toLowerCase())
+              );
+              return [...prevItems, ...newItems.map(capitalizeFirstLetter)];
+            });
+          } else if (category === 'staples') {
+            setStaples((prevItems) => {
+              const existingItemsSet = new Set(prevItems.map(i => i.toLowerCase()));
+              const newItems = parsedItems.filter(
+                item => !existingItemsSet.has(item.toLowerCase())
+              );
+              return [...prevItems, ...newItems.map(capitalizeFirstLetter)];
+            });
+          }
+          
+          // Show success message with the items that were added
+          if (parsedItems.length > 0) {
+            toast.success(
+              `Added ${parsedItems.length} ${categoryDisplayName}${parsedItems.length === 1 ? '' : 's'}: ${parsedItems.join(', ')}`,
+              { duration: 4000 }
+            );
+          }
+        } else {
+          toast.error(`No ${categoryDisplayName}s detected. Please try again.`);
+        }
+      };
+      
+      // Handle errors
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error', event.error);
+        setListening(false);
+        recognitionRef.current = null;
+        
+        // Provide helpful error messages based on the error type
+        if (event.error === 'not-allowed') {
+          toast.error('Microphone access denied. Please allow microphone permissions.');
+        } else if (event.error === 'no-speech') {
+          toast.error('No speech detected. Please try again.');
+        } else {
+          toast.error('Voice recognition error. Please try again.');
+        }
+      };
+      
+      // Handle end of recognition
+      recognition.onend = () => {
+        setListening(false);
+        recognitionRef.current = null;
+      };
+      
+      // Start recognition with error handling
       recognition.start();
     } catch (error) {
       console.error('Speech recognition error', error);
       setListening(false);
-      setRecognitionInstance(null);
+      recognitionRef.current = null;
       toast.error('Could not start voice recognition. Please check your microphone permissions.');
     }
   };
-
-  // Add function to stop recognition
+  
+  // Stop recognition
   const stopVoiceRecognition = () => {
-    if (recognitionInstance) {
-      recognitionInstance.stop();
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.error('Error stopping recognition:', error);
+      }
+      
       setListening(false);
-      setRecognitionInstance(null);
+      recognitionRef.current = null;
       
       if (transcript) {
         toast.info('Voice recognition stopped');
       }
     }
-  }
-
-  // More flexible parsing function that adapts based on category
+  };
+  
+  // Parse items from text
   const parseItemsFromText = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string[] => {
-    // Normalize text: convert to lowercase
-    let normalizedText = text.toLowerCase();
-    
-    // Different parsing strategies based on category
-    if (category === 'ingredients') {
-      // Replace common fraction words with symbols for ingredients
-      normalizedText = normalizedText
-        .replace(/\bhalf\b/g, '1/2')
-        .replace(/\bhalf a\b/g, '1/2')
-        .replace(/\bquarter\b/g, '1/4')
-        .replace(/\bthird\b/g, '1/3')
-        .replace(/\bthree quarters\b/g, '3/4');
+    try {
+      // Normalize text: convert to lowercase
+      let normalizedText = text.toLowerCase();
       
-      // Convert number words to digits but keep them as standalone words
-      normalizedText = normalizedText
-        .replace(/\bone\b/g, '1')
-        .replace(/\btwo\b/g, '2')
-        .replace(/\bthree\b/g, '3')
-        .replace(/\bfour\b/g, '4')
-        .replace(/\bfive\b/g, '5')
-        .replace(/\bsix\b/g, '6')
-        .replace(/\bseven\b/g, '7')
-        .replace(/\beight\b/g, '8')
-        .replace(/\bnine\b/g, '9')
-        .replace(/\bten\b/g, '10');
-    }
-    
-    // Split by common delimiters for all categories
-    const explicitSplits = normalizedText.split(/(?:,|\band\b|\balso\b|\bplus\b|\bthen\b)\s*/i);
-    
-    // Array to hold the parsed items
-    let items: string[] = [];
-    
-    // Process each chunk that might contain multiple items
-    for (let chunk of explicitSplits) {
-      // Remove filler words
-      chunk = chunk.replace(/\b(?:uhh?|umm?|err?|like|maybe|i think|i have|i've got|got|have)\b/gi, '');
-      
+      // Different parsing strategies based on category
       if (category === 'ingredients') {
-        // More detailed parsing for ingredients
+        // Replace common fraction words with symbols for ingredients
+        normalizedText = normalizedText
+          .replace(/\bhalf\b/g, '1/2')
+          .replace(/\bhalf a\b/g, '1/2')
+          .replace(/\bquarter\b/g, '1/4')
+          .replace(/\bthird\b/g, '1/3')
+          .replace(/\bthree quarters\b/g, '3/4');
         
-        // Identify if the chunk might contain multiple ingredients indicated by "some" keyword
-        const someBasedChunks = chunk.split(/\bsome\b/i).map(part => part.trim()).filter(Boolean);
+        // Convert number words to digits but keep them as standalone words
+        normalizedText = normalizedText
+          .replace(/\bone\b/g, '1')
+          .replace(/\btwo\b/g, '2')
+          .replace(/\bthree\b/g, '3')
+          .replace(/\bfour\b/g, '4')
+          .replace(/\bfive\b/g, '5')
+          .replace(/\bsix\b/g, '6')
+          .replace(/\bseven\b/g, '7')
+          .replace(/\beight\b/g, '8')
+          .replace(/\bnine\b/g, '9')
+          .replace(/\bten\b/g, '10');
+      }
+      
+      // Split by common delimiters for all categories
+      const explicitSplits = normalizedText.split(/(?:,|\band\b|\balso\b|\bplus\b|\bthen\b)\s*/i);
+      
+      // Array to hold the parsed items
+      let items: string[] = [];
+      
+      // Process each chunk that might contain multiple items
+      for (let chunk of explicitSplits) {
+        // Remove filler words
+        chunk = chunk.replace(/\b(?:uhh?|umm?|err?|like|maybe|i think|i have|i've got|got|have)\b/gi, '');
         
-        if (someBasedChunks.length > 1) {
-          // If "some" was used as a separator, process each part
-          for (let part of someBasedChunks) {
-            if (part) items.push(cleanItem(part, category));
+        if (category === 'ingredients') {
+          // More detailed parsing for ingredients
+          
+          // Identify if the chunk might contain multiple ingredients indicated by "some" keyword
+          const someBasedChunks = chunk.split(/\bsome\b/i).map(part => part.trim()).filter(Boolean);
+          
+          if (someBasedChunks.length > 1) {
+            // If "some" was used as a separator, process each part
+            for (let part of someBasedChunks) {
+              if (part) items.push(cleanItem(part, category));
+            }
+          } else {
+            // Check if this chunk might contain a quantity followed by an ingredient
+            const quantityMatch = chunk.match(/^(\d+(?:\/\d+)?)\s+([a-z\s]+)$/);
+            
+            if (quantityMatch) {
+              // We found a quantity followed by an ingredient
+              const quantity = quantityMatch[1];
+              const ingredientText = quantityMatch[2].trim();
+              items.push(`${quantity} ${ingredientText}`);
+            } else {
+              // No quantity pattern found, just clean it normally
+              const cleaned = cleanItem(chunk, category);
+              if (cleaned) items.push(cleaned);
+            }
           }
         } else {
-          // Check if this chunk might contain a quantity followed by an ingredient
-          const quantityMatch = chunk.match(/^(\d+(?:\/\d+)?)\s+([a-z\s]+)$/);
-          
-          if (quantityMatch) {
-            // We found a quantity followed by an ingredient
-            const quantity = quantityMatch[1];
-            const ingredientText = quantityMatch[2].trim();
-            items.push(`${quantity} ${ingredientText}`);
-          } else {
-            // No quantity pattern found, just clean it normally
-            const cleaned = cleanItem(chunk, category);
-            if (cleaned) items.push(cleaned);
-          }
+          // Simpler parsing for equipment and staples
+          const cleaned = cleanItem(chunk, category);
+          if (cleaned) items.push(cleaned);
         }
-      } else {
-        // Simpler parsing for equipment and staples
-        const cleaned = cleanItem(chunk, category);
-        if (cleaned) items.push(cleaned);
       }
+      
+      return items.filter(i => i.length > 0);
+    } catch (error) {
+      console.error('Error parsing speech:', error);
+      return [];
     }
-    
-    return items.filter(i => i.length > 0);
   };
-
-  // Helper function to clean up individual item text based on category
+  
+  // Helper function to clean up individual item text
   const cleanItem = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string => {
     // Remove common articles from the beginning for all categories
     let cleaned = text.replace(/^\s*(?:a|an|the|some|few|little)\s+/i, '');
@@ -409,15 +458,8 @@ function GenerateRecipes() {
     
     return cleaned;
   };
-
-  // Helper function to capitalize first letter of each word
-  const capitalizeFirstLetter = (string: string): string => {
-    return string.split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
-
-  // New function to add common preset items
+  
+  // Add common preset items
   const addCommonItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary') => {
     switch (category) {
       case 'ingredients':
@@ -443,6 +485,7 @@ function GenerateRecipes() {
     }
   };
   
+  // Navigation functions
   const nextStep = async () => {
     if (step === 1 && ingredients.length === 0) {
       setError('Please add at least one ingredient');
@@ -478,6 +521,7 @@ function GenerateRecipes() {
     }
   };
   
+  // Generate recipes
   const generateRecipes = async () => {
     if (ingredients.length === 0) {
       setError('Please add at least one ingredient');
@@ -495,7 +539,12 @@ function GenerateRecipes() {
     
     try {
       // Update user stats
-      await incrementRecipesGenerated(currentUser.uid);
+      try {
+        await incrementRecipesGenerated(currentUser.uid);
+      } catch (error) {
+        console.error('Error incrementing recipes generated:', error);
+        // Continue anyway - this isn't critical
+      }
       
       // Get the user's ID token for authentication
       const token = await currentUser.getIdToken();
@@ -509,14 +558,27 @@ function GenerateRecipes() {
       }, {
         headers: {
           'Authorization': `Bearer ${token}`
-        }
+        },
+        timeout: 60000 // 60 second timeout for recipe generation
       });
       
-      // Store the recipes in session storage to access them on the results page
-      sessionStorage.setItem('generatedRecipes', JSON.stringify(response.data.recipes));
+      if (!response.data.recipes || response.data.recipes.length === 0) {
+        throw new Error('No recipes were generated');
+      }
       
-      // Navigate to the results page
-      router.push('/recipes/results');
+      // Store the recipes in session storage to access them on the results page
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('generatedRecipes', JSON.stringify(response.data.recipes));
+          
+          // Navigate to the results page
+          router.push('/recipes/results');
+        } catch (error) {
+          console.error('Error storing recipes in session storage:', error);
+          setError('Failed to save generated recipes. Please try again.');
+          setGenerating(false);
+        }
+      }
     } catch (error: any) {
       console.error('Error generating recipes:', error);
       
@@ -526,10 +588,14 @@ function GenerateRecipes() {
         setTimeout(() => router.push('/signin'), 2000);
       } else if (error.response?.status === 403 && error.response?.data?.limitExceeded) {
         setError('You have reached your free tier limit. Please upgrade to continue.');
+      } else if (error.response?.data?.error) {
+        setError(error.response.data.error);
+      } else if (error.message) {
+        setError(`Error: ${error.message}`);
       } else {
-        setError(error.response?.data?.error || 'Failed to generate recipes');
+        setError('Failed to generate recipes. Please try again.');
       }
-    } finally {
+      
       setGenerating(false);
     }
   };
@@ -686,8 +752,8 @@ function GenerateRecipes() {
                 Add
               </Button>
               
-              {/* Voice button appears in steps 1-3 (ingredients, equipment, staples) instead of just step 1 */}
-              {step <= 3 && (
+              {/* Voice button only shows if speech is supported and in steps 1-3 */}
+              {speechSupported && step <= 3 && (
                 <Button 
                   variant={listening ? "destructive" : "outline"}
                   onClick={listening ? stopVoiceRecognition : startVoiceRecognition}
@@ -728,7 +794,7 @@ function GenerateRecipes() {
               </div>
             )}
 
-            {/* Common Items Section - This must always appear regardless of preference loading state */}
+            {/* Common Items Section */}
             <div className="mt-2">
               <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
                 Common {step === 1 ? 'Ingredients' : step === 2 ? 'Equipment' : step === 3 ? 'Staples' : 'Preferences'}
@@ -826,4 +892,52 @@ function GenerateRecipes() {
       </Card>
     </div>
   );
+}
+
+// TypeScript interfaces for Speech Recognition API
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+  isFinal: boolean;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: ((event: Event) => void) | null;
+}
+
+// Extend the Window interface to include SpeechRecognition
+declare global {
+  interface Window { 
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
 }
