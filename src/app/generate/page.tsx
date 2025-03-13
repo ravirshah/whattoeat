@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { getUserPreferences, updateUserPreferences, incrementRecipesGenerated } from '@/lib/db';
+import { toast } from 'sonner';
 import axios from 'axios';
 import MainLayout from '@/components/layout/MainLayout';
 import AuthWrapper from '@/components/auth/AuthWrapper';
@@ -38,6 +39,10 @@ import {
   ShoppingBag,
   AlertTriangle
 } from 'lucide-react';
+// Remove this line since Mic is already imported above
+import { Square } from 'lucide-react';
+
+
 
 // Common preset options - moved to the top for reusability
 const COMMON_INGREDIENTS = [
@@ -76,7 +81,7 @@ export default function GenerateRecipesPage() {
 function GenerateRecipes() {
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
-  
+  const [recognitionInstance, setRecognitionInstance] = useState<any>(null);
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [newIngredient, setNewIngredient] = useState('');
   const [equipment, setEquipment] = useState<string[]>([]);
@@ -201,20 +206,202 @@ function GenerateRecipes() {
   };
   
   const startVoiceRecognition = () => {
-    if (!('webkitSpeechRecognition' in window)) {
-      alert('Voice recognition is not supported in your browser');
+    // Check browser compatibility
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast.error('Voice recognition is not supported in your browser');
       return;
     }
     
+    // Create speech recognition instance
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    // Configure recognition settings
+    recognition.lang = 'en-US';
+    recognition.continuous = true; // Changed to true for longer listening sessions
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    
+    // Store the recognition instance so we can stop it later
+    setRecognitionInstance(recognition);
+    
+    // Set listening state
     setListening(true);
-    setTimeout(() => {
-      setListening(false);
-      setTranscript('chicken, potatoes, carrots');
+    setTranscript('');
+    
+    // Handle recognition results
+    recognition.onresult = (event: any) => {
+      // Get the last result (most recent utterance)
+      const lastResultIndex = event.results.length - 1;
+      const transcript = event.results[lastResultIndex][0].transcript;
       
-      const items = ['chicken', 'potatoes', 'carrots'];
-      setIngredients([...new Set([...ingredients, ...items])]);
-    }, 2000);
+      setTranscript(transcript);
+      
+      // Parse ingredients from transcript
+      const parsedIngredients = parseIngredientsFromText(transcript);
+      
+      if (parsedIngredients.length > 0) {
+        // Add unique ingredients to the list
+        setIngredients((prevIngredients) => {
+          // Create a set of existing ingredients for faster lookup
+          const existingIngredientsSet = new Set(prevIngredients.map(i => i.toLowerCase()));
+          
+          // Only add ingredients that don't already exist (case insensitive)
+          const newIngredients = parsedIngredients.filter(
+            ingredient => !existingIngredientsSet.has(ingredient.toLowerCase())
+          );
+          
+          // Return combined list with properly cased ingredients
+          return [...prevIngredients, ...newIngredients.map(capitalizeFirstLetter)];
+        });
+        
+        // Show success message with the ingredients that were added
+        if (parsedIngredients.length > 0) {
+          toast.success(
+            `Added ${parsedIngredients.length} ingredient${parsedIngredients.length === 1 ? '' : 's'}: ${parsedIngredients.join(', ')}`,
+            { duration: 4000 }
+          );
+        }
+      } else {
+        toast.error('No ingredients detected. Please try again.');
+      }
+    };
+    
+    // Handle errors
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error', event.error);
+      setListening(false);
+      
+      // Provide helpful error messages based on the error type
+      if (event.error === 'not-allowed') {
+        toast.error('Microphone access denied. Please allow microphone permissions.');
+      } else if (event.error === 'no-speech') {
+        toast.error('No speech detected. Please try again.');
+      } else {
+        toast.error('Voice recognition error. Please try again.');
+      }
+    };
+    
+    // Handle end of recognition
+    recognition.onend = () => {
+      setListening(false);
+      setRecognitionInstance(null);
+    };
+    
+    // Start recognition with error handling
+    try {
+      recognition.start();
+    } catch (error) {
+      console.error('Speech recognition error', error);
+      setListening(false);
+      setRecognitionInstance(null);
+      toast.error('Could not start voice recognition. Please check your microphone permissions.');
+    }
   };
+
+  // Add function to stop recognition
+  const stopVoiceRecognition = () => {
+    if (recognitionInstance) {
+      recognitionInstance.stop();
+      setListening(false);
+      setRecognitionInstance(null);
+      
+      if (transcript) {
+        toast.info('Voice recognition stopped');
+      }
+    }
+  }
+
+  // Helper function to capitalize first letter of each word
+  const capitalizeFirstLetter = (string: string): string => {
+    return string.split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  // Function to parse ingredients from text
+  const parseIngredientsFromText = (text: string): string[] => {
+    // Normalize text: convert to lowercase
+    let normalizedText = text.toLowerCase();
+    
+    // Replace common fraction words with symbols
+    normalizedText = normalizedText
+      .replace(/\bhalf\b/g, '1/2')
+      .replace(/\bhalf a\b/g, '1/2')
+      .replace(/\bquarter\b/g, '1/4')
+      .replace(/\bthird\b/g, '1/3')
+      .replace(/\bthree quarters\b/g, '3/4');
+    
+    // Convert number words to digits but keep them as standalone words
+    // This helps prevent merging quantities with ingredients
+    normalizedText = normalizedText
+      .replace(/\bone\b/g, '1')
+      .replace(/\btwo\b/g, '2')
+      .replace(/\bthree\b/g, '3')
+      .replace(/\bfour\b/g, '4')
+      .replace(/\bfive\b/g, '5')
+      .replace(/\bsix\b/g, '6')
+      .replace(/\bseven\b/g, '7')
+      .replace(/\beight\b/g, '8')
+      .replace(/\bnine\b/g, '9')
+      .replace(/\bten\b/g, '10');
+      
+    // First, split by explicit delimiters (commas and conjunctions)
+    let ingredients: string[] = [];
+    
+    // Split by common delimiters
+    const explicitSplits = normalizedText.split(/(?:,|\band\b|\balso\b|\bplus\b|\bthen\b)\s*/i);
+    
+    // Process each chunk that might contain multiple ingredients
+    for (let chunk of explicitSplits) {
+      // Remove filler words
+      chunk = chunk.replace(/\b(?:uhh?|umm?|err?|like|maybe|i think|i have|i've got|got|have)\b/gi, '');
+      
+      // Identify if the chunk might contain multiple ingredients indicated by "some" keyword
+      const someBasedChunks = chunk.split(/\bsome\b/i).map(part => part.trim()).filter(Boolean);
+      
+      if (someBasedChunks.length > 1) {
+        // If "some" was used as a separator, process each part
+        for (let part of someBasedChunks) {
+          if (part) ingredients.push(cleanIngredient(part));
+        }
+      } else {
+        // Check if this chunk might contain a quantity followed by an ingredient
+        const quantityMatch = chunk.match(/^(\d+(?:\/\d+)?)\s+([a-z\s]+)$/);
+        
+        if (quantityMatch) {
+          // We found a quantity followed by an ingredient
+          const quantity = quantityMatch[1];
+          const ingredientText = quantityMatch[2].trim();
+          ingredients.push(`${quantity} ${ingredientText}`);
+        } else {
+          // No quantity pattern found, just clean it normally
+          const cleaned = cleanIngredient(chunk);
+          if (cleaned) ingredients.push(cleaned);
+        }
+      }
+    }
+    
+    return ingredients.filter(i => i.length > 0);
+  };
+
+  // Helper function to clean up individual ingredient text
+  const cleanIngredient = (text: string): string => {
+    // Remove common articles from the beginning
+    let cleaned = text.replace(/^\s*(?:a|an|the|some|few|little)\s+/i, '');
+    
+    // Handle "head of" pattern (e.g., "head of broccoli" -> "broccoli")
+    cleaned = cleaned.replace(/\b(head|bunch|clove|piece)s?\s+of\s+/i, '');
+    
+    // Handle common quantity expressions
+    cleaned = cleaned.replace(/\ba\s+(?:little|bit\s+of)\s+/i, '');
+    
+    // Clean up any extra whitespace
+    cleaned = cleaned.trim();
+    
+    return cleaned;
+  };
+
   
   const nextStep = async () => {
     if (step === 1 && ingredients.length === 0) {
@@ -463,27 +650,45 @@ function GenerateRecipes() {
               </Button>
               
               {step === 1 && (
-                <Button 
-                  variant="outline" 
-                  disabled={listening}
-                  onClick={startVoiceRecognition}
-                  className={listening ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" : ""}
-                >
-                  {listening ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <Mic className="h-4 w-4 mr-1" />
-                  )}
-                  {listening ? "Listening..." : "Voice"}
-                </Button>
-              )}
+  <Button 
+    variant={listening ? "destructive" : "outline"}
+    onClick={listening ? stopVoiceRecognition : startVoiceRecognition}
+    className={listening ? "animate-pulse" : ""}
+  >
+    {listening ? (
+      <>
+        <Square className="h-4 w-4 mr-1" />
+        Stop
+      </>
+    ) : (
+      <>
+        <Mic className="h-4 w-4 mr-1" />
+        Voice
+      </>
+    )}
+  </Button>
+)}
             </div>
             
-            {transcript && step === 1 && (
-              <p className="text-sm text-gray-500 italic">
-                Heard: "{transcript}"
-              </p>
-            )}
+            {/* Add this below the flex container with the input and buttons */}
+{listening && (
+  <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-md">
+    <div className="flex items-center space-x-2">
+      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+      <p className="text-sm text-red-600 dark:text-red-400">
+        Listening... Say your ingredients and click Stop when done
+      </p>
+    </div>
+  </div>
+)}
+
+{transcript && !listening && (
+  <div className="mt-2">
+    <p className="text-sm text-gray-600 dark:text-gray-400">
+      <span className="font-medium">Last recording:</span> "{transcript}"
+    </p>
+  </div>
+)}
 
             {/* Common Items Section - This must always appear regardless of preference loading state */}
             <div className="mt-2">
