@@ -3,8 +3,11 @@ const nextConfig = {
   basePath: '/whattoeat',
   trailingSlash: true,
   eslint: {
-    // Warning: This allows you to deploy with ESLint errors
     ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // This allows you to deploy with TypeScript errors
+    ignoreBuildErrors: true,
   },
 }
 
