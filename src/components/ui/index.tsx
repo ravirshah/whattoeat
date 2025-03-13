@@ -3,6 +3,7 @@
 
 export { Alert, AlertTitle, AlertDescription } from "./alert"
 export { Avatar, AvatarImage, AvatarFallback } from "./avatar"
+export { Badge, badgeVariants } from "./badge"
 export { Button, buttonVariants } from "./button"
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent } from "./card"
 export {
@@ -30,5 +31,4 @@ export { Separator } from "./separator"
 export { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from "./sheet"
 export { Switch } from "./switch"
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs"
-export { Toast, ToastProvider, ToastViewport } from "./toast"
-export { useToast, toast } from "./use-toast"
+export { Toaster } from "./sonner"

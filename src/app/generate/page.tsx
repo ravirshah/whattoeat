@@ -5,8 +5,51 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { getUserPreferences, updateUserPreferences, incrementRecipesGenerated } from '@/lib/db';
 import axios from 'axios';
+import MainLayout from '@/components/layout/MainLayout';
+import AuthWrapper from '@/components/auth/AuthWrapper';
+import { 
+  Button, 
+  Input, 
+  Card, 
+  CardContent, 
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+  Alert,
+  AlertDescription,
+  Badge,
+  Progress,
+  Tabs,
+  TabsList,
+  TabsTrigger, 
+  TabsContent
+} from '@/components/ui';
+import { 
+  Loader2, 
+  AlertCircle, 
+  ChevronLeft, 
+  ChevronRight, 
+  Plus, 
+  X, 
+  Mic, 
+  CookingPot,
+  Utensils,
+  ShoppingBag,
+  AlertTriangle
+} from 'lucide-react';
 
-export default function GenerateRecipes() {
+export default function GenerateRecipesPage() {
+  return (
+    <AuthWrapper>
+      <MainLayout>
+        <GenerateRecipes />
+      </MainLayout>
+    </AuthWrapper>
+  );
+}
+
+function GenerateRecipes() {
   const { currentUser, loading } = useAuth();
   const router = useRouter();
   
@@ -26,13 +69,6 @@ export default function GenerateRecipes() {
   // Voice recognition state
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  
-  // Auth redirect check
-  useEffect(() => {
-    if (!loading && !currentUser) {
-      router.push('/signin');
-    }
-  }, [currentUser, loading, router]);
   
   // Load user preferences
   useEffect(() => {
@@ -209,199 +245,226 @@ export default function GenerateRecipes() {
     }
   };
   
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
-      </div>
-    );
-  }
+  // Get the current step details
+  const getStepContent = () => {
+    switch (step) {
+      case 1:
+        return {
+          title: "What ingredients do you have?",
+          description: "Add the main ingredients you want to use in your recipe.",
+          icon: <ShoppingBag className="h-6 w-6" />,
+          inputPlaceholder: "Add an ingredient...",
+          inputValue: newIngredient,
+          setInputValue: setNewIngredient,
+          addItem: addIngredient,
+          items: ingredients,
+          removeItem: removeIngredient,
+          emptyMessage: "No ingredients added yet",
+          badgeClassName: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+        };
+      
+      case 2:
+        return {
+          title: "What cooking equipment do you have?",
+          description: "Add the kitchen equipment you have available.",
+          icon: <Utensils className="h-6 w-6" />,
+          inputPlaceholder: "Add equipment...",
+          inputValue: newEquipment,
+          setInputValue: setNewEquipment,
+          addItem: addEquipment,
+          items: equipment,
+          removeItem: removeEquipment,
+          emptyMessage: "No equipment added yet",
+          badgeClassName: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+        };
+      
+      case 3:
+        return {
+          title: "What staples do you keep in your pantry?",
+          description: "Add basic ingredients you typically have on hand.",
+          icon: <ShoppingBag className="h-6 w-6" />,
+          inputPlaceholder: "Add a staple...",
+          inputValue: newStaple,
+          setInputValue: setNewStaple,
+          addItem: addStaple,
+          items: staples,
+          removeItem: removeStaple,
+          emptyMessage: "No staples added yet",
+          badgeClassName: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+        };
+      
+      case 4:
+        return {
+          title: "Any dietary preferences or restrictions?",
+          description: "Add any dietary needs or preferences you have.",
+          icon: <AlertTriangle className="h-6 w-6" />,
+          inputPlaceholder: "Add a dietary preference...",
+          inputValue: newDietaryPref,
+          setInputValue: setNewDietaryPref,
+          addItem: addDietaryPref,
+          items: dietaryPrefs,
+          removeItem: removeDietaryPref,
+          emptyMessage: "No dietary preferences added yet",
+          badgeClassName: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+        };
+      
+      default:
+        return {
+          title: "",
+          description: "",
+          icon: null,
+          inputPlaceholder: "",
+          inputValue: "",
+          setInputValue: () => {},
+          addItem: () => {},
+          items: [],
+          removeItem: () => {},
+          emptyMessage: "",
+          badgeClassName: ""
+        };
+    }
+  };
+  
+  const stepContent = getStepContent();
   
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold text-center mb-8 text-gray-900">
-        Generate Recipes
-      </h1>
-      
-      {error && (
-        <div className="mb-6 p-3 bg-red-100 text-red-700 rounded-md">
-          {error}
-        </div>
-      )}
-      
-      {/* Step 1: Ingredients */}
-      {step === 1 && (
-        <div className="space-y-6">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Step 1: What ingredients do you have?
-          </h2>
-          
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newIngredient}
-              onChange={(e) => setNewIngredient(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && addIngredient()}
-              placeholder="Add an ingredient..."
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
-            />
-            <button
-              onClick={addIngredient}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700"
-            >
-              Add
-            </button>
-            <button
-              onClick={startVoiceRecognition}
-              disabled={listening}
-              className={`px-4 py-2 text-white rounded-md flex items-center ${
-                listening ? 'bg-red-600 animate-pulse' : 'bg-blue-600 hover:bg-blue-700'
-              }`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              </svg>
-              {listening ? 'Listening...' : 'Voice'}
-            </button>
-          </div>
-          
-          {transcript && (
-            <p className="text-sm text-gray-500 italic">
-              Heard: "{transcript}"
-            </p>
-          )}
-          
-          <div className="mt-4">
-            <h3 className="text-sm font-medium text-gray-900">Your ingredients:</h3>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {ingredients.length === 0 ? (
-                <p className="text-sm text-gray-500 italic">No ingredients added yet</p>
-              ) : (
-                ingredients.map((item, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800"
-                  >
-                    {item}
-                    <button
-                      type="button"
-                      onClick={() => removeIngredient(index)}
-                      className="ml-1.5 inline-flex items-center justify-center h-4 w-4 rounded-full text-emerald-400 hover:bg-emerald-200 hover:text-emerald-600 focus:outline-none"
-                    >
-                      <span className="sr-only">Remove {item}</span>
-                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </span>
-                ))
-              )}
+    <div className="container mx-auto px-4 py-12">
+      <Card className="max-w-2xl mx-auto">
+        <CardHeader>
+          <div className="flex items-center justify-between mb-2">
+            <CardTitle className="text-2xl font-bold flex items-center">
+              <CookingPot className="mr-2 h-6 w-6 text-emerald-600" />
+              Generate Recipes
+            </CardTitle>
+            <div className="text-sm font-medium text-gray-500">
+              Step {step} of 4
             </div>
           </div>
-        </div>
-      )}
-      
-      {/* Step 2: Equipment */}
-      {step === 2 && (
-        <div className="space-y-6">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Step 2: What cooking equipment do you have?
-          </h2>
-          
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newEquipment}
-              onChange={(e) => setNewEquipment(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && addEquipment()}
-              placeholder="Add equipment..."
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
-            />
-            <button
-              onClick={addEquipment}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700"
-            >
-              Add
-            </button>
+          <Progress value={step * 25} className="h-2" />
+        </CardHeader>
+        
+        {error && (
+          <div className="px-6">
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           </div>
-          
-          <div className="mt-4">
-            <h3 className="text-sm font-medium text-gray-900">Your equipment:</h3>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {equipment.length === 0 ? (
-                <p className="text-sm text-gray-500 italic">No equipment added yet</p>
-              ) : (
-                equipment.map((item, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-                  >
-                    {item}
-                    <button
-                      type="button"
-                      onClick={() => removeEquipment(index)}
-                      className="ml-1.5 inline-flex items-center justify-center h-4 w-4 rounded-full text-blue-400 hover:bg-blue-200 hover:text-blue-600 focus:outline-none"
-                    >
-                      <span className="sr-only">Remove {item}</span>
-                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </span>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Steps 3 and 4 have similar structure - omitted for brevity */}
-      
-      <div className="mt-8 flex justify-between">
-        {step > 1 && (
-          <button
-            onClick={prevStep}
-            className="flex items-center px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            <svg className="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-            Back
-          </button>
         )}
         
-        <button
-          onClick={nextStep}
-          disabled={generating}
-          className={`flex items-center px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 ml-auto ${
-            generating ? 'opacity-75 cursor-not-allowed' : ''
-          }`}
-        >
-          {generating ? (
-            <>
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Generating...
-            </>
-          ) : step < 4 ? (
-            <>
-              Next
-              <svg className="ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-              </svg>
-            </>
-          ) : (
-            <>
-              Generate Recipes
-              <svg className="ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clipRule="evenodd" />
-              </svg>
-            </>
-          )}
-        </button>
-      </div>
+        <CardContent className="pt-6">
+          <div className="space-y-6">
+            <div className="flex items-start gap-4">
+              <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
+                {stepContent.icon}
+              </div>
+              <div>
+                <h3 className="text-lg font-medium mb-1">{stepContent.title}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{stepContent.description}</p>
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                value={stepContent.inputValue}
+                onChange={(e) => stepContent.setInputValue(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && stepContent.addItem()}
+                placeholder={stepContent.inputPlaceholder}
+                className="flex-1"
+              />
+              <Button onClick={stepContent.addItem}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add
+              </Button>
+              
+              {step === 1 && (
+                <Button 
+                  variant="outline" 
+                  disabled={listening}
+                  onClick={startVoiceRecognition}
+                  className={listening ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" : ""}
+                >
+                  {listening ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Mic className="h-4 w-4 mr-1" />
+                  )}
+                  {listening ? "Listening..." : "Voice"}
+                </Button>
+              )}
+            </div>
+            
+            {transcript && step === 1 && (
+              <p className="text-sm text-gray-500 italic">
+                Heard: "{transcript}"
+              </p>
+            )}
+            
+            <div>
+              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                {stepContent.items.length > 0 ? `Your ${step === 1 ? 'ingredients' : step === 2 ? 'equipment' : step === 3 ? 'staples' : 'preferences'} (${stepContent.items.length})` : ''}
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {stepContent.items.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic">{stepContent.emptyMessage}</p>
+                ) : (
+                  stepContent.items.map((item, index) => (
+                    <Badge
+                      key={index}
+                      variant="outline"
+                      className={stepContent.badgeClassName}
+                    >
+                      {item}
+                      <button
+                        type="button"
+                        onClick={() => stepContent.removeItem(index)}
+                        className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-1"
+                      >
+                        <X className="h-3 w-3" />
+                        <span className="sr-only">Remove {item}</span>
+                      </button>
+                    </Badge>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+        
+        <CardFooter className="flex justify-between pt-6">
+          <Button
+            variant="outline"
+            onClick={prevStep}
+            disabled={step === 1}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+          
+          <Button
+            onClick={nextStep}
+            disabled={generating}
+          >
+            {generating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : step < 4 ? (
+              <>
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </>
+            ) : (
+              <>
+                Generate Recipes
+                <CookingPot className="h-4 w-4 ml-1" />
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }
