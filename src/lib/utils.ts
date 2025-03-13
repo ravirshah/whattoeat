@@ -1,30 +1,31 @@
-// src/lib/utils.ts - Updated getBasePath function
+// src/lib/utils.ts
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export function getBasePath(): string {
-  // For server-side rendering
   if (typeof window === 'undefined') {
     return process.env.NEXT_PUBLIC_BASE_PATH || '';
   }
-  
-  // For client-side - handle both development and production
-  const { pathname } = window.location;
-  
-  // Check for specific deployment paths
-  if (pathname.startsWith('/whattoeat')) {
-    return '/whattoeat';
-  }
-  
-  // Default to empty string (no base path)
+  // Assume root deployment on Vercel unless specified otherwise
   return '';
 }
 
-// Use this to correctly format API requests
-export function getApiUrl(endpoint: string): string {
+export function withBasePath(path: string): string {
   const basePath = getBasePath();
-  // Make sure endpoint starts with /api
-  const formattedEndpoint = endpoint.startsWith('/api') 
-    ? endpoint 
-    : `/api/${endpoint.replace(/^\//, '')}`;
-    
-  return `${basePath}${formattedEndpoint}`;
+  if (basePath && path.startsWith(basePath)) return path;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${basePath}${normalizedPath}`;
+}
+
+export function navigateTo(path: string, router?: any): void {
+  const fullPath = withBasePath(path);
+  if (router && typeof router.push === 'function') {
+    router.push(fullPath);
+  } else if (typeof window !== 'undefined') {
+    window.location.href = fullPath;
+  }
 }

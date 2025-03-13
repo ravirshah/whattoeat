@@ -36,7 +36,6 @@ import {
   Square,
   RefreshCw
 } from 'lucide-react';
-import { getApiUrl } from '@/lib/utils';
 
 // Common preset options
 const COMMON_INGREDIENTS = [
@@ -521,131 +520,73 @@ function GenerateRecipes() {
   };
   
   // Generate recipes
-  // Replace the existing generateRecipes function with this one
-const generateRecipes = async () => {
-  if (ingredients.length === 0) {
-    setError('Please add at least one ingredient');
-    return;
-  }
-  
-  if (!currentUser) {
-    setError('You must be logged in to generate recipes');
-    router.push('/signin');
-    return;
-  }
-  
-  setGenerating(true);
-  setError('');
-  
-  try {
-    // Get the user's ID token for authentication
-    const token = await currentUser.getIdToken();
-    
-    if (!token) {
-      throw new Error("Failed to get authentication token");
-    }
-    
-    // Prepare request data
-    const requestData = {
-      ingredients, 
-      equipment, 
-      staples, 
-      dietaryPrefs
-    };
-    
-    // Get the correct API URL with base path
-    const apiUrl = getApiUrl('/api/generate-recipes');
-    console.log("Using API URL:", apiUrl);
-    
-    console.log("Sending API request for recipe generation...");
-    
-    // Make the API request with a timeout
-    const response = await axios.post(
-      apiUrl, 
-      requestData,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 60000 // 60 second timeout
-      }
-    );
-    
-    // Check if we got a valid response with recipes
-    if (response.data && response.data.recipes && response.data.recipes.length > 0) {
-      console.log(`Received ${response.data.recipes.length} recipes from API`);
-      
-      // Check if this is using fallback recipes
-      if (response.data.apiError) {
-        console.log("Using API fallback recipes due to:", response.data.apiError);
-        toast.info("Using backup recipes", {
-          description: "We're showing example recipes while our AI system is busy."
-        });
-      }
-      
-      // Store the recipes in session storage
-      sessionStorage.setItem('generatedRecipes', JSON.stringify(response.data.recipes));
-      
-      // Reset retry count on success
-      setRetryCount(0);
-      
-      // Navigate to results page
-      router.push('/recipes/results');
+  const generateRecipes = async () => {
+    if (ingredients.length === 0) {
+      setError('Please add at least one ingredient');
       return;
     }
     
-    throw new Error("No recipes returned from API");
+    if (!currentUser) {
+      setError('You must be logged in to generate recipes');
+      router.push('/signin');
+      return;
+    }
     
-  } catch (error: any) {
-    console.error("Error generating recipes:", error);
+    setGenerating(true);
+    setError('');
     
-    // Increment retry count
-    const newRetryCount = retryCount + 1;
-    setRetryCount(newRetryCount);
-    
-    // Different handling based on error type
-    if (error.response) {
-      // Server returned an error response
-      console.error("Server error:", error.response.status, error.response.data);
-      
-      if (error.response.status === 401) {
-        setError("Your session has expired. Please sign in again.");
-      } else if (error.response.data && error.response.data.error) {
-        setError(error.response.data.error);
-      } else {
-        setError("Error communicating with the recipe service. Please try again.");
+    try {
+      // Try to update user stats in background (don't await)
+      try {
+        incrementRecipesGenerated(currentUser.uid).catch(err => {
+          console.error("Failed to increment recipe count:", err);
+          // Non-critical operation, continue regardless
+        });
+      } catch (statsError) {
+        console.error("Error updating stats:", statsError);
+        // Continue anyway - this isn't critical
       }
-    } else if (error.request) {
-      // No response received (network issue)
-      console.error("Network error, no response received");
-      setError("Network issue. Please check your connection and try again.");
-    } else {
-      // Error setting up the request
-      console.error("Request setup error:", error.message);
-      setError("Failed to create recipe request. Please try again.");
-    }
-    
-    // Don't retry too many times
-    if (newRetryCount > maxRetries) {
-      toast.error("We're having trouble connecting to our service", {
-        description: "Please try again later"
+      
+      // Get the user's ID token for authentication
+      let token;
+      try {
+        token = await currentUser.getIdToken();
+        if (!token) {
+          throw new Error("Failed to get authentication token");
+        }
+      } catch (tokenError) {
+        console.error("Error getting auth token:", tokenError);
+        setError('Authentication error. Please try signing in again.');
+        setGenerating(false);
+        return;
+      }
+      
+      // Prepare request data
+      const requestData = {
+        ingredients, 
+        equipment, 
+        staples, 
+        dietaryPrefs
+      };
+      
+      console.log("Sending API request with data:", {
+        ingredientsCount: ingredients.length,
+        equipmentCount: equipment.length,
+        staplesCount: staples.length,
+        dietaryPrefsCount: dietaryPrefs.length
       });
-    }
-    
-    setGenerating(false);
-  }
-};
       
       // Make the API request with a timeout
-      const apiUrl = getApiUrl('/api/generate-recipes');
-const response = await axios.post(apiUrl, requestData, {
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
-  },
-  timeout: 60000 // 60 second timeout
-});
+      const response = await axios.post('/api/generate-recipes', 
+        requestData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 60000 // 60 second timeout
+        }
+      );
       
       // Check if we got a valid response with recipes
       if (response.data && response.data.recipes && response.data.recipes.length > 0) {

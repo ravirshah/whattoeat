@@ -32,12 +32,8 @@ import {
   Users,
   ArrowLeft,
   Expand,
-  Minimize,
-  AlertCircle,
-  Info
+  Minimize
 } from 'lucide-react';
-import { navigateTo } from '@/lib/utils';
-import { getApiUrl } from '@/lib/utils';
 
 // Types for chat messages
 type MessageRole = 'user' | 'assistant';
@@ -46,17 +42,7 @@ interface ChatMessage {
   role: MessageRole;
   content: string;
   timestamp: Date;
-  isFallback?: boolean;
 }
-
-// Fallback responses for when the API completely fails
-const EMERGENCY_FALLBACK_RESPONSES = [
-  "I'd recommend cooking this recipe at a slightly lower temperature if you want it to be more tender.",
-  "You can substitute the main protein with tofu for a vegetarian version. Just make sure to press it well first!",
-  "For a spicier version, add red pepper flakes or a diced jalapeño.",
-  "To make this dish gluten-free, you can use corn starch instead of flour as a thickener.",
-  "For meal prep, this recipe stores well in the refrigerator for up to 3 days."
-];
 
 export default function RecipeChatPage() {
   return (
@@ -80,8 +66,6 @@ function RecipeChat() {
   const [initializing, setInitializing] = useState(true);
   const [expandedRecipe, setExpandedRecipe] = useState(true);
   const [isFromGenerated, setIsFromGenerated] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [connectionIssue, setConnectionIssue] = useState(false);
   
   // Load recipe data on mount
   useEffect(() => {
@@ -107,13 +91,7 @@ function RecipeChat() {
         setInitializing(false);
       } catch (error) {
         console.error('Error parsing recipe:', error);
-        toast.error('Error loading recipe details', {
-          description: 'Please try selecting the recipe again'
-        });
-        
-        setTimeout(() => {
-          router.push('/recipes');
-        }, 2000);
+        router.push('/recipes');
       }
     } else {
       router.push('/recipes');
@@ -127,26 +105,22 @@ function RecipeChat() {
     }
   }, [messages]);
   
-  // Update this function in src/app/recipes/chat/page.tsx
-
-import { getApiUrl } from '@/lib/utils';
-
-const handleSendMessage = async () => {
-  if (!input.trim() || !recipe || loading) return;
-  
-  const userMessage: ChatMessage = {
-    role: 'user' as const,
-    content: input,
-    timestamp: new Date()
-  };
-  
-  setMessages(prev => [...prev, userMessage]);
-  setInput('');
-  setLoading(true);
-  
-  try {
-    // Prepare the context for Gemini API
-    const recipeContext = `
+  const handleSendMessage = async () => {
+    if (!input.trim() || !recipe || loading) return;
+    
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: input,
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setLoading(true);
+    
+    try {
+      // Prepare the context for Gemini API
+      const recipeContext = `
 Recipe: ${recipe.name}
 
 Ingredients:
@@ -160,151 +134,43 @@ Nutritional Facts: ${recipe.nutritionalFacts}
 Servings: ${recipe.servings}
 
 Prep/Cook Times: ${recipe.times}
-    `;
-    
-    // Get conversation history for context
-    const conversationHistory = messages
-      .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-      .join('\n\n');
-    
-    // Get user token for authentication
-    const token = await currentUser.getIdToken();
-    
-    // Get the correct API URL with base path
-    const apiUrl = getApiUrl('/api/chat-with-recipe');
-    console.log("Using API URL:", apiUrl);
-    
-    // Call API endpoint
-    const response = await axios.post(
-      apiUrl,
-      {
+      `;
+      
+      // Get conversation history for context
+      const conversationHistory = messages
+        .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+        .join('\n\n');
+      
+      // Get user token for authentication
+      const token = await currentUser.getIdToken();
+      
+      // Call API endpoint
+      const response = await axios.post('/api/chat-with-recipe', {
         message: input,
         recipeContext,
         conversationHistory
-      }, 
-      {
+      }, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 30000 // 30 second timeout
-      }
-    );
-    
-    // Add assistant response to messages
-    const assistantMessage: ChatMessage = {
-      role: 'assistant' as const,
-      content: response.data.reply,
-      timestamp: new Date()
-    };
-    
-    setMessages(prev => [...prev, assistantMessage]);
-    
-    // If this was a fallback response, let the user know
-    if (response.data.fallback) {
-      toast.info("Using a standard response", {
-        description: "We're experiencing high demand. Your question was answered with a pre-written response."
+          'Authorization': `Bearer ${token}`
+        }
       });
-    }
-    
-  } catch (error: any) {
-    console.error('Error sending message:', error);
-    
-    // Try to provide a helpful error message
-    if (error.response) {
-      console.error("API error:", error.response.status, error.response.data);
-    }
-    
-    toast.error('Failed to get a response', {
-      description: 'Please try again or refresh the page.'
-    });
-    
-    // Add a system message about the error
-    const errorMessage: ChatMessage = {
-      role: 'assistant' as const,
-      content: "I'm sorry, I couldn't process your request at the moment. Please try again or ask a different question.",
-      timestamp: new Date()
-    };
-    
-    setMessages(prev => [...prev, errorMessage]);
-    
-  } finally {
-    setLoading(false);
-  }
-};
-      // Call API endpoint with race against timeout
-      
-      const apiUrl = getApiUrl('/api/chat-with-recipe');
-const response = await axios.post(apiUrl, requestData, {
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
-  },
-  timeout: 60000 // 60 second timeout
-});
-      
-      const response = await Promise.race([responsePromise, timeoutPromise]) as any;
-      
-      // Reset retry count on successful request
-      setRetryCount(0);
-      setConnectionIssue(false);
-      
-      // Check if response has fallback flag
-      const isFallback = response?.data?.fallback === true;
       
       // Add assistant response to messages
       const assistantMessage: ChatMessage = {
-        role: 'assistant' as const,
+        role: 'assistant',
         content: response.data.reply,
-        timestamp: new Date(),
-        isFallback: isFallback
+        timestamp: new Date()
       };
       
       setMessages(prev => [...prev, assistantMessage]);
       
-      // Show a toast if using fallback response
-      if (isFallback) {
-        toast.info('Using simplified response mode', {
-          description: 'The AI service is currently busy. Using basic responses instead.'
-        });
-      }
-      
     } catch (error) {
       console.error('Error sending message:', error);
       
-      // Increase retry count
-      const newRetryCount = retryCount + 1;
-      setRetryCount(newRetryCount);
+      toast.error('Failed to get a response', {
+        description: 'Please try again or refresh the page.'
+      });
       
-      // Set connection issue flag after multiple failures
-      if (newRetryCount >= 2) {
-        setConnectionIssue(true);
-      }
-      
-      // Emergency fallback - generate a simple response client-side
-      const randomIndex = Math.floor(Math.random() * EMERGENCY_FALLBACK_RESPONSES.length);
-      const fallbackContent = EMERGENCY_FALLBACK_RESPONSES[randomIndex];
-      
-      // Add fallback message
-      const fallbackMessage: ChatMessage = {
-        role: 'assistant' as const,
-        content: fallbackContent,
-        timestamp: new Date(),
-        isFallback: true
-      };
-      
-      setMessages(prev => [...prev, fallbackMessage]);
-      
-      // Show error toast
-      if (newRetryCount >= 2) {
-        toast.error('Connection issue detected', {
-          description: 'Using simplified chat mode due to service interruption.'
-        });
-      } else {
-        toast.error('Failed to get response', {
-          description: 'Using a simplified response instead. You can try again.'
-        });
-      }
     } finally {
       setLoading(false);
     }
@@ -326,8 +192,6 @@ const response = await axios.post(apiUrl, requestData, {
       };
       
       setMessages([initialMessage]);
-      setRetryCount(0);
-      setConnectionIssue(false);
       
       toast.success('Conversation reset', {
         description: 'Starting a new conversation about this recipe.'
@@ -338,10 +202,10 @@ const response = await axios.post(apiUrl, requestData, {
   const handleBackToRecipes = () => {
     // If we came from generated recipes, go back to results
     if (isFromGenerated) {
-      navigateTo('/recipes/results', router);
+      router.push('/recipes/results');
     } else {
       // Otherwise go to saved recipes
-      navigateTo('/recipes', router);
+      router.push('/recipes');
     }
   };
   
@@ -392,15 +256,6 @@ const response = await axios.post(apiUrl, requestData, {
             </Button>
           </div>
         </div>
-        
-        {connectionIssue && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Connection issues detected. The AI service may be temporarily unavailable. Using simplified responses.
-            </AlertDescription>
-          </Alert>
-        )}
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Recipe Details Panel - Collapsible on mobile */}
@@ -521,19 +376,12 @@ const response = await axios.post(apiUrl, requestData, {
                           className={`max-w-[80%] rounded-lg p-4 ${
                             message.role === 'user'
                               ? 'bg-emerald-600 text-white'
-                              : message.isFallback
-                              ? 'bg-amber-50 dark:bg-amber-900/20 text-gray-900 dark:text-gray-100 border border-amber-200 dark:border-amber-800'
                               : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
                           }`}
                         >
                           <div className="flex items-start mb-1">
                             {message.role === 'assistant' ? (
-                              <>
-                                <Bot className={`h-5 w-5 mr-2 ${message.isFallback ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'} flex-shrink-0`} />
-                                {message.isFallback && (
-                                  <AlertCircle className="h-4 w-4 mr-1 text-amber-600 dark:text-amber-400" />
-                                )}
-                              </>
+                              <Bot className="h-5 w-5 mr-2 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
                             ) : (
                               <User className="h-5 w-5 mr-2 text-white flex-shrink-0" />
                             )}
@@ -542,12 +390,6 @@ const response = await axios.post(apiUrl, requestData, {
                             </span>
                           </div>
                           <p className="whitespace-pre-line">{message.content}</p>
-                          {message.isFallback && (
-                            <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-300 flex items-center">
-                              <Info className="h-3 w-3 mr-1" />
-                              <span>Basic response mode</span>
-                            </div>
-                          )}
                         </div>
                       </div>
                     ))}
