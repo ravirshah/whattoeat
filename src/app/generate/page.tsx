@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { getUserPreferences, updateUserPreferences, incrementRecipesGenerated } from '@/lib/db';
 import { toast } from 'sonner';
@@ -58,9 +59,6 @@ const COMMON_DIETARY_PREFS = [
   'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 
   'Low-Carb', 'Keto', 'Paleo', 'Nut-Free', 'Low-Sugar'
 ];
-
-// IMPORTANT: Hard-coded base path for Vercel deployment
-const BASE_PATH = '/whattoeat';
 
 // Sample recipes (used if API fails)
 const SAMPLE_RECIPES = [
@@ -142,6 +140,7 @@ const SAMPLE_RECIPES = [
 
 function GenerateRecipes() {
   const { currentUser, loading: authLoading } = useAuth();
+  const router = useRouter();
   
   // Speech recognition ref
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -598,8 +597,7 @@ function GenerateRecipes() {
     
     if (!currentUser) {
       setError('You must be logged in to generate recipes');
-      // Use hardcoded BASE_PATH for consistent navigation
-      window.location.href = `${BASE_PATH}/signin`;
+      router.push('/signin');
       return;
     }
     
@@ -618,14 +616,6 @@ function GenerateRecipes() {
       // Get the user's ID token for authentication
       const token = await currentUser.getIdToken();
       
-      // Set up API options for the request
-      const apiOptions = {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        timeout: 30000 // 30 second timeout
-      };
-      
       // Data payload
       const recipeData = {
         ingredients,
@@ -636,54 +626,98 @@ function GenerateRecipes() {
       
       console.log("Attempting to generate recipes...");
       
+      // First try the normal API endpoint
       try {
-        // Skip API calls and use sample recipes to avoid API issues
-        console.log("Using sample recipes to avoid API issues");
+        // Set up API options for the request with a longer timeout
+        const apiOptions = {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          timeout: 45000 // 45 second timeout (increased from 30s)
+        };
         
-        // Store the recipes in session storage
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('generatedRecipes', JSON.stringify(SAMPLE_RECIPES));
-          
-          // Navigate to the results page using the BASE_PATH
-          const resultsUrl = `${BASE_PATH}/recipes/results`;
-          console.log("Navigating to: ", resultsUrl);
-          window.location.href = resultsUrl;
+        // Call the standard API endpoint
+        const response = await axios.post('/api/generate-recipes', recipeData, apiOptions);
+        
+        // If we got a response, store the recipes and navigate
+        if (response.data?.recipes && response.data.recipes.length > 0) {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('generatedRecipes', JSON.stringify(response.data.recipes));
+            router.push('/recipes/results');
+          }
+          return;
         }
-      } catch (error) {
-        console.error('Error with sample recipes:', error);
-        setError('Failed to generate recipes. Please try again.');
-        setGenerating(false);
+      } catch (apiError) {
+        console.log("Main API call failed, trying fallback API:", apiError);
+        
+        // Try the simplified API endpoint if normal one fails
+        try {
+          const simplifiedOptions = {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+            timeout: 25000 // 25 second timeout for simple endpoint
+          };
+          
+          const fallbackResponse = await axios.post('/api/generate-recipes-simple', recipeData, simplifiedOptions);
+          
+          if (fallbackResponse.data?.recipes && fallbackResponse.data.recipes.length > 0) {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('generatedRecipes', JSON.stringify(fallbackResponse.data.recipes));
+              router.push('/recipes/results');
+            }
+            return;
+          }
+        } catch (fallbackError) {
+          console.error("Fallback API call failed:", fallbackError);
+          // If both API calls fail, we'll use the client-side fallback below
+          throw new Error("Both main and fallback API calls failed");
+        }
       }
+      
+      // If we reached here, both API calls failed, use client-side fallback
+      console.log("Using client-side sample recipes as final fallback");
+      
+      // Store sample recipes in session storage
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('generatedRecipes', JSON.stringify(SAMPLE_RECIPES));
+        
+        // Show toast to indicate we're using sample recipes
+        toast.info("Using sample recipes due to API limitations");
+        
+        // Navigate to results page
+        router.push('/recipes/results');
+      }
+      
     } catch (error: any) {
       console.error('Error generating recipes:', error);
       
-      // Check for specific error responses
-      if (error.response?.status === 404) {
-        setError('API endpoint not found. Using sample recipes instead.');
-        
-        // Fall back to sample recipes
-        if (typeof window !== 'undefined') {
+      // Last resort fallback for any uncaught errors
+      if (typeof window !== 'undefined') {
+        try {
+          console.log("Using emergency fallback recipes");
           sessionStorage.setItem('generatedRecipes', JSON.stringify(SAMPLE_RECIPES));
           
-          // Navigate to the results page using the BASE_PATH
+          // Show a toast message about using fallback recipes
+          toast.error(
+            "Encountered an error with recipe generation",
+            { description: "Using sample recipes instead. Please try again later." }
+          );
+          
+          // Navigate after a short delay
           setTimeout(() => {
-            window.location.href = `${BASE_PATH}/recipes/results`;
-          }, 2000);
+            router.push('/recipes/results');
+          }, 1500);
+        } catch (storageFallbackError) {
+          // If even the fallback fails, show detailed error
+          setError("Could not generate or display recipes. Please try again later.");
+          setGenerating(false);
         }
-      } else if (error.response?.status === 401) {
-        setError('Authentication error. Please sign in again.');
-        setTimeout(() => {
-          window.location.href = `${BASE_PATH}/signin`;
-        }, 2000);
-      } else if (error.response?.data?.error) {
-        setError(error.response.data.error);
-      } else if (error.message) {
-        setError(`Error: ${error.message}`);
       } else {
+        // For SSR, just show the error
         setError('Failed to generate recipes. Please try again.');
+        setGenerating(false);
       }
-      
-      setGenerating(false);
     }
   };
   
@@ -977,14 +1011,6 @@ function GenerateRecipes() {
           </Button>
         </CardFooter>
       </Card>
-      
-      {/* Path info */}
-      <div className="max-w-2xl mx-auto mt-8 p-4 text-center">
-        <p className="text-xs text-gray-500">
-          Base Path: {BASE_PATH} | 
-          Target URL: {`${BASE_PATH}/recipes/results`}
-        </p>
-      </div>
     </div>
   );
 }

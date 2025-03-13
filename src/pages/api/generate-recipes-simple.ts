@@ -38,6 +38,13 @@ if (!getApps().length) {
 const adminAuth = getAuth();
 const adminDb = getFirestore();
 
+type RecipeResponse = {
+  recipes?: any[];
+  error?: string;
+  limitExceeded?: boolean;
+  details?: string;
+};
+
 // Sample recipes for quick testing - bypass the AI API call
 const SAMPLE_RECIPES = [
   {
@@ -116,15 +123,46 @@ const SAMPLE_RECIPES = [
   }
 ];
 
-// Function to check user usage - simplified to always return true for testing
-const checkUserUsage = async (userId: string): Promise<boolean> => {
-  console.log(`Checking usage for user ${userId} - simplified version`);
-  return true;
+// Helper function to clean array input
+const cleanArrayInput = (arr: string[] | undefined): string[] => {
+  if (!arr || !Array.isArray(arr)) return [];
+  return arr.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+};
+
+// Function to increment recipes generated count in user stats
+const incrementRecipesGenerated = async (userId: string): Promise<void> => {
+  try {
+    const userDocRef = adminDb.collection('users').doc(userId);
+    const userDoc = await userDocRef.get();
+    
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      if (!userData) return;
+      
+      const currentMonth = new Date().getMonth();
+      
+      // If the month has changed, reset the counter
+      if (!userData.usageStats || userData.usageStats.month !== currentMonth) {
+        await userDocRef.update({
+          "usageStats.month": currentMonth,
+          "usageStats.recipesGenerated": 1
+        });
+      } else {
+        // Otherwise increment the counter
+        await userDocRef.update({
+          "usageStats.recipesGenerated": (userData.usageStats.recipesGenerated || 0) + 1
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error incrementing recipes generated:", error);
+    // Continue even if this fails - it's not critical for the user experience
+  }
 };
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse<RecipeResponse>
 ) {
   console.log("Simple recipe generation API called");
   
@@ -148,11 +186,29 @@ export default async function handler(
     const userId = decodedToken.uid;
     console.log(`Token verified successfully for user: ${userId}`);
 
-    // Skip the actual recipe generation and return sample recipes
-    console.log("Returning sample recipes to avoid timeout");
+    // Get input data from request, if any
+    const { ingredients, equipment, staples, dietaryPrefs } = req.body;
+    
+    // Clean the input data 
+    const cleanedIngredients = cleanArrayInput(ingredients);
+    const cleanedEquipment = cleanArrayInput(equipment);
+    const cleanedStaples = cleanArrayInput(staples);
+    const cleanedDietaryPrefs = cleanArrayInput(dietaryPrefs);
+    
+    console.log(`User provided: ${cleanedIngredients.length} ingredients, ${cleanedEquipment.length} equipment items,` + 
+      ` ${cleanedStaples.length} staples, and ${cleanedDietaryPrefs.length} dietary preferences`);
+
+    // Update user stats in background (don't await this)
+    incrementRecipesGenerated(userId).catch(error => {
+      console.error("Background update of user stats failed:", error);
+    });
+
+    // Return sample recipes array with a custom message in the log
+    console.log("Returning sample recipes from simplified endpoint");
     return res.status(200).json({ recipes: SAMPLE_RECIPES });
+    
   } catch (error: any) {
-    console.error('Error generating recipes:', error);
+    console.error('Error in simple recipe generation:', error);
     
     // More specific error handling
     if (error.code === 'auth/id-token-expired') {
@@ -167,7 +223,7 @@ export default async function handler(
     
     return res.status(500).json({ 
       error: 'Failed to generate recipes',
-      details: process.env.NODE_ENV === 'development' ? errorMessage : undefined 
+      details: process.env.NODE_ENV === 'development' ? errorMessage : 'Internal server error' 
     });
   }
 }

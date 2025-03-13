@@ -44,7 +44,86 @@ type RecipeResponse = {
   error?: string;
   limitExceeded?: boolean;
   details?: string;
+  fallback?: boolean;
 };
+
+// Sample recipes for fallback when API fails
+const FALLBACK_RECIPES = [
+  {
+    name: "Quick Chicken Stir-Fry",
+    ingredients: [
+      "2 boneless, skinless chicken breasts, cut into strips",
+      "2 cups mixed vegetables (bell peppers, carrots, broccoli)",
+      "3 cloves garlic, minced",
+      "2 tbsp soy sauce",
+      "1 tbsp vegetable oil",
+      "1 tsp ginger, minced",
+      "Salt and pepper to taste"
+    ],
+    instructions: [
+      "Heat oil in a large skillet or wok over medium-high heat.",
+      "Add chicken and cook until no longer pink, about 5-6 minutes.",
+      "Add garlic and ginger, cook for 30 seconds until fragrant.",
+      "Add vegetables and stir-fry for 3-4 minutes until crisp-tender.",
+      "Pour in soy sauce, stir well, and cook for another minute.",
+      "Season with salt and pepper to taste.",
+      "Serve hot over rice or noodles."
+    ],
+    nutritionalFacts: "Calories: ~300 per serving, Protein: 25g, Carbs: 15g, Fat: 12g",
+    servings: "Serves 2",
+    times: "Prep: 10 min | Cook: 15 min"
+  },
+  {
+    name: "Simple Pasta with Garlic and Olive Oil",
+    ingredients: [
+      "8 oz pasta (spaghetti or linguine)",
+      "1/4 cup olive oil",
+      "4 cloves garlic, thinly sliced",
+      "1/4 tsp red pepper flakes (optional)",
+      "2 tbsp fresh parsley, chopped",
+      "Salt and pepper to taste",
+      "Grated Parmesan cheese for serving"
+    ],
+    instructions: [
+      "Bring a large pot of salted water to boil and cook pasta according to package directions until al dente.",
+      "Meanwhile, in a large skillet, heat olive oil over medium-low heat.",
+      "Add sliced garlic and red pepper flakes, cook until garlic is golden (about 2 minutes).",
+      "Drain pasta, reserving 1/4 cup of pasta water.",
+      "Add pasta to the skillet with the garlic oil, toss to coat.",
+      "Add reserved pasta water as needed to create a light sauce.",
+      "Stir in parsley, season with salt and pepper.",
+      "Serve immediately with grated Parmesan cheese."
+    ],
+    nutritionalFacts: "Calories: ~400 per serving, Protein: 10g, Carbs: 50g, Fat: 18g",
+    servings: "Serves 2",
+    times: "Prep: 5 min | Cook: 15 min"
+  },
+  {
+    name: "Vegetable Frittata",
+    ingredients: [
+      "6 large eggs",
+      "1/4 cup milk",
+      "1 cup mixed vegetables (spinach, bell peppers, onions)",
+      "1/2 cup cheese, shredded (cheddar or mozzarella)",
+      "1 tbsp olive oil",
+      "Salt and pepper to taste",
+      "Fresh herbs (optional)"
+    ],
+    instructions: [
+      "Preheat oven to 375°F (190°C).",
+      "In a bowl, whisk together eggs and milk, season with salt and pepper.",
+      "Heat olive oil in an oven-safe skillet over medium heat.",
+      "Add vegetables and cook until softened, about 3-4 minutes.",
+      "Pour egg mixture over vegetables and cook until edges start to set, about 2 minutes.",
+      "Sprinkle cheese on top and transfer skillet to oven.",
+      "Bake for 10-12 minutes until eggs are set and top is lightly golden.",
+      "Let cool slightly before slicing and serving."
+    ],
+    nutritionalFacts: "Calories: ~250 per serving, Protein: 18g, Carbs: 5g, Fat: 18g",
+    servings: "Serves 4",
+    times: "Prep: 10 min | Cook: 20 min"
+  }
+];
 
 // Helper function to clean array input
 const cleanArrayInput = (arr: string[] | undefined): string[] => {
@@ -196,105 +275,138 @@ export default async function handler(
       return res.status(400).json({ error: 'At least one ingredient is required' });
     }
 
-    // Initialize Gemini API
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error("No Gemini API key found in environment variables");
-      throw new Error('Gemini API key not found in server environment');
-    }
-    
-    console.log("Initializing Gemini API...");
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // Use gemini-2.0 flash model
-    const modelName = "gemini-2.0-flash";
-    console.log(`Using Gemini model: ${modelName}`);
-    const model = genAI.getGenerativeModel({ model: modelName });
+    try {
+      // Update usage stats in background (don't await)
+      incrementRecipesGenerated(userId).catch(err => {
+        console.error("Failed to increment recipe count:", err);
+      });
 
-    // Construct the prompt
-    const prompt = `
-      Generate 3 detailed recipes based on these inputs:
-
-      INGREDIENTS: ${cleanedIngredients.join(', ')}
-      ${cleanedEquipment.length > 0 ? `EQUIPMENT: ${cleanedEquipment.join(', ')}` : ''}
-      ${cleanedStaples.length > 0 ? `STAPLES: ${cleanedStaples.join(', ')}` : ''}
-      ${cleanedDietaryPrefs.length > 0 ? `DIETARY RESTRICTIONS: ${cleanedDietaryPrefs.join(', ')}` : ''}
-
-      For each recipe, follow this exact structure:
+      // Initialize Gemini API
+      const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) {
+        console.error("No Gemini API key found in environment variables");
+        throw new Error('Gemini API key not found in server environment');
+      }
       
-      Recipe Name: [Name]
+      console.log("Initializing Gemini API...");
+      const genAI = new GoogleGenerativeAI(apiKey);
       
-      Ingredients:
-      - [ingredient with quantity]
-      - [ingredient with quantity]
-      
-      Instructions:
-      1. [Step 1]
-      2. [Step 2]
-      
-      Nutritional Facts: [Brief nutritional information]
-      
-      Servings: [Number of servings]
-      
-      Prep/Cook Times: [Time information]
+      // Use gemini-2.0 flash model
+      const modelName = "gemini-2.0-flash";
+      console.log(`Using Gemini model: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
 
-      IMPORTANT: Format the response exactly as specified above with clear section headings and numbered instructions. Make the recipes practical and achievable with the ingredients provided.
-    `;
+      // Construct the prompt
+      const prompt = `
+        Generate 3 detailed recipes based on these inputs:
 
-    // Generate response with safety settings
-    console.log("Sending request to Gemini API...");
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 4096,
-      },
-      safetySettings: [
-        {
-          category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-      ],
-    });
+        INGREDIENTS: ${cleanedIngredients.join(', ')}
+        ${cleanedEquipment.length > 0 ? `EQUIPMENT: ${cleanedEquipment.join(', ')}` : ''}
+        ${cleanedStaples.length > 0 ? `STAPLES: ${cleanedStaples.join(', ')}` : ''}
+        ${cleanedDietaryPrefs.length > 0 ? `DIETARY RESTRICTIONS: ${cleanedDietaryPrefs.join(', ')}` : ''}
 
-    const response = result.response;
+        For each recipe, follow this exact structure:
+        
+        Recipe Name: [Name]
+        
+        Ingredients:
+        - [ingredient with quantity]
+        - [ingredient with quantity]
+        
+        Instructions:
+        1. [Step 1]
+        2. [Step 2]
+        
+        Nutritional Facts: [Brief nutritional information]
+        
+        Servings: [Number of servings]
+        
+        Prep/Cook Times: [Time information]
 
-    if (!response) {
+        IMPORTANT: Format the response exactly as specified above with clear section headings and numbered instructions. Make the recipes practical and achievable with the ingredients provided.
+      `;
+
+      // Create a timeout promise
+      const timeoutPromise = new Promise<null>((_, reject) => {
+        setTimeout(() => reject(new Error('API request timed out')), 25000); // 25 second timeout
+      });
+
+      // Generate response with safety settings
+      console.log("Sending request to Gemini API...");
+      
+      // Race between the API call and the timeout
+      const result = await Promise.race([
+        model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 4096,
+          },
+          safetySettings: [
+            {
+              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+              threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+              threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+              threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+              threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+          ],
+        }),
+        timeoutPromise
+      ]) as any;
+
+      if (!result) {
+        throw new Error('Gemini API request timed out or returned null');
+      }
+
+      const response = result.response;
+
+      if (!response) {
         console.error("Gemini API returned an empty response.");
-        return res.status(500).json({ error: 'Failed to generate recipes - Gemini API returned empty response' });
+        throw new Error('Failed to generate recipes - Gemini API returned empty response');
+      }
+
+      const text = response.text();
+      console.log("Successfully received response from Gemini API");
+
+      // Parse the response
+      const recipes = parseRecipes(text);
+
+      if (recipes.length === 0) {
+        console.error("Failed to parse any recipes from the response");
+        console.log("Response text (first 300 chars):", text.substring(0, 300));
+        throw new Error('Failed to parse recipes from AI response');
+      }
+
+      console.log(`Successfully parsed ${recipes.length} recipes`);
+      return res.status(200).json({ recipes });
+        
+    } catch (aiError) {
+      console.error('Error with Gemini API:', aiError);
+      
+      // Fall back to the simplified API
+      try {
+        console.log("Falling back to sample recipes");
+        return res.status(200).json({ 
+          recipes: FALLBACK_RECIPES,
+          fallback: true
+        });
+      } catch (fallbackError) {
+        console.error("Even fallback failed:", fallbackError);
+        throw new Error('Complete API failure');
+      }
     }
-
-    const text = response.text();
-    console.log("Successfully received response from Gemini API");
-
-    // Parse the response
-    const recipes = parseRecipes(text);
-
-    if (recipes.length === 0) {
-      console.error("Failed to parse any recipes from the response");
-      console.log("Response text (first 300 chars):", text.substring(0, 300));
-      return res.status(500).json({ error: 'Failed to parse recipes from AI response' });
-    }
-
-    // Update usage stats after successful generation
-    await incrementRecipesGenerated(userId);
-
-    console.log(`Successfully parsed ${recipes.length} recipes`);
-    return res.status(200).json({ recipes });
   } catch (error: any) {
     console.error('Error generating recipes:', error);
     
@@ -309,13 +421,17 @@ export default async function handler(
     const errorMessage = typeof error.message === 'string' ? error.message : 'Unknown error';
     console.error('Detailed error message:', errorMessage);
     
-    if (errorMessage.includes('PERMISSION_DENIED')) {
-      return res.status(403).json({ error: 'Permission denied to access AI service' });
+    // Last resort fallback
+    if (errorMessage.includes('Complete API failure')) {
+      return res.status(200).json({
+        recipes: FALLBACK_RECIPES,
+        fallback: true
+      });
     }
     
     return res.status(500).json({ 
       error: 'Failed to generate recipes',
-      details: process.env.NODE_ENV === 'development' ? errorMessage : undefined 
+      details: process.env.NODE_ENV === 'development' ? errorMessage : 'Internal server error' 
     });
   }
 }
@@ -343,10 +459,10 @@ function parseRecipes(text: string) {
       // Extract recipe components with safer pattern matching
       const nameMatch = block.match(/^(.*?)(?=\s*\n\s*Ingredients:|\s*\n\s*INGREDIENTS:)/s);
       const ingredientsMatch = block.match(/(?:Ingredients:|INGREDIENTS:)(.*?)(?=\s*\n\s*Instructions:|\s*\n\s*INSTRUCTIONS:)/s);
-      const instructionsMatch = block.match(/(?:Instructions:|INSTRUCTIONS:)(.*?)(?=\s*\n\s*Nutritional Facts:|\s*\n\s*NUTRITIONAL FACTS:)/s);
-      const nutritionalMatch = block.match(/(?:Nutritional Facts:|NUTRITIONAL FACTS:)(.*?)(?=\s*\n\s*Servings:|\s*\n\s*SERVINGS:)/s);
-      const servingsMatch = block.match(/(?:Servings:|SERVINGS:)(.*?)(?=\s*\n\s*Prep\/Cook Times:|\s*\n\s*PREP\/COOK TIMES:)/s);
-      const timesMatch = block.match(/(?:Prep\/Cook Times:|PREP\/COOK TIMES:)(.*?)(?=\s*$)/s);
+      const instructionsMatch = block.match(/(?:Instructions:|INSTRUCTIONS:)(.*?)(?=\s*\n\s*Nutritional Facts:|\s*\n\s*NUTRITIONAL FACTS:|\s*\n\s*Nutrition Facts:|\s*\n\s*NUTRITION FACTS:)/s);
+      const nutritionalMatch = block.match(/(?:Nutritional Facts:|NUTRITIONAL FACTS:|Nutrition Facts:|NUTRITION FACTS:)(.*?)(?=\s*\n\s*Servings:|\s*\n\s*SERVINGS:)/s);
+      const servingsMatch = block.match(/(?:Servings:|SERVINGS:)(.*?)(?=\s*\n\s*Prep\/Cook Times:|\s*\n\s*PREP\/COOK TIMES:|\s*\n\s*Time:|\s*\n\s*TIME:)/s);
+      const timesMatch = block.match(/(?:Prep\/Cook Times:|PREP\/COOK TIMES:|Time:|TIME:)(.*?)(?=\s*$|\s*\n\s*Recipe Name:|\s*\n\s*RECIPE \d+:)/s);
 
       // Process ingredients with proper null handling
       let ingredients: string[] = [];
