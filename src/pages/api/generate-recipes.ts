@@ -1,51 +1,9 @@
 // src/pages/api/generate-recipes.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { ServiceAccount } from 'firebase-admin';
-
-// Firebase Admin SDK initialization for server-side auth
-if (!getApps().length) {
-  try {
-    // Try to initialize with service account if available
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-      const serviceAccount: ServiceAccount = JSON.parse(
-        Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY, 'base64').toString()
-      );
-      
-      initializeApp({
-        credential: cert(serviceAccount),
-      });
-      console.log("Firebase Admin initialized with service account");
-    } else {
-      // Fall back to project ID initialization
-      initializeApp({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      });
-      console.log("Firebase Admin initialized with project ID only");
-    }
-  } catch (error) {
-    console.error('Error initializing Firebase Admin:', error);
-    initializeApp({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    });
-    console.log("Firebase Admin initialized with fallback after error");
-  }
-}
-
-// Get admin instances
-const adminAuth = getAuth();
-const adminDb = getFirestore();
-
-type RecipeResponse = {
-  recipes?: any[];
-  error?: string;
-  limitExceeded?: boolean;
-  details?: string;
-  apiInfo?: any;
-};
 
 // Sample recipes for fallback when API fails
 const FALLBACK_RECIPES = [
@@ -125,46 +83,44 @@ const FALLBACK_RECIPES = [
   }
 ];
 
+// Firebase Admin SDK initialization for server-side auth
+if (!getApps().length) {
+  try {
+    // Try to initialize with service account if available
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      const serviceAccount = JSON.parse(
+        Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY, 'base64').toString()
+      );
+      
+      initializeApp({
+        credential: cert(serviceAccount),
+      });
+      console.log("Firebase Admin initialized with service account");
+    } else {
+      // Fall back to project ID initialization
+      initializeApp({
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      });
+      console.log("Firebase Admin initialized with project ID only");
+    }
+  } catch (error) {
+    console.error('Error initializing Firebase Admin:', error);
+    initializeApp({
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    });
+    console.log("Firebase Admin initialized with fallback after error");
+  }
+}
+
 // Helper function to clean array input
 const cleanArrayInput = (arr: string[] | undefined): string[] => {
   if (!arr || !Array.isArray(arr)) return [];
   return arr.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
 };
 
-// Function to increment recipes generated count
-const incrementRecipesGenerated = async (userId: string): Promise<void> => {
-  try {
-    const userDocRef = adminDb.collection('users').doc(userId);
-    const userDoc = await userDocRef.get();
-    
-    if (userDoc.exists) {
-      const userData = userDoc.data();
-      if (!userData) return;
-      
-      const currentMonth = new Date().getMonth();
-      
-      // If the month has changed, reset the counter
-      if (!userData.usageStats || userData.usageStats.month !== currentMonth) {
-        await userDocRef.update({
-          "usageStats.month": currentMonth,
-          "usageStats.recipesGenerated": 1
-        });
-      } else {
-        // Otherwise increment the counter
-        await userDocRef.update({
-          "usageStats.recipesGenerated": (userData.usageStats.recipesGenerated || 0) + 1
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Error incrementing recipes generated:", error);
-    // We'll continue even if this fails - it's not critical for functionality
-  }
-};
-
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<RecipeResponse>
+  res: NextApiResponse
 ) {
   console.log("Recipe generation API called");
   
@@ -184,7 +140,7 @@ export default async function handler(
   try {
     console.log("Verifying token...");
     // Verify the token
-    const decodedToken = await adminAuth.verifyIdToken(token);
+    const decodedToken = await getAuth().verifyIdToken(token);
     const userId = decodedToken.uid;
     console.log(`Token verified successfully for user: ${userId}`);
 
@@ -202,45 +158,30 @@ export default async function handler(
       return res.status(400).json({ error: 'At least one ingredient is required' });
     }
 
-    // Update usage stats in background (don't await)
-    incrementRecipesGenerated(userId).catch(err => {
-      console.error("Failed to increment recipe count:", err);
-    });
-
-    // Initialize Gemini API
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    
-    // Diagnostic check for API key
-    if (!apiKey) {
-      console.error("No Gemini API key found in environment variables");
-      return res.status(500).json({ 
-        error: 'API configuration error',
-        details: 'Gemini API key not found in server environment',
-        apiInfo: {
-          hasKey: false,
-          envVars: Object.keys(process.env)
-            .filter(key => key.includes('GEMINI') || key.includes('API'))
-            .map(key => key)
-        }
-      });
-    }
-    
-    // Log limited version of key for debugging
-    const keyFirstChars = apiKey.substring(0, 4);
-    const keyLength = apiKey.length;
-    console.log(`Using Gemini API key (first 4 chars: ${keyFirstChars}..., length: ${keyLength})`);
-    
-    // Initialize Google Generative AI client
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // Always use 2.0 flash
-    const modelName = "gemini-2.0-flash";
-    console.log(`Using Gemini model: ${modelName}`);
-    
+    // Try to use Gemini API
     try {
+      // Get API key (try both environment variables)
+      const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      
+      if (!apiKey) {
+        console.error("No Gemini API key found in environment variables");
+        throw new Error('Gemini API key not configured');
+      }
+      
+      // Log limited version of key for debugging (first 4 chars)
+      const keyFirstChars = apiKey.substring(0, 4);
+      console.log(`Using Gemini API key (first 4 chars: ${keyFirstChars}...)`);
+      
+      // Initialize Google Generative AI client
+      const genAI = new GoogleGenerativeAI(apiKey);
+      
+      // Always use 2.0 flash
+      const modelName = "gemini-2.0-flash";
+      console.log(`Using Gemini model: ${modelName}`);
+      
       const model = genAI.getGenerativeModel({ model: modelName });
 
-      // Create a more concise, direct prompt
+      // Create a simple, direct prompt
       const prompt = `
 Create 3 recipes based on these ingredients:
 ${cleanedIngredients.join(', ')}
@@ -259,98 +200,76 @@ Prep/Cook Times: [Time]
 
       console.log("Sending request to Gemini API with prompt:", prompt.substring(0, 200) + "...");
       
-      // Generate content with reduced parameters for faster response
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2048, // Reduced for faster response
-        },
-        safetySettings: [
-          {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-        ],
-      });
+      // Generate content with timeout
+      const result = await Promise.race([
+        model.generateContent(prompt),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('API request timed out')), 30000)
+        )
+      ]);
 
-      if (!result || !result.response) {
-        console.error("Gemini API returned an empty response");
-        throw new Error('Empty response from Gemini API');
+      if (!result) {
+        throw new Error('Empty or timeout response from Gemini API');
       }
 
-      const text = result.response.text();
+      // @ts-ignore (TypeScript might not recognize this specific API form)
+      const response = result.response;
+      const text = response.text();
       
-      // Log a small sample of the response
+      // Log a small sample of the response for debugging
       console.log("Received response from Gemini API, first 100 chars:", text.substring(0, 100));
       
-      // Parse the response
+      // Parse the response into structured recipes
       const recipes = parseRecipes(text);
 
-      // Validate that we got at least one recipe
+      // Check if we got any valid recipes
       if (recipes.length === 0) {
         console.error("Failed to parse any recipes from the response");
-        console.log("Raw response (first 300 chars):", text.substring(0, 300));
-        
-        // Try basic parsing as fallback
-        const basicRecipes = basicParseRecipes(text);
-        if (basicRecipes.length > 0) {
-          console.log("Basic parsing succeeded with", basicRecipes.length, "recipes");
-          return res.status(200).json({ recipes: basicRecipes });
-        }
-        
         throw new Error('Failed to parse recipes from AI response');
       }
 
       console.log(`Successfully parsed ${recipes.length} recipes`);
       return res.status(200).json({ recipes });
       
-    } catch (aiError: any) {
-      console.error('Gemini API error:', aiError);
+    } catch (apiError) {
+      console.error('Gemini API error:', apiError);
+      
+      // Provide helpful debug information in the console
+      if (apiError instanceof Error) {
+        console.error('Error details:', {
+          message: apiError.message,
+          stack: apiError.stack,
+        });
+      }
       
       // Return the fallback recipes but include detailed error info for debugging
+      console.log("Returning fallback recipes due to API error");
       return res.status(200).json({ 
         recipes: FALLBACK_RECIPES, 
-        apiInfo: {
-          modelName,
-          error: aiError.message || 'Unknown API error',
-          stack: aiError.stack?.substring(0, 500)
-        }
+        apiError: apiError instanceof Error ? apiError.message : 'Unknown API error'
       });
     }
-  } catch (error: any) {
-    console.error('Error generating recipes:', error);
+  } catch (error) {
+    console.error('Error in recipe generation API:', error);
     
     // More specific error handling
-    if (error.code === 'auth/id-token-expired') {
-      return res.status(401).json({ error: 'Authentication token expired' });
-    }
-    if (error.code === 'auth/invalid-id-token') {
-      return res.status(401).json({ error: 'Invalid authentication token' });
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+      });
     }
     
-    // Last resort - return fallback recipes
-    console.log("Returning fallback recipes due to error");
+    // Return fallback recipes in case of any error
+    console.log("Returning fallback recipes due to general error");
     return res.status(200).json({ 
       recipes: FALLBACK_RECIPES,
-      details: error.message || 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 }
 
-// Enhanced recipe parser with better error tolerance
+// Basic recipe parser function
 function parseRecipes(text: string) {
   if (!text || typeof text !== 'string') {
     console.warn('Invalid input to parseRecipes:', text);
@@ -359,39 +278,32 @@ function parseRecipes(text: string) {
 
   const recipes = [];
   
-  // Try different ways to split the text into recipe blocks
+  // Try to split the text into recipe blocks
   let recipeBlocks = text.split(/Recipe Name:|RECIPE \d+:|Recipe \d+:/i)
     .filter(block => block && block.trim().length > 0);
   
   if (recipeBlocks.length === 0) {
-    // Try alternative splitting strategy
-    recipeBlocks = text.split(/\n\s*\d+\.\s*/)
-      .filter(block => block && block.trim().length > 0 && block.toLowerCase().includes('ingredient'));
-  }
-  
-  if (recipeBlocks.length === 0) {
-    console.warn('No recipe blocks found using standard methods, trying basic splitting');
+    console.warn('No recipe blocks found using standard methods');
     return [];
   }
 
   for (const block of recipeBlocks) {
     try {
-      // Extract recipe components with safer pattern matching
-      const nameMatch = block.match(/^(.*?)(?=\s*\n\s*Ingredients:|\s*\n\s*INGREDIENTS:)/is) || 
-                        block.match(/^(.*?)(?=\s*\n\s*Ingredients)/is);
+      // Extract recipe components with regex patterns
+      const nameMatch = block.match(/^(.*?)(?=\s*\n\s*Ingredients:|\s*\n\s*INGREDIENTS:)/is);
       
-      const ingredientsMatch = block.match(/(?:Ingredients:|INGREDIENTS:|Ingredients)(.*?)(?=\s*\n\s*Instructions:|\s*\n\s*INSTRUCTIONS:|\s*\n\s*Instructions)/is);
+      const ingredientsMatch = block.match(/(?:Ingredients:|INGREDIENTS:)(.*?)(?=\s*\n\s*Instructions:|\s*\n\s*INSTRUCTIONS:)/is);
       
-      const instructionsMatch = block.match(/(?:Instructions:|INSTRUCTIONS:|Instructions)(.*?)(?=\s*\n\s*Nutritional Facts:|\s*\n\s*NUTRITIONAL FACTS:|\s*\n\s*Nutrition Facts:|\s*\n\s*Nutrition:|\s*\n\s*Nutritional Information:)/is);
+      const instructionsMatch = block.match(/(?:Instructions:|INSTRUCTIONS:)(.*?)(?=\s*\n\s*Nutritional Facts:|\s*\n\s*NUTRITIONAL FACTS:|\s*\n\s*Nutrition:)/is);
       
-      const nutritionalMatch = block.match(/(?:Nutritional Facts:|NUTRITIONAL FACTS:|Nutrition Facts:|Nutrition:|Nutritional Information:)(.*?)(?=\s*\n\s*Servings:|\s*\n\s*SERVINGS:|\s*\n\s*Serving:)/is);
+      const nutritionalMatch = block.match(/(?:Nutritional Facts:|NUTRITIONAL FACTS:|Nutrition:)(.*?)(?=\s*\n\s*Servings:|\s*\n\s*SERVINGS:)/is);
       
-      const servingsMatch = block.match(/(?:Servings:|SERVINGS:|Serving:|Yield:)(.*?)(?=\s*\n\s*Prep\/Cook Times:|\s*\n\s*PREP\/COOK TIMES:|\s*\n\s*Time:|\s*\n\s*TIME:|\s*\n\s*Prep Time:|\s*\n\s*Cook Time:)/is);
+      const servingsMatch = block.match(/(?:Servings:|SERVINGS:)(.*?)(?=\s*\n\s*Prep\/Cook Times:|\s*\n\s*Time:)/is);
       
-      const timesMatch = block.match(/(?:Prep\/Cook Times:|PREP\/COOK TIMES:|Time:|TIME:|Prep Time:|Cook Time:)(.*?)(?=\s*$|\s*\n\s*Recipe Name:|\s*\n\s*RECIPE \d+:|\s*\n\s*Recipe \d+:)/is);
+      const timesMatch = block.match(/(?:Prep\/Cook Times:|TIME:|Time:)(.*?)(?=\s*$|\s*\n\s*Recipe Name:|\s*\n\s*RECIPE \d+:)/is);
 
-      // Process ingredients with proper null handling
-      let ingredients: string[] = [];
+      // Process ingredients
+      let ingredients = [];
       if (ingredientsMatch && ingredientsMatch[1]) {
         ingredients = ingredientsMatch[1]
           .split('\n')
@@ -401,14 +313,14 @@ function parseRecipes(text: string) {
             line.startsWith('•') || 
             line.startsWith('*') || 
             /^\d+\./.test(line) ||
-            line.length > 5  // If we're desperate, accept any long enough line
+            line.length > 5
           )
           .map(line => line.replace(/^[-•*\d.]\s*/, ''))
           .filter(Boolean);
       }
 
-      // Process instructions with proper null handling
-      let instructions: string[] = [];
+      // Process instructions
+      let instructions = [];
       if (instructionsMatch && instructionsMatch[1]) {
         instructions = instructionsMatch[1]
           .split('\n')
@@ -416,13 +328,13 @@ function parseRecipes(text: string) {
           .filter(line => 
             /^\d+\./.test(line) || 
             /^Step \d+:/.test(line) ||
-            line.length > 10  // Accept longer lines as instructions
+            line.length > 10
           )
           .map(line => line.replace(/^\d+\.\s*|^Step \d+:\s*/, ''))
           .filter(Boolean);
       }
 
-      // If we have at least a name and some content, create a recipe
+      // Build valid recipe object
       if ((nameMatch || block.length > 50) && (ingredients.length > 0 || instructions.length > 0)) {
         const recipeName = nameMatch ? nameMatch[1].trim() : 'Recipe';
         
@@ -441,72 +353,5 @@ function parseRecipes(text: string) {
     }
   }
 
-  return recipes;
-}
-
-// Extremely basic fallback parser when regular parsing fails
-function basicParseRecipes(text: string) {
-  if (!text || text.length < 100) return [];
-  
-  // Split by double newlines to get potential recipe chunks
-  const chunks = text.split(/\n\n+/);
-  
-  // We'll create up to 3 recipes
-  const recipes = [];
-  let currentRecipe: any = null;
-  
-  for (const chunk of chunks) {
-    // If chunk looks like a title (short, no punctuation), treat it as recipe name
-    if (chunk.trim().length < 50 && !chunk.includes('.') && !currentRecipe) {
-      currentRecipe = {
-        name: chunk.trim(),
-        ingredients: [],
-        instructions: [],
-        nutritionalFacts: 'Not available',
-        servings: 'Not specified',
-        times: 'Not specified'
-      };
-    } 
-    // If chunk contains "ingredient" keyword, treat as ingredients section
-    else if (currentRecipe && chunk.toLowerCase().includes('ingredient')) {
-      currentRecipe.ingredients = chunk
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0 && !line.toLowerCase().includes('ingredient'))
-        .map(line => line.replace(/^[-•*\d.]\s*/, ''));
-    }
-    // If chunk contains "instruction" or "direction" keyword, treat as instructions section
-    else if (currentRecipe && (chunk.toLowerCase().includes('instruction') || chunk.toLowerCase().includes('direction'))) {
-      currentRecipe.instructions = chunk
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0 && !line.toLowerCase().includes('instruction') && !line.toLowerCase().includes('direction'))
-        .map(line => line.replace(/^[-•*\d.]\s*/, ''));
-    }
-    // If chunk mentions nutrition or serving or time, update those fields
-    else if (currentRecipe) {
-      if (chunk.toLowerCase().includes('nutrition') || chunk.toLowerCase().includes('calorie')) {
-        currentRecipe.nutritionalFacts = chunk.trim();
-      }
-      if (chunk.toLowerCase().includes('serv')) {
-        currentRecipe.servings = chunk.trim();
-      }
-      if (chunk.toLowerCase().includes('time') || chunk.toLowerCase().includes('prep') || chunk.toLowerCase().includes('cook')) {
-        currentRecipe.times = chunk.trim();
-      }
-    }
-    
-    // If we have enough content for a recipe, add it and start a new one
-    if (currentRecipe && 
-        currentRecipe.ingredients.length > 0 && 
-        currentRecipe.instructions.length > 0) {
-      recipes.push(currentRecipe);
-      currentRecipe = null;
-      
-      // Only generate up to 3 recipes
-      if (recipes.length >= 3) break;
-    }
-  }
-  
   return recipes;
 }
