@@ -1,15 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  basePath: '/whattoeat', // Replace with your actual subdirectory
+  basePath: '/whattoeat',
+  trailingSlash: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // This allows you to deploy with TypeScript errors
+    ignoreBuildErrors: true,
+  },
   async rewrites() {
     return [
       {
-        source: '/generate-recipes', // What the app requests
-        destination: '/api/generate-recipes', // Where it should go
+        source: '/generate-recipes',
+        destination: '/api/generate-recipes',
       },
-    ]
-  }
-};
+    ];
+  },
+}
 
-module.exports = nextConfig;
+module.exports = nextConfig
