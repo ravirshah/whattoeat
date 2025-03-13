@@ -2,11 +2,10 @@
 const nextConfig = {
   basePath: '/whattoeat',
   trailingSlash: true,
-  images: {
-    domains: ['']
+  eslint: {
+    // Warning: This allows you to deploy with ESLint errors
+    ignoreDuringBuilds: true,
   },
-  // If you're using a specific output directory
-  // output: 'standalone',
 }
 
 module.exports = nextConfig

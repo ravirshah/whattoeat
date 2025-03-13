@@ -501,19 +501,16 @@ function GenerateRecipes() {
       const token = await currentUser.getIdToken();
       
       // Call the API to generate recipes
-// Update the API call to generate recipes
-const response = await axios.post(`${router.basePath}/api/generate-recipes`, {        {
-          ingredients,
-          equipment,
-          staples,
-          dietaryPrefs
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+      const response = await axios.post('/api/generate-recipes', {
+        ingredients,
+        equipment,
+        staples,
+        dietaryPrefs
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-      );
+      });
       
       // Store the recipes in session storage to access them on the results page
       sessionStorage.setItem('generatedRecipes', JSON.stringify(response.data.recipes));
