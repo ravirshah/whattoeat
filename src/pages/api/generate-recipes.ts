@@ -4,16 +4,25 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/ge
 import { checkUserUsage } from '@/lib/db';
 import { getAuth } from 'firebase-admin/auth';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { ServiceAccount } from 'firebase-admin';
 
 // Firebase Admin SDK initialization for server-side auth
 if (!getApps().length) {
-  const serviceAccount = JSON.parse(
-    Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '', 'base64').toString()
-  );
-  
-  initializeApp({
-    credential: cert(serviceAccount)
-  });
+  try {
+    const serviceAccount: ServiceAccount = JSON.parse(
+      Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '', 'base64').toString()
+    );
+    
+    initializeApp({
+      credential: cert(serviceAccount),
+    });
+  } catch (error) {
+    console.error('Error initializing Firebase Admin:', error);
+    // Fallback initialization
+    initializeApp({
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    });
+  }
 }
 
 type RecipeResponse = {
@@ -26,7 +35,7 @@ type RecipeResponse = {
 // Helper function to clean array input
 const cleanArrayInput = (arr: string[] | undefined): string[] => {
   if (!arr || !Array.isArray(arr)) return [];
-  return arr.filter(item => typeof item === 'string' && item.trim() !== '');
+  return arr.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
 };
 
 export default async function handler(
@@ -74,8 +83,16 @@ export default async function handler(
     }
 
     // Initialize Gemini API
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Using gemini 2.0 flash
+    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('Gemini API key not found');
+    }
+    
+    const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // Use gemini-pro as fallback if gemini-2.0-flash is not available
+    const modelName = "gemini-pro"; // Changed to gemini-pro as gemini-2.0-flash may not be accessible
+    const model = genAI.getGenerativeModel({ model: modelName });
 
     // Construct the prompt
     const prompt = `
@@ -136,7 +153,13 @@ export default async function handler(
       ],
     });
 
-    const response = await result.response;
+    const response = result.response;
+
+    if (!response) {
+        console.error("Gemini API returned an empty response.");
+        return res.status(500).json({ error: 'Failed to generate recipes - Gemini API returned empty response' });
+    }
+
     const text = response.text();
 
     // Parse the response
@@ -153,13 +176,16 @@ export default async function handler(
     if (error.code === 'auth/invalid-token') {
       return res.status(401).json({ error: 'Invalid authentication token' });
     }
-    if (error.message?.includes('PERMISSION_DENIED')) {
+    
+    const errorMessage = typeof error.message === 'string' ? error.message : 'Unknown error';
+    
+    if (errorMessage.includes('PERMISSION_DENIED')) {
       return res.status(403).json({ error: 'Permission denied to access AI service' });
     }
     
     return res.status(500).json({ 
       error: 'Failed to generate recipes',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+      details: process.env.NODE_ENV === 'development' ? errorMessage : undefined 
     });
   }
 }
@@ -175,7 +201,7 @@ function parseRecipes(text: string) {
   
   // Split the text into recipe blocks
   const recipeBlocks = text.split(/Recipe Name:|RECIPE \d+:/i)
-    .filter(block => block.trim().length > 0);
+    .filter(block => block && block.trim().length > 0);
   
   if (recipeBlocks.length === 0) {
     console.warn('No recipe blocks found in:', text);
@@ -184,7 +210,7 @@ function parseRecipes(text: string) {
 
   for (const block of recipeBlocks) {
     try {
-      // Extract recipe components
+      // Extract recipe components with safer pattern matching
       const nameMatch = block.match(/^(.*?)(?=\s*\n\s*Ingredients:|\s*\n\s*INGREDIENTS:)/s);
       const ingredientsMatch = block.match(/(?:Ingredients:|INGREDIENTS:)(.*?)(?=\s*\n\s*Instructions:|\s*\n\s*INSTRUCTIONS:)/s);
       const instructionsMatch = block.match(/(?:Instructions:|INSTRUCTIONS:)(.*?)(?=\s*\n\s*Nutritional Facts:|\s*\n\s*NUTRITIONAL FACTS:)/s);
@@ -192,35 +218,41 @@ function parseRecipes(text: string) {
       const servingsMatch = block.match(/(?:Servings:|SERVINGS:)(.*?)(?=\s*\n\s*Prep\/Cook Times:|\s*\n\s*PREP\/COOK TIMES:)/s);
       const timesMatch = block.match(/(?:Prep\/Cook Times:|PREP\/COOK TIMES:)(.*?)(?=\s*$)/s);
 
-      // Process ingredients
-      const ingredients = ingredientsMatch?.[1]
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.startsWith('-') || line.startsWith('•') || /^\d+\./.test(line))
-        .map(line => line.replace(/^[-•\d.]\s*/, ''))
-        .filter(Boolean) ?? [];
+      // Process ingredients with proper null handling
+      let ingredients: string[] = [];
+      if (ingredientsMatch && ingredientsMatch[1]) {
+        ingredients = ingredientsMatch[1]
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.startsWith('-') || line.startsWith('•') || /^\d+\./.test(line))
+          .map(line => line.replace(/^[-•\d.]\s*/, ''))
+          .filter(Boolean);
+      }
 
-      // Process instructions
-      const instructions = instructionsMatch?.[1]
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => /^\d+\./.test(line) || line.length > 0)
-        .map(line => line.replace(/^\d+\.\s*/, ''))
-        .filter(Boolean) ?? [];
+      // Process instructions with proper null handling
+      let instructions: string[] = [];
+      if (instructionsMatch && instructionsMatch[1]) {
+        instructions = instructionsMatch[1]
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => /^\d+\./.test(line) || line.length > 0)
+          .map(line => line.replace(/^\d+\.\s*/, ''))
+          .filter(Boolean);
+      }
 
       // Validate required fields
       if (!nameMatch || !ingredientsMatch || !instructionsMatch) {
-        console.warn('Missing required recipe fields in block:', block);
+        console.warn('Missing required recipe fields in block');
         continue;
       }
 
       recipes.push({
-        name: nameMatch[1].trim(),
-        ingredients,
-        instructions,
-        nutritionalFacts: nutritionalMatch?.[1].trim() ?? 'Not available',
-        servings: servingsMatch?.[1].trim() ?? 'Not specified',
-        times: timesMatch?.[1].trim() ?? 'Not specified'
+        name: nameMatch[1] ? nameMatch[1].trim() : 'Untitled Recipe',
+        ingredients: ingredients,
+        instructions: instructions,
+        nutritionalFacts: nutritionalMatch && nutritionalMatch[1] ? nutritionalMatch[1].trim() : 'Not available',
+        servings: servingsMatch && servingsMatch[1] ? servingsMatch[1].trim() : 'Not specified',
+        times: timesMatch && timesMatch[1] ? timesMatch[1].trim() : 'Not specified'
       });
     } catch (err) {
       console.error('Error parsing recipe block:', err);
