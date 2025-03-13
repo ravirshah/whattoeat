@@ -1,68 +1,34 @@
-import * as React from "react"
+// Export all UI components from this index file
+// This allows for cleaner imports in other files
 
-import { cn } from "@/lib/utils"
-
-function Card({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card"
-      className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-header"
-      className={cn("flex flex-col gap-1.5 px-6", className)}
-      {...props}
-    />
-  )
-}
-
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-title"
-      className={cn("leading-none font-semibold", className)}
-      {...props}
-    />
-  )
-}
-
-function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-description"
-      className={cn("text-muted-foreground text-sm", className)}
-      {...props}
-    />
-  )
-}
-
-function CardContent({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-content"
-      className={cn("px-6", className)}
-      {...props}
-    />
-  )
-}
-
-function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-footer"
-      className={cn("flex items-center px-6", className)}
-      {...props}
-    />
-  )
-}
-
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+export { Alert, AlertTitle, AlertDescription } from "./alert"
+export { Avatar, AvatarImage, AvatarFallback } from "./avatar"
+export { Button, buttonVariants } from "./button"
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent } from "./card"
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuGroup,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuRadioGroup,
+} from "./dropdown-menu"
+export { Input } from "./input"
+export { Label } from "./label"
+export { Progress } from "./progress"
+export { ScrollArea, ScrollBar } from "./scroll-area"
+export { Separator } from "./separator"
+export { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from "./sheet"
+export { Switch } from "./switch"
+export { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs"
+export { Toast, ToastProvider, ToastViewport } from "./toast"
+export { useToast, toast } from "./use-toast"

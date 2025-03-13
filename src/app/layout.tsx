@@ -3,14 +3,17 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from './providers';
 
+// Load fonts with display: 'swap' for better performance
 const geistSans = Geist({
-  variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: 'swap',
+  variable: "--font-geist-sans",
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: 'swap',
+  variable: "--font-geist-mono",
 });
 
 export const metadata: Metadata = {
