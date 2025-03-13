@@ -1,12 +1,25 @@
+// src/app/recipes/results/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { saveRecipe } from '@/lib/db';
+import AuthWrapper from '@/components/auth/AuthWrapper';
+import MainLayout from '@/components/layout/MainLayout';
 
-export default function RecipeResults() {
-  const { currentUser, loading } = useAuth();
+export default function RecipeResultsPage() {
+  return (
+    <AuthWrapper>
+      <MainLayout>
+        <RecipeResults />
+      </MainLayout>
+    </AuthWrapper>
+  );
+}
+
+function RecipeResults() {
+  const { currentUser } = useAuth();
   const router = useRouter();
   
   const [recipes, setRecipes] = useState<any[]>([]);
@@ -15,11 +28,6 @@ export default function RecipeResults() {
   const [saved, setSaved] = useState(false);
   
   useEffect(() => {
-    if (!loading && !currentUser) {
-      router.push('/signin');
-      return;
-    }
-    
     // Load recipes from session storage
     const storedRecipes = sessionStorage.getItem('generatedRecipes');
     if (storedRecipes) {
@@ -35,7 +43,7 @@ export default function RecipeResults() {
     } else {
       router.push('/generate');
     }
-  }, [currentUser, loading, router]);
+  }, [router]);
   
   const handleSaveRecipe = async () => {
     if (!currentUser || !selectedRecipe) return;
@@ -56,14 +64,6 @@ export default function RecipeResults() {
       setSaving(false);
     }
   };
-  
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
-      </div>
-    );
-  }
   
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
