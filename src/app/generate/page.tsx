@@ -33,7 +33,8 @@ import {
   Utensils,
   ShoppingBag,
   AlertTriangle,
-  Square
+  Square,
+  RefreshCw
 } from 'lucide-react';
 
 // Common preset options
@@ -58,84 +59,6 @@ const COMMON_STAPLES = [
 const COMMON_DIETARY_PREFS = [
   'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 
   'Low-Carb', 'Keto', 'Paleo', 'Nut-Free', 'Low-Sugar'
-];
-
-// Sample recipes (used if API fails)
-const SAMPLE_RECIPES = [
-  {
-    name: "Quick Chicken Stir-Fry",
-    ingredients: [
-      "2 boneless, skinless chicken breasts, cut into strips",
-      "2 cups mixed vegetables (bell peppers, carrots, broccoli)",
-      "3 cloves garlic, minced",
-      "2 tbsp soy sauce",
-      "1 tbsp vegetable oil",
-      "1 tsp ginger, minced",
-      "Salt and pepper to taste"
-    ],
-    instructions: [
-      "Heat oil in a large skillet or wok over medium-high heat.",
-      "Add chicken and cook until no longer pink, about 5-6 minutes.",
-      "Add garlic and ginger, cook for 30 seconds until fragrant.",
-      "Add vegetables and stir-fry for 3-4 minutes until crisp-tender.",
-      "Pour in soy sauce, stir well, and cook for another minute.",
-      "Season with salt and pepper to taste.",
-      "Serve hot over rice or noodles."
-    ],
-    nutritionalFacts: "Calories: ~300 per serving, Protein: 25g, Carbs: 15g, Fat: 12g",
-    servings: "Serves 2",
-    times: "Prep: 10 min | Cook: 15 min"
-  },
-  {
-    name: "Simple Pasta with Garlic and Olive Oil",
-    ingredients: [
-      "8 oz pasta (spaghetti or linguine)",
-      "1/4 cup olive oil",
-      "4 cloves garlic, thinly sliced",
-      "1/4 tsp red pepper flakes (optional)",
-      "2 tbsp fresh parsley, chopped",
-      "Salt and pepper to taste",
-      "Grated Parmesan cheese for serving"
-    ],
-    instructions: [
-      "Bring a large pot of salted water to boil and cook pasta according to package directions until al dente.",
-      "Meanwhile, in a large skillet, heat olive oil over medium-low heat.",
-      "Add sliced garlic and red pepper flakes, cook until garlic is golden (about 2 minutes).",
-      "Drain pasta, reserving 1/4 cup of pasta water.",
-      "Add pasta to the skillet with the garlic oil, toss to coat.",
-      "Add reserved pasta water as needed to create a light sauce.",
-      "Stir in parsley, season with salt and pepper.",
-      "Serve immediately with grated Parmesan cheese."
-    ],
-    nutritionalFacts: "Calories: ~400 per serving, Protein: 10g, Carbs: 50g, Fat: 18g",
-    servings: "Serves 2",
-    times: "Prep: 5 min | Cook: 15 min"
-  },
-  {
-    name: "Vegetable Frittata",
-    ingredients: [
-      "6 large eggs",
-      "1/4 cup milk",
-      "1 cup mixed vegetables (spinach, bell peppers, onions)",
-      "1/2 cup cheese, shredded (cheddar or mozzarella)",
-      "1 tbsp olive oil",
-      "Salt and pepper to taste",
-      "Fresh herbs (optional)"
-    ],
-    instructions: [
-      "Preheat oven to 375°F (190°C).",
-      "In a bowl, whisk together eggs and milk, season with salt and pepper.",
-      "Heat olive oil in an oven-safe skillet over medium heat.",
-      "Add vegetables and cook until softened, about 3-4 minutes.",
-      "Pour egg mixture over vegetables and cook until edges start to set, about 2 minutes.",
-      "Sprinkle cheese on top and transfer skillet to oven.",
-      "Bake for 10-12 minutes until eggs are set and top is lightly golden.",
-      "Let cool slightly before slicing and serving."
-    ],
-    nutritionalFacts: "Calories: ~250 per serving, Protein: 18g, Carbs: 5g, Fat: 18g",
-    servings: "Serves 4",
-    times: "Prep: 10 min | Cook: 20 min"
-  }
 ];
 
 function GenerateRecipes() {
@@ -166,6 +89,10 @@ function GenerateRecipes() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [speechSupported, setSpeechSupported] = useState(false);
+  
+  // Retry mechanism
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 2;
   
   // Check if speech recognition is supported
   useEffect(() => {
@@ -208,6 +135,9 @@ function GenerateRecipes() {
       } catch (error) {
         console.error('Error loading preferences:', error);
         setPreferencesError(true);
+        toast.error('Failed to load your preferences', {
+          description: 'Using default settings instead'
+        });
       } finally {
         setLoadingPreferences(false);
       }
@@ -570,6 +500,7 @@ function GenerateRecipes() {
         });
       } catch (error) {
         console.error('Error saving preferences:', error);
+        // Continue despite error - user experience is more important
       }
     }
     
@@ -605,120 +536,128 @@ function GenerateRecipes() {
     setError('');
     
     try {
-      // Update user stats
+      // Try to update user stats in background (don't await)
       try {
-        await incrementRecipesGenerated(currentUser.uid);
-      } catch (error) {
-        console.error('Error incrementing recipes generated:', error);
+        incrementRecipesGenerated(currentUser.uid).catch(err => {
+          console.error("Failed to increment recipe count:", err);
+          // Non-critical operation, continue regardless
+        });
+      } catch (statsError) {
+        console.error("Error updating stats:", statsError);
         // Continue anyway - this isn't critical
       }
       
       // Get the user's ID token for authentication
-      const token = await currentUser.getIdToken();
+      let token;
+      try {
+        token = await currentUser.getIdToken();
+        if (!token) {
+          throw new Error("Failed to get authentication token");
+        }
+      } catch (tokenError) {
+        console.error("Error getting auth token:", tokenError);
+        setError('Authentication error. Please try signing in again.');
+        setGenerating(false);
+        return;
+      }
       
-      // Data payload
-      const recipeData = {
-        ingredients,
-        equipment,
-        staples,
+      // Prepare request data
+      const requestData = {
+        ingredients, 
+        equipment, 
+        staples, 
         dietaryPrefs
       };
       
-      console.log("Attempting to generate recipes...");
+      console.log("Sending API request with data:", {
+        ingredientsCount: ingredients.length,
+        equipmentCount: equipment.length,
+        staplesCount: staples.length,
+        dietaryPrefsCount: dietaryPrefs.length
+      });
       
-      // First try the normal API endpoint
-      try {
-        // Set up API options for the request with a longer timeout
-        const apiOptions = {
+      // Make the API request with a timeout
+      const response = await axios.post('/api/generate-recipes', 
+        requestData,
+        {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           },
-          timeout: 45000 // 45 second timeout (increased from 30s)
-        };
-        
-        // Call the standard API endpoint
-        const response = await axios.post('/api/generate-recipes', recipeData, apiOptions);
-        
-        // If we got a response, store the recipes and navigate
-        if (response.data?.recipes && response.data.recipes.length > 0) {
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem('generatedRecipes', JSON.stringify(response.data.recipes));
-            router.push('/recipes/results');
-          }
-          return;
+          timeout: 60000 // 60 second timeout
         }
-      } catch (apiError) {
-        console.log("Main API call failed, trying fallback API:", apiError);
+      );
+      
+      // Check if we got a valid response with recipes
+      if (response.data && response.data.recipes && response.data.recipes.length > 0) {
+        console.log(`Received ${response.data.recipes.length} recipes from API`);
         
-        // Try the simplified API endpoint if normal one fails
-        try {
-          const simplifiedOptions = {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            },
-            timeout: 25000 // 25 second timeout for simple endpoint
-          };
-          
-          const fallbackResponse = await axios.post('/api/generate-recipes-simple', recipeData, simplifiedOptions);
-          
-          if (fallbackResponse.data?.recipes && fallbackResponse.data.recipes.length > 0) {
-            if (typeof window !== 'undefined') {
-              sessionStorage.setItem('generatedRecipes', JSON.stringify(fallbackResponse.data.recipes));
-              router.push('/recipes/results');
-            }
-            return;
-          }
-        } catch (fallbackError) {
-          console.error("Fallback API call failed:", fallbackError);
-          // If both API calls fail, we'll use the client-side fallback below
-          throw new Error("Both main and fallback API calls failed");
+        // Check if this is using fallback recipes
+        if (response.data.apiInfo) {
+          console.log("Using API fallback recipes due to:", response.data.apiInfo.error);
+          toast.info("Using sample recipes", {
+            description: "We're showing example recipes while our system is busy."
+          });
         }
-      }
-      
-      // If we reached here, both API calls failed, use client-side fallback
-      console.log("Using client-side sample recipes as final fallback");
-      
-      // Store sample recipes in session storage
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('generatedRecipes', JSON.stringify(SAMPLE_RECIPES));
         
-        // Show toast to indicate we're using sample recipes
-        toast.info("Using sample recipes due to API limitations");
+        // Store the recipes in session storage
+        sessionStorage.setItem('generatedRecipes', JSON.stringify(response.data.recipes));
+        
+        // Reset retry count on success
+        setRetryCount(0);
         
         // Navigate to results page
         router.push('/recipes/results');
+        return;
       }
+      
+      throw new Error("No recipes returned from API");
       
     } catch (error: any) {
-      console.error('Error generating recipes:', error);
+      console.error("Error generating recipes:", error);
       
-      // Last resort fallback for any uncaught errors
-      if (typeof window !== 'undefined') {
-        try {
-          console.log("Using emergency fallback recipes");
-          sessionStorage.setItem('generatedRecipes', JSON.stringify(SAMPLE_RECIPES));
-          
-          // Show a toast message about using fallback recipes
-          toast.error(
-            "Encountered an error with recipe generation",
-            { description: "Using sample recipes instead. Please try again later." }
-          );
-          
-          // Navigate after a short delay
-          setTimeout(() => {
-            router.push('/recipes/results');
-          }, 1500);
-        } catch (storageFallbackError) {
-          // If even the fallback fails, show detailed error
-          setError("Could not generate or display recipes. Please try again later.");
-          setGenerating(false);
+      // Increment retry count
+      const newRetryCount = retryCount + 1;
+      setRetryCount(newRetryCount);
+      
+      // Different handling based on error type
+      if (error.response) {
+        // Server returned an error response
+        console.error("Server error:", error.response.status, error.response.data);
+        
+        if (error.response.status === 401) {
+          setError("Your session has expired. Please sign in again.");
+        } else if (error.response.data && error.response.data.error) {
+          setError(error.response.data.error);
+        } else {
+          setError("Error communicating with the recipe service. Please try again.");
         }
+      } else if (error.request) {
+        // No response received (network issue)
+        console.error("Network error, no response received");
+        setError("Network issue. Please check your connection and try again.");
       } else {
-        // For SSR, just show the error
-        setError('Failed to generate recipes. Please try again.');
-        setGenerating(false);
+        // Error setting up the request
+        console.error("Request setup error:", error.message);
+        setError("Failed to create recipe request. Please try again.");
       }
+      
+      // Don't retry too many times
+      if (newRetryCount > maxRetries) {
+        toast.error("We're having trouble connecting to our service", {
+          description: "Please try again later"
+        });
+      }
+      
+      setGenerating(false);
     }
+  };
+  
+  // Retry recipe generation
+  const retryGeneration = () => {
+    setGenerating(true);
+    setError('');
+    generateRecipes();
   };
   
   // Get the current step details
@@ -840,9 +779,22 @@ function GenerateRecipes() {
         
         {error && (
           <div className="px-6">
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+            <Alert variant="destructive" className="mb-4 flex justify-between items-center">
+              <div className="flex items-center">
+                <AlertCircle className="h-4 w-4 mr-2" />
+                <AlertDescription>{error}</AlertDescription>
+              </div>
+              {retryCount > 0 && retryCount <= maxRetries && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={retryGeneration}
+                  className="ml-2 whitespace-nowrap"
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Retry
+                </Button>
+              )}
             </Alert>
           </div>
         )}
