@@ -23,7 +23,8 @@ import {
   BookmarkPlus, 
   CheckCircle2, 
   Info, 
-  CookingPot 
+  CookingPot,
+  MessageSquare
 } from 'lucide-react';
 
 export default function RecipeResultsPage() {
@@ -87,6 +88,22 @@ function RecipeResults() {
       setSaving(false);
     }
   };
+
+  // Updated chat function to preserve context
+  const handleChatWithRecipe = () => {
+    if (!selectedRecipe) return;
+    
+    // Make sure the generatedRecipes is still in session storage for proper back navigation
+    if (!sessionStorage.getItem('generatedRecipes')) {
+      sessionStorage.setItem('generatedRecipes', JSON.stringify(recipes));
+    }
+    
+    // Store the selected recipe in session storage for chat page
+    sessionStorage.setItem('recipeToChat', JSON.stringify(selectedRecipe));
+    
+    // Navigate to chat page
+    router.push('/recipes/chat');
+  };
   
   if (recipes.length === 0) {
     return (
@@ -110,7 +127,7 @@ function RecipeResults() {
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col space-y-2 md:flex-row md:items-center md:justify-between md:space-y-0 mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Your Recipes
+            Your Generated Recipes
           </h1>
           <Button variant="outline" size="sm" onClick={() => router.push('/generate')}>
             <ChevronLeft className="h-4 w-4 mr-1" />
@@ -177,24 +194,34 @@ function RecipeResults() {
                       </div>
                     </div>
                     
-                    <Button
-                      variant="outline"
-                      className="mt-4 lg:mt-0"
-                      onClick={handleSaveRecipe}
-                      disabled={saving}
-                    >
-                      {saving ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
-                          Saved
-                        </>
-                      ) : (
-                        <>
-                          <BookmarkPlus className="h-4 w-4 mr-2" />
-                          Save Recipe
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex mt-4 lg:mt-0 space-x-2">
+                      {/* Chat Button */}
+                      <Button
+                        variant="outline"
+                        onClick={handleChatWithRecipe}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Chat
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={handleSaveRecipe}
+                        disabled={saving}
+                      >
+                        {saving ? (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <BookmarkPlus className="h-4 w-4 mr-2" />
+                            Save Recipe
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   
                   <Separator className="my-6" />
@@ -236,6 +263,13 @@ function RecipeResults() {
                         {selectedRecipe.nutritionalFacts}
                       </p>
                     </div>
+
+                    <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                      <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <AlertDescription className="text-blue-800 dark:text-blue-300">
+                        Want to modify this recipe? Use the chat feature to ask about substitutions, portion adjustments, or cooking techniques.
+                      </AlertDescription>
+                    </Alert>
                   </div>
                 </CardContent>
               </Card>

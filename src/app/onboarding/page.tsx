@@ -18,7 +18,8 @@ import {
   Badge,
   Separator,
   Alert,
-  AlertDescription
+  AlertDescription,
+  Input
 } from '@/components/ui';
 import { toast } from 'sonner';
 import { 
@@ -30,7 +31,9 @@ import {
   ChefHat,
   UtensilsCrossed,
   ShoppingBag,
-  AlertTriangle
+  AlertTriangle,
+  Plus,
+  X
 } from 'lucide-react';
 
 // Common preset options
@@ -84,6 +87,12 @@ function Onboarding() {
   const [dietaryPrefs, setDietaryPrefs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   
+  // New state for input fields
+  const [newIngredient, setNewIngredient] = useState('');
+  const [newEquipment, setNewEquipment] = useState('');
+  const [newStaple, setNewStaple] = useState('');
+  const [newDietaryPref, setNewDietaryPref] = useState('');
+  
   // Toggle selection of an item
   const toggleItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary') => {
     switch (category) {
@@ -116,6 +125,52 @@ function Onboarding() {
         );
         break;
     }
+  };
+  
+  // Add item functions
+  const addIngredient = () => {
+    if (newIngredient.trim() !== '' && !ingredients.includes(newIngredient.trim())) {
+      setIngredients([...ingredients, newIngredient.trim()]);
+      setNewIngredient('');
+    }
+  };
+  
+  const addEquipment = () => {
+    if (newEquipment.trim() !== '' && !equipment.includes(newEquipment.trim())) {
+      setEquipment([...equipment, newEquipment.trim()]);
+      setNewEquipment('');
+    }
+  };
+  
+  const addStaple = () => {
+    if (newStaple.trim() !== '' && !staples.includes(newStaple.trim())) {
+      setStaples([...staples, newStaple.trim()]);
+      setNewStaple('');
+    }
+  };
+  
+  const addDietaryPref = () => {
+    if (newDietaryPref.trim() !== '' && !dietaryPrefs.includes(newDietaryPref.trim())) {
+      setDietaryPrefs([...dietaryPrefs, newDietaryPref.trim()]);
+      setNewDietaryPref('');
+    }
+  };
+  
+  // Remove item functions
+  const removeIngredient = (index: number) => {
+    setIngredients(ingredients.filter((_, i) => i !== index));
+  };
+  
+  const removeEquipment = (index: number) => {
+    setEquipment(equipment.filter((_, i) => i !== index));
+  };
+  
+  const removeStaple = (index: number) => {
+    setStaples(staples.filter((_, i) => i !== index));
+  };
+  
+  const removeDietaryPref = (index: number) => {
+    setDietaryPrefs(dietaryPrefs.filter((_, i) => i !== index));
   };
   
   // Navigation functions
@@ -217,71 +272,150 @@ function Onboarding() {
   
   const stepInfo = getStepInfo();
   
-  // Render selection options for the current step
-  const renderSelectionOptions = () => {
-    let options: string[] = [];
-    let category: 'ingredients' | 'equipment' | 'staples' | 'dietary' = 'ingredients';
-    let selectedItems: string[] = [];
-    let bgColor = "bg-emerald-50";
-    let textColor = "text-emerald-700";
-    let darkBgColor = "dark:bg-emerald-900/20";
-    let darkTextColor = "dark:text-emerald-300";
-    
+  // Get current step content details for the UI
+  const getCurrentStepContent = () => {
     switch (step) {
       case 2:
-        options = COMMON_INGREDIENTS;
-        category = 'ingredients';
-        selectedItems = ingredients;
-        break;
+        return {
+          items: ingredients,
+          commonItems: COMMON_INGREDIENTS,
+          category: 'ingredients',
+          inputValue: newIngredient,
+          setInputValue: setNewIngredient,
+          addItem: addIngredient,
+          removeItem: removeIngredient,
+          bgColor: "bg-emerald-50",
+          textColor: "text-emerald-700",
+          darkBgColor: "dark:bg-emerald-900/20",
+          darkTextColor: "dark:text-emerald-300",
+          buttonBgColor: "bg-emerald-100 dark:bg-emerald-900/50"
+        };
       case 3:
-        options = COMMON_EQUIPMENT;
-        category = 'equipment';
-        selectedItems = equipment;
-        bgColor = "bg-blue-50";
-        textColor = "text-blue-700";
-        darkBgColor = "dark:bg-blue-900/20";
-        darkTextColor = "dark:text-blue-300";
-        break;
+        return {
+          items: equipment,
+          commonItems: COMMON_EQUIPMENT,
+          category: 'equipment',
+          inputValue: newEquipment,
+          setInputValue: setNewEquipment,
+          addItem: addEquipment,
+          removeItem: removeEquipment,
+          bgColor: "bg-blue-50",
+          textColor: "text-blue-700",
+          darkBgColor: "dark:bg-blue-900/20",
+          darkTextColor: "dark:text-blue-300",
+          buttonBgColor: "bg-blue-100 dark:bg-blue-900/50"
+        };
       case 4:
-        options = COMMON_STAPLES;
-        category = 'staples';
-        selectedItems = staples;
-        bgColor = "bg-amber-50";
-        textColor = "text-amber-700";
-        darkBgColor = "dark:bg-amber-900/20";
-        darkTextColor = "dark:text-amber-300";
-        break;
+        return {
+          items: staples,
+          commonItems: COMMON_STAPLES,
+          category: 'staples',
+          inputValue: newStaple,
+          setInputValue: setNewStaple,
+          addItem: addStaple,
+          removeItem: removeStaple,
+          bgColor: "bg-amber-50",
+          textColor: "text-amber-700",
+          darkBgColor: "dark:bg-amber-900/20",
+          darkTextColor: "dark:text-amber-300",
+          buttonBgColor: "bg-amber-100 dark:bg-amber-900/50"
+        };
       case 5:
-        options = COMMON_DIETARY_PREFS;
-        category = 'dietary';
-        selectedItems = dietaryPrefs;
-        bgColor = "bg-purple-50";
-        textColor = "text-purple-700";
-        darkBgColor = "dark:bg-purple-900/20";
-        darkTextColor = "dark:text-purple-300";
-        break;
+        return {
+          items: dietaryPrefs,
+          commonItems: COMMON_DIETARY_PREFS,
+          category: 'dietary',
+          inputValue: newDietaryPref,
+          setInputValue: setNewDietaryPref,
+          addItem: addDietaryPref,
+          removeItem: removeDietaryPref,
+          bgColor: "bg-purple-50",
+          textColor: "text-purple-700",
+          darkBgColor: "dark:bg-purple-900/20",
+          darkTextColor: "dark:text-purple-300",
+          buttonBgColor: "bg-purple-100 dark:bg-purple-900/50"
+        };
       default:
         return null;
     }
+  };
+  
+  const stepContent = getCurrentStepContent();
+  
+  // Enhanced rendering of selection options with common items
+  const renderSelectionOptions = () => {
+    if (!stepContent) return null;
     
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 my-4">
-        {options.map((item) => (
-          <button
-            key={item}
-            onClick={() => toggleItem(item, category)}
-            className={`flex items-center justify-between px-3 py-2 rounded-md border ${
-              selectedItems.includes(item)
-                ? `${bgColor} ${textColor} ${darkBgColor} ${darkTextColor} border-transparent`
-                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-            } hover:shadow-sm transition-all`}
-          >
-            <span>{item}</span>
-            {selectedItems.includes(item) && (
-              <Check className="h-4 w-4 ml-2 flex-shrink-0" />
+      <div className="space-y-6">
+        {/* Manual input section */}
+        <div className="flex gap-2">
+          <Input
+            type="text"
+            value={stepContent.inputValue}
+            onChange={(e) => stepContent.setInputValue(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && stepContent.addItem()}
+            placeholder={`Add ${step === 2 ? 'an ingredient' : step === 3 ? 'equipment' : step === 4 ? 'a staple' : 'a dietary preference'}...`}
+            className="flex-1"
+          />
+          <Button onClick={stepContent.addItem}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add
+          </Button>
+        </div>
+        
+        {/* Common items section */}
+        <div>
+          <h4 className="text-sm font-medium mb-3">Common {step === 2 ? 'Ingredients' : step === 3 ? 'Equipment' : step === 4 ? 'Staples' : 'Dietary Preferences'}</h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {stepContent.commonItems.map((item) => (
+              <Button
+                key={item}
+                variant="outline"
+                size="sm"
+                onClick={() => toggleItem(item, stepContent.category as any)}
+                className={`text-left justify-start px-3 py-2 h-auto ${
+                  stepContent.items.includes(item) 
+                    ? `${stepContent.buttonBgColor} border-transparent font-medium`
+                    : ''
+                }`}
+              >
+                {stepContent.items.includes(item) && (
+                  <Check className="h-4 w-4 mr-2 flex-shrink-0" />
+                )}
+                <span className="truncate">{item}</span>
+              </Button>
+            ))}
+          </div>
+        </div>
+        
+        {/* Selected items */}
+        <div>
+          <h4 className="text-sm font-medium mb-2">Selected Items ({stepContent.items.length})</h4>
+          <div className="flex flex-wrap gap-2">
+            {stepContent.items.length === 0 ? (
+              <p className="text-sm text-gray-500 italic">No items selected yet</p>
+            ) : (
+              stepContent.items.map((item, index) => (
+                <Badge
+                  key={index}
+                  variant="outline"
+                  className={`${stepContent.bgColor} ${stepContent.textColor} ${stepContent.darkBgColor} ${stepContent.darkTextColor}`}
+                >
+                  {item}
+                  <button
+                    type="button"
+                    onClick={() => stepContent.removeItem(index)}
+                    className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-1"
+                  >
+                    <X className="h-3 w-3" />
+                    <span className="sr-only">Remove {item}</span>
+                  </button>
+                </Badge>
+              ))
             )}
-          </button>
-        ))}
+          </div>
+        </div>
       </div>
     );
   };
@@ -347,14 +481,6 @@ function Onboarding() {
               </div>
             ) : (
               renderSelectionOptions()
-            )}
-            
-            {step > 1 && (
-              <div className="mt-2">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Selected: {step === 2 ? ingredients.length : step === 3 ? equipment.length : step === 4 ? staples.length : dietaryPrefs.length} items
-                </p>
-              </div>
             )}
           </CardContent>
           
