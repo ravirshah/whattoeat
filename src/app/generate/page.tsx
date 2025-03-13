@@ -608,19 +608,37 @@ function GenerateRecipes() {
       const basePath = typeof window !== 'undefined' 
         ? window.location.pathname.startsWith('/whattoeat') ? '/whattoeat' : '' 
         : '';
-        
-      // Call the API to generate recipes with the correct path
-      const response = await axios.post(`${basePath}/api/generate-recipes`, {
+      
+      // Set up API options for the request
+      const apiOptions = {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        timeout: 30000 // 30 second timeout
+      };
+      
+      // Data payload
+      const recipeData = {
         ingredients,
         equipment,
         staples,
         dietaryPrefs
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        timeout: 60000 // 60 second timeout for recipe generation
-      });
+      };
+      
+      console.log("Attempting to generate recipes...");
+      
+      let response;
+      try {
+        // First try the simpler endpoint (faster, returns sample recipes)
+        console.log("Trying simplified API endpoint");
+        response = await axios.post(`${basePath}/api/generate-recipes-simple`, recipeData, apiOptions);
+      } catch (simpleError) {
+        console.log("Simplified endpoint failed, falling back to main endpoint");
+        console.error("Simple endpoint error:", simpleError);
+        
+        // Fall back to the original endpoint if the simple one fails
+        response = await axios.post(`${basePath}/api/generate-recipes`, recipeData, apiOptions);
+      }
       
       console.log('API Response:', response.status, response.data);
       
