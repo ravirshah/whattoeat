@@ -27,12 +27,16 @@ export default function GenerateRecipes() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   
+  // Auth redirect check
   useEffect(() => {
+    console.log("Generate page loaded, auth state:", { currentUser, loading });
     if (!loading && !currentUser) {
+      console.log("Redirecting to signin because no user is logged in");
       router.push('/signin');
     }
   }, [currentUser, loading, router]);
   
+  // Load user preferences
   useEffect(() => {
     const loadUserPreferences = async () => {
       if (currentUser) {
@@ -49,13 +53,6 @@ export default function GenerateRecipes() {
         }
       }
     };
-    useEffect(() => {
-        console.log("Generate page loaded, auth state:", { currentUser, loading });
-        if (!loading && !currentUser) {
-          console.log("Redirecting to signin because no user is logged in");
-          router.push('/signin');
-        }
-      }, [currentUser, loading, router]);
     
     loadUserPreferences();
   }, [currentUser]);
@@ -110,14 +107,11 @@ export default function GenerateRecipes() {
       return;
     }
     
-    // This is a placeholder for voice recognition
-    // In a real app, you would integrate with OpenAI Whisper API here
     setListening(true);
     setTimeout(() => {
       setListening(false);
       setTranscript('chicken, potatoes, carrots');
       
-      // Add the recognized ingredients
       const items = ['chicken', 'potatoes', 'carrots'];
       setIngredients([...new Set([...ingredients, ...items])]);
     }, 2000);
