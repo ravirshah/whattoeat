@@ -5,6 +5,11 @@ import Image from 'next/image';
 import MainLayout from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui';
 import { ChefHat, LayoutList, Settings, SparkleIcon, ChevronRight, LucideIcon } from 'lucide-react';
+import { useRouter } from 'next/router'
+
+// In your component:
+const router = useRouter()
+const basePath = router.basePath || ''
 
 // Feature component
 interface FeatureProps {
@@ -101,10 +106,10 @@ export default function Home() {
               <div className="absolute -inset-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 opacity-30 blur-xl" />
               <div className="relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
                 <Image 
-                  src="/landingpage.png" 
+                  src={`${basePath}/landingpage.png`}
                   alt="WhatToEat App Interface"
                   width={800}
-                  height={600}
+                  height={600}                
                   className="w-full h-auto rounded-lg shadow-xl"
                   priority
                 />
