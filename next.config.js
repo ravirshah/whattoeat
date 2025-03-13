@@ -2,6 +2,12 @@
 const nextConfig = {
   basePath: '/whattoeat',
   trailingSlash: true,
+  reactStrictMode: true,
+  swcMinify: true,
+  experimental: {
+    appDir: true,
+  }
+,
   eslint: {
     ignoreDuringBuilds: true,
   },
