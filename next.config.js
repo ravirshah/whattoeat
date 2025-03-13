@@ -18,8 +18,8 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: '/generate-recipes',
-        destination: '/api/generate-recipes',
+        source: '/whattoeat/generate-recipes',
+        destination: '/whattoeat/api/generate-recipes',
       },
     ];
   },

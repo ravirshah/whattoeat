@@ -36,6 +36,7 @@ import {
   Square,
   RefreshCw
 } from 'lucide-react';
+import { getApiUrl } from '@/lib/utils';
 
 // Common preset options
 const COMMON_INGREDIENTS = [
@@ -579,7 +580,7 @@ function GenerateRecipes() {
       // First try the main API endpoint with a timeout
       let recipeData;
       try {
-        const response = await axios.post('/api/generate-recipes', 
+        const response = await axios.post(getApiUrl('/api/generate-recipes'), 
           requestData,
           {
             headers: {
@@ -595,7 +596,7 @@ function GenerateRecipes() {
         
         // If the main API fails, try the simplified endpoint as a fallback
         try {
-          const fallbackResponse = await axios.post('/api/generate-recipes-simple', 
+          const fallbackResponse = await axios.post(getApiUrl('/api/generate-recipes-simple'), 
             requestData,
             {
               headers: {

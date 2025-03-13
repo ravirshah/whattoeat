@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/context/AuthContext';
 import MainLayout from '@/components/layout/MainLayout';
 import axios from 'axios';
-
+import { getApiUrl } from '@/lib/utils';
 export default function DebugPage() {
   const { currentUser, loading } = useAuth();
   
@@ -36,7 +36,7 @@ export default function DebugPage() {
       const token = await currentUser.getIdToken();
       
       // Call debug auth API
-      const response = await axios.post('/api/debug-auth', {}, {
+      const response = await axios.post(getApiUrl('/api/debug-auth'), {}, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -75,7 +75,7 @@ export default function DebugPage() {
     
     try {
       // Call debug Gemini API
-      const response = await axios.post('/api/debug-gemini', {});
+      const response = await axios.post(getApiUrl('/api/debug-gemini'), {});
       
       setGeminiTestResult(response.data);
     } catch (error: any) {
@@ -118,7 +118,7 @@ export default function DebugPage() {
       const token = await currentUser.getIdToken();
       
       // Call generate-recipes API with minimal data
-      const response = await axios.post('/api/generate-recipes', 
+      const response = await axios.post(getApiUrl('/api/generate-recipes'), 
         {
           ingredients: ['chicken', 'potatoes', 'carrots'],
           equipment: ['oven', 'pan'],
