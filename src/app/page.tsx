@@ -5,11 +5,7 @@ import Image from 'next/image';
 import MainLayout from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui';
 import { ChefHat, LayoutList, Settings, SparkleIcon, ChevronRight, LucideIcon } from 'lucide-react';
-import { useRouter } from 'next/router'
-
-// In your component:
-const router = useRouter()
-const basePath = router.basePath || ''
+import { getBasePath } from '@/lib/utils';
 
 // Feature component
 interface FeatureProps {
@@ -61,6 +57,9 @@ function Testimonial({ content, author, role }: TestimonialProps) {
 }
 
 export default function Home() {
+  // Get base path from utils function instead of using useRouter
+  const basePath = getBasePath();
+  
   return (
     <MainLayout>
       {/* Hero section */}

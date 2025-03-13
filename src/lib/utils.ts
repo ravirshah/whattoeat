@@ -5,14 +5,18 @@ import { twMerge } from "tailwind-merge"
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
-// Add this to your utils.ts
+
+/**
+ * Gets the base path for the application
+ * Works in both client and server environments
+ */
 export function getBasePath() {
-  // Default for client-side
+  // For client-side navigation
   if (typeof window !== 'undefined') {
-    // For client-side navigation
     return window.location.pathname.startsWith('/whattoeat') ? '/whattoeat' : '';
   }
   
   // For server-side rendering
-  return process.env.NEXT_PUBLIC_BASE_PATH || '';
+  // This will be an empty string during SSR unless explicitly set
+  return '';
 }
