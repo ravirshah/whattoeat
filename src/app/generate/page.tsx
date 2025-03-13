@@ -525,16 +525,16 @@ function GenerateRecipes() {
       setError('Please add at least one ingredient');
       return;
     }
-    
+  
     if (!currentUser) {
       setError('You must be logged in to generate recipes');
       router.push('/signin');
       return;
     }
-    
+  
     setGenerating(true);
     setError('');
-    
+  
     try {
       // Try to update user stats in background (don't await)
       try {
@@ -546,7 +546,7 @@ function GenerateRecipes() {
         console.error("Error updating stats:", statsError);
         // Continue anyway - this isn't critical
       }
-      
+  
       // Get the user's ID token for authentication
       let token;
       try {
@@ -560,7 +560,7 @@ function GenerateRecipes() {
         setGenerating(false);
         return;
       }
-      
+  
       // Prepare request data
       const requestData = {
         ingredients, 
@@ -568,65 +568,99 @@ function GenerateRecipes() {
         staples, 
         dietaryPrefs
       };
-      
+  
       console.log("Sending API request with data:", {
         ingredientsCount: ingredients.length,
         equipmentCount: equipment.length,
         staplesCount: staples.length,
         dietaryPrefsCount: dietaryPrefs.length
       });
-      
-      // Make the API request with a timeout
-      const response = await axios.post('/api/generate-recipes', 
-        requestData,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 60000 // 60 second timeout
-        }
-      );
-      
-      // Check if we got a valid response with recipes
-      if (response.data && response.data.recipes && response.data.recipes.length > 0) {
-        console.log(`Received ${response.data.recipes.length} recipes from API`);
+  
+      // First try the main API endpoint with a timeout
+      let recipeData;
+      try {
+        const response = await axios.post('/api/generate-recipes', 
+          requestData,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 60000 // 60 second timeout
+          }
+        );
+        recipeData = response.data;
+      } catch (mainApiError) {
+        console.error("Error with main API, trying fallback:", mainApiError);
         
+        // If the main API fails, try the simplified endpoint as a fallback
+        try {
+          const fallbackResponse = await axios.post('/api/generate-recipes-simple', 
+            requestData,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              timeout: 30000 // 30 second timeout
+            }
+          );
+          
+          recipeData = fallbackResponse.data;
+          // Show a toast notification about using fallback recipes
+          toast.info('Using sample recipes', {
+            description: 'Our full recipe generator is busy. Showing example recipes instead.'
+          });
+        } catch (fallbackError) {
+          console.error("Fallback API also failed:", fallbackError);
+          throw mainApiError; // Throw the original error for better error messaging
+        }
+      }
+  
+      // Check if we got a valid response with recipes
+      if (recipeData && recipeData.recipes && recipeData.recipes.length > 0) {
+        console.log(`Received ${recipeData.recipes.length} recipes from API`);
+  
         // Check if this is using fallback recipes
-        if (response.data.apiInfo) {
-          console.log("Using API fallback recipes due to:", response.data.apiInfo.error);
+        if (recipeData.apiInfo) {
+          console.log("Using API fallback recipes due to:", recipeData.apiInfo.error);
           toast.info("Using sample recipes", {
             description: "We're showing example recipes while our system is busy."
           });
         }
-        
+  
         // Store the recipes in session storage
-        sessionStorage.setItem('generatedRecipes', JSON.stringify(response.data.recipes));
-        
+        sessionStorage.setItem('generatedRecipes', JSON.stringify(recipeData.recipes));
+  
         // Reset retry count on success
         setRetryCount(0);
-        
+  
         // Navigate to results page
         router.push('/recipes/results');
         return;
       }
-      
+  
       throw new Error("No recipes returned from API");
-      
+  
     } catch (error: any) {
       console.error("Error generating recipes:", error);
-      
+  
       // Increment retry count
       const newRetryCount = retryCount + 1;
       setRetryCount(newRetryCount);
-      
+  
       // Different handling based on error type
       if (error.response) {
         // Server returned an error response
         console.error("Server error:", error.response.status, error.response.data);
-        
+  
         if (error.response.status === 401) {
           setError("Your session has expired. Please sign in again.");
+          
+          // Optionally redirect to sign-in page
+          setTimeout(() => {
+            router.push('/signin');
+          }, 2000);
         } else if (error.response.data && error.response.data.error) {
           setError(error.response.data.error);
         } else {
@@ -641,25 +675,33 @@ function GenerateRecipes() {
         console.error("Request setup error:", error.message);
         setError("Failed to create recipe request. Please try again.");
       }
-      
+  
       // Don't retry too many times
       if (newRetryCount > maxRetries) {
         toast.error("We're having trouble connecting to our service", {
           description: "Please try again later"
         });
       }
-      
+  
       setGenerating(false);
     }
   };
   
-  // Retry recipe generation
+  // Also replace the retryGeneration function with this improved version
   const retryGeneration = () => {
-    setGenerating(true);
-    setError('');
-    generateRecipes();
+    // Incremental backoff based on retry count (500ms, 1000ms, 1500ms, etc.)
+    const backoffTime = Math.min(500 * retryCount, 2000);
+    
+    setError(`Retrying in ${backoffTime/1000} seconds...`);
+    
+    setTimeout(() => {
+      setGenerating(true);
+      setError('');
+      generateRecipes();
+    }, backoffTime);
   };
   
+
   // Get the current step details
   const getStepContent = () => {
     switch (step) {

@@ -5,6 +5,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getApps, initializeApp, cert } from 'firebase-admin/app';
 import { ServiceAccount } from 'firebase-admin';
 
+// Initialize Firebase Admin if it hasn't been already
 if (!getApps().length) {
   try {
     if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
@@ -17,15 +18,16 @@ if (!getApps().length) {
       console.log('Firebase Admin initialized with service account');
     } else {
       initializeApp({
-        projectId: process.env.FIREBASE_PROJECT_ID,
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       });
       console.log('Firebase Admin initialized with project ID only');
     }
   } catch (error) {
     console.error('Error initializing Firebase Admin:', error);
     initializeApp({
-      projectId: process.env.FIREBASE_PROJECT_ID,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
     });
+    console.log('Firebase Admin initialized with fallback');
   }
 }
 
@@ -66,6 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
   try {
     console.log('Verifying token...');
+    // Verify the token with Firebase Admin
     await adminAuth.verifyIdToken(token);
 
     const { message, recipeContext, conversationHistory } = req.body;
@@ -79,9 +82,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     }
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
+      // Get API key from environment variables, with fallback
+      const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
       if (!apiKey) {
-        console.error('No GEMINI_API_KEY in environment');
+        console.error('No Gemini API key in environment');
         throw new Error('Gemini API key not found');
       }
 
@@ -121,8 +125,10 @@ USER MESSAGE: ${message}
 `;
 
       console.log('Sending request to Gemini API...');
+      
+      // Create a timeout promise to handle API timeouts more gracefully
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('API request timed out')), 30000)
+        setTimeout(() => reject(new Error('API request timed out')), 25000)
       );
 
       const result = (await Promise.race([
@@ -153,6 +159,7 @@ USER MESSAGE: ${message}
       console.error('Gemini API error:', geminiError);
       console.log('Using fallback response');
 
+      // Select an appropriate fallback response based on the message content
       let fallbackResponse = '';
       if (message.toLowerCase().includes('spic')) {
         fallbackResponse = FALLBACK_RESPONSES[2];
@@ -175,15 +182,27 @@ USER MESSAGE: ${message}
         fallbackResponse = FALLBACK_RESPONSES[randomIndex];
       }
 
-      return res.status(200).json({ reply: fallbackResponse, fallback: true });
+      return res.status(200).json({ 
+        reply: fallbackResponse,
+        fallback: true
+      });
     }
   } catch (error: any) {
     console.error('Error processing chat:', error);
-    if (error.code === 'auth/id-token-expired') return res.status(401).json({ error: 'Token expired' });
-    if (error.code === 'auth/invalid-id-token') return res.status(401).json({ error: 'Invalid token' });
+    
+    // More specific error handling
+    if (error.code === 'auth/id-token-expired') {
+      return res.status(401).json({ error: 'Authentication token expired' });
+    }
+    if (error.code === 'auth/invalid-id-token') {
+      return res.status(401).json({ error: 'Invalid authentication token' });
+    }
+    
+    const errorMessage = typeof error.message === 'string' ? error.message : 'Unknown error';
+    
     return res.status(500).json({
       error: 'Failed to process chat request',
-      details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? errorMessage : 'Internal server error',
     });
   }
 }

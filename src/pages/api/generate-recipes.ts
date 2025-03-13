@@ -1,777 +1,355 @@
-// src/pages/generate-recipes.tsx
-'use client';
+// src/pages/api/generate-recipes.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { ServiceAccount } from 'firebase-admin';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/context/AuthContext';
-import { getUserPreferences, updateUserPreferences, incrementRecipesGenerated } from '@/lib/db';
-import { toast } from 'sonner';
-import axios from 'axios';
-import MainLayout from '@/components/layout/MainLayout';
-import AuthWrapper from '@/components/auth/AuthWrapper';
-import {
-  Button,
-  Input,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-  Alert,
-  AlertDescription,
-  Badge,
-  Progress,
-} from '@/components/ui';
-import {
-  Loader2,
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  X,
-  Mic,
-  CookingPot,
-  Utensils,
-  ShoppingBag,
-  AlertTriangle,
-  Square,
-  RefreshCw,
-} from 'lucide-react';
-
-const COMMON_INGREDIENTS = [
-  'Chicken', 'Rice', 'Pasta', 'Potatoes', 'Onions', 'Garlic',
-  'Tomatoes', 'Eggs', 'Beef', 'Pork', 'Carrots', 'Bell Peppers',
-  'Broccoli', 'Spinach', 'Mushrooms', 'Beans', 'Cheese',
-];
-
-const COMMON_EQUIPMENT = [
-  'Oven', 'Stovetop', 'Microwave', 'Blender', 'Slow Cooker',
-  'Air Fryer', 'Pressure Cooker', 'Grill', 'Toaster',
-  'Cast Iron Pan', 'Non-Stick Pan', 'Baking Sheet',
-];
-
-const COMMON_STAPLES = [
-  'Salt', 'Pepper', 'Olive Oil', 'Vegetable Oil', 'Flour',
-  'Sugar', 'Butter', 'Soy Sauce', 'Vinegar', 'Honey',
-  'Pasta Sauce', 'Canned Tomatoes', 'Spices',
-];
-
-const COMMON_DIETARY_PREFS = [
-  'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free',
-  'Low-Carb', 'Keto', 'Paleo', 'Nut-Free', 'Low-Sugar',
-];
-
-function GenerateRecipes() {
-  const { currentUser, loading: authLoading } = useAuth();
-  const router = useRouter();
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-
-  const [ingredients, setIngredients] = useState<string[]>([]);
-  const [newIngredient, setNewIngredient] = useState('');
-  const [equipment, setEquipment] = useState<string[]>([]);
-  const [newEquipment, setNewEquipment] = useState('');
-  const [staples, setStaples] = useState<string[]>([]);
-  const [newStaple, setNewStaple] = useState('');
-  const [dietaryPrefs, setDietaryPrefs] = useState<string[]>([]);
-  const [newDietaryPref, setNewDietaryPref] = useState('');
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState('');
-  const [step, setStep] = useState(1);
-  const [loadingPreferences, setLoadingPreferences] = useState(true);
-  const [preferencesError, setPreferencesError] = useState(false);
-  const [listening, setListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [speechSupported, setSpeechSupported] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 2;
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const isSupported = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
-      setSpeechSupported(isSupported);
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (recognitionRef.current && listening) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, [listening]);
-
-  useEffect(() => {
-    const loadUserPreferences = async () => {
-      if (!currentUser) {
-        setLoadingPreferences(false);
-        return;
-      }
-      setLoadingPreferences(true);
-      try {
-        const prefs = await getUserPreferences(currentUser.uid);
-        if (prefs) {
-          setIngredients(prefs.ingredients || []);
-          setEquipment(prefs.equipment || []);
-          setStaples(prefs.staples || []);
-          setDietaryPrefs(prefs.dietaryPrefs || []);
-        }
-      } catch (error) {
-        console.error('Error loading preferences:', error);
-        setPreferencesError(true);
-        toast.error('Failed to load preferences', { description: 'Using defaults' });
-      } finally {
-        setLoadingPreferences(false);
-      }
-    };
-    if (!authLoading) loadUserPreferences();
-  }, [currentUser, authLoading]);
-
-  const addIngredient = () => {
-    if (newIngredient.trim() && !ingredients.includes(newIngredient.trim())) {
-      setIngredients([...ingredients, newIngredient.trim()]);
-      setNewIngredient('');
-    }
-  };
-
-  const removeIngredient = (index: number) => {
-    setIngredients(ingredients.filter((_, i) => i !== index));
-  };
-
-  const addEquipment = () => {
-    if (newEquipment.trim() && !equipment.includes(newEquipment.trim())) {
-      setEquipment([...equipment, newEquipment.trim()]);
-      setNewEquipment('');
-    }
-  };
-
-  const removeEquipment = (index: number) => {
-    setEquipment(equipment.filter((_, i) => i !== index));
-  };
-
-  const addStaple = () => {
-    if (newStaple.trim() && !staples.includes(newStaple.trim())) {
-      setStaples([...staples, newStaple.trim()]);
-      setNewStaple('');
-    }
-  };
-
-  const removeStaple = (index: number) => {
-    setStaples(staples.filter((_, i) => i !== index));
-  };
-
-  const addDietaryPref = () => {
-    if (newDietaryPref.trim() && !dietaryPrefs.includes(newDietaryPref.trim())) {
-      setDietaryPrefs([...dietaryPrefs, newDietaryPref.trim()]);
-      setNewDietaryPref('');
-    }
-  };
-
-  const removeDietaryPref = (index: number) => {
-    setDietaryPrefs(dietaryPrefs.filter((_, i) => i !== index));
-  };
-
-  const capitalizeFirstLetter = (string: string): string => {
-    return string
-      .split(' ')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
-
-  const startVoiceRecognition = () => {
-    if (!speechSupported) {
-      toast.error('Voice recognition not supported');
-      return;
-    }
-    try {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        toast.error('Voice recognition unavailable');
-        return;
-      }
-      const recognition = new SpeechRecognition();
-      recognitionRef.current = recognition;
-      recognition.lang = 'en-US';
-      recognition.continuous = true;
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-      setListening(true);
-      setTranscript('');
-
-      const category = step === 1 ? 'ingredients' : step === 2 ? 'equipment' : 'staples';
-      const categoryDisplayName = category === 'ingredients' ? 'ingredient' : category === 'equipment' ? 'equipment item' : 'staple item';
-
-      recognition.onresult = (event) => {
-        const transcriptText = event.results[event.results.length - 1][0].transcript;
-        setTranscript(transcriptText);
-        const parsedItems = parseItemsFromText(transcriptText, category);
-        if (parsedItems.length > 0) {
-          if (category === 'ingredients') {
-            setIngredients((prev) => [...prev, ...parsedItems.filter((item) => !prev.includes(item)).map(capitalizeFirstLetter)]);
-          } else if (category === 'equipment') {
-            setEquipment((prev) => [...prev, ...parsedItems.filter((item) => !prev.includes(item)).map(capitalizeFirstLetter)]);
-          } else {
-            setStaples((prev) => [...prev, ...parsedItems.filter((item) => !prev.includes(item)).map(capitalizeFirstLetter)]);
-          }
-          toast.success(`Added ${parsedItems.length} ${categoryDisplayName}${parsedItems.length === 1 ? '' : 's'}: ${parsedItems.join(', ')}`, { duration: 4000 });
-        } else {
-          toast.error(`No ${categoryDisplayName}s detected`);
-        }
-      };
-
-      recognition.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-        setListening(false);
-        recognitionRef.current = null;
-        if (event.error === 'not-allowed') toast.error('Microphone access denied');
-        else if (event.error === 'no-speech') toast.error('No speech detected');
-        else toast.error('Voice recognition error');
-      };
-
-      recognition.onend = () => {
-        setListening(false);
-        recognitionRef.current = null;
-      };
-
-      recognition.start();
-    } catch (error) {
-      console.error('Speech recognition error', error);
-      setListening(false);
-      recognitionRef.current = null;
-      toast.error('Could not start voice recognition');
-    }
-  };
-
-  const stopVoiceRecognition = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      setListening(false);
-      recognitionRef.current = null;
-      if (transcript) toast.info('Voice recognition stopped');
-    }
-  };
-
-  const parseItemsFromText = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string[] => {
-    try {
-      let normalizedText = text.toLowerCase();
-      if (category === 'ingredients') {
-        normalizedText = normalizedText
-          .replace(/\bhalf\b/g, '1/2')
-          .replace(/\bhalf a\b/g, '1/2')
-          .replace(/\bquarter\b/g, '1/4')
-          .replace(/\bthird\b/g, '1/3')
-          .replace(/\bthree quarters\b/g, '3/4')
-          .replace(/\bone\b/g, '1')
-          .replace(/\btwo\b/g, '2')
-          .replace(/\bthree\b/g, '3')
-          .replace(/\bfour\b/g, '4')
-          .replace(/\bfive\b/g, '5')
-          .replace(/\bsix\b/g, '6')
-          .replace(/\bseven\b/g, '7')
-          .replace(/\beight\b/g, '8')
-          .replace(/\bnine\b/g, '9')
-          .replace(/\bten\b/g, '10');
-      }
-      const explicitSplits = normalizedText.split(/(?:,|\band\b|\balso\b|\bplus\b|\bthen\b)\s*/i);
-      let items: string[] = [];
-      for (let chunk of explicitSplits) {
-        chunk = chunk.replace(/\b(?:uhh?|umm?|err?|like|maybe|i think|i have|i've got|got|have)\b/gi, '');
-        if (category === 'ingredients') {
-          const someBasedChunks = chunk.split(/\bsome\b/i).map((part) => part.trim()).filter(Boolean);
-          if (someBasedChunks.length > 1) {
-            for (let part of someBasedChunks) {
-              if (part) items.push(cleanItem(part, category));
-            }
-          } else {
-            const quantityMatch = chunk.match(/^(\d+(?:\/\d+)?)\s+([a-z\s]+)$/);
-            if (quantityMatch) {
-              items.push(`${quantityMatch[1]} ${quantityMatch[2].trim()}`);
-            } else {
-              const cleaned = cleanItem(chunk, category);
-              if (cleaned) items.push(cleaned);
-            }
-          }
-        } else {
-          const cleaned = cleanItem(chunk, category);
-          if (cleaned) items.push(cleaned);
-        }
-      }
-      return items.filter((i) => i.length > 0);
-    } catch (error) {
-      console.error('Error parsing speech:', error);
-      return [];
-    }
-  };
-
-  const cleanItem = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string => {
-    let cleaned = text.replace(/^\s*(?:a|an|the|some|few|little)\s+/i, '');
-    if (category === 'ingredients') {
-      cleaned = cleaned.replace(/\b(head|bunch|clove|piece)s?\s+of\s+/i, '');
-      cleaned = cleaned.replace(/\ba\s+(?:little|bit\s+of)\s+/i, '');
-    } else if (category === 'equipment') {
-      cleaned = cleaned.replace(/\bmy\s+/i, '');
-      cleaned = cleaned.replace(/\bi\s+(?:use|have|own)\s+(?:a|an|the)?\s*/i, '');
-    } else {
-      cleaned = cleaned.replace(/\balways\s+(?:have|keep)\s+/i, '');
-      cleaned = cleaned.replace(/\bin\s+(?:my|the)\s+pantry\b/i, '');
-    }
-    return cleaned.trim();
-  };
-
-  const addCommonItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary') => {
-    switch (category) {
-      case 'ingredients':
-        if (!ingredients.includes(item)) setIngredients([...ingredients, item]);
-        break;
-      case 'equipment':
-        if (!equipment.includes(item)) setEquipment([...equipment, item]);
-        break;
-      case 'staples':
-        if (!staples.includes(item)) setStaples([...staples, item]);
-        break;
-      case 'dietary':
-        if (!dietaryPrefs.includes(item)) setDietaryPrefs([...dietaryPrefs, item]);
-        break;
-    }
-  };
-
-  const nextStep = async () => {
-    if (step === 1 && ingredients.length === 0) {
-      setError('Please add at least one ingredient');
-      return;
-    }
-    if (currentUser) {
-      try {
-        await updateUserPreferences(currentUser.uid, { ingredients, equipment, staples, dietaryPrefs });
-      } catch (error) {
-        console.error('Error saving preferences:', error);
-      }
-    }
-    if (step < 4) {
-      setStep(step + 1);
-      setError('');
-    } else {
-      generateRecipes();
-    }
-  };
-
-  const prevStep = () => {
-    if (step > 1) {
-      setStep(step - 1);
-      setError('');
-    }
-  };
-
-  const generateRecipes = async () => {
-    if (ingredients.length === 0) {
-      setError('Please add at least one ingredient');
-      return;
-    }
-    if (!currentUser) {
-      setError('You must be logged in');
-      router.push('/signin');
-      return;
-    }
-    setGenerating(true);
-    setError('');
-    try {
-      incrementRecipesGenerated(currentUser.uid).catch((err) => console.error('Failed to increment count:', err));
-      const token = await currentUser.getIdToken();
-      if (!token) throw new Error('Failed to get auth token');
-      const requestData = { ingredients, equipment, staples, dietaryPrefs };
-      console.log('Sending API request:', {
-        ingredientsCount: ingredients.length,
-        equipmentCount: equipment.length,
-        staplesCount: staples.length,
-        dietaryPrefsCount: dietaryPrefs.length,
-      });
-      const response = await axios.post('/api/generate-recipes', requestData, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        timeout: 60000,
-      });
-      if (response.data && response.data.recipes && response.data.recipes.length > 0) {
-        console.log(`Received ${response.data.recipes.length} recipes`);
-        if (response.data.apiInfo) {
-          console.log('Using fallback recipes:', response.data.apiInfo.error);
-          toast.info('Using sample recipes', { description: 'Showing examples due to system load' });
-        }
-        sessionStorage.setItem('generatedRecipes', JSON.stringify(response.data.recipes));
-        sessionStorage.setItem('isFallbackRecipes', response.data.apiInfo ? 'true' : 'false');
-        setRetryCount(0);
-        router.push('/recipes/results');
-      } else {
-        throw new Error('No recipes returned');
-      }
-    } catch (error: any) {
-      console.error('Error generating recipes:', error);
-      const newRetryCount = retryCount + 1;
-      setRetryCount(newRetryCount);
-      if (error.response) {
-        console.error('Server error:', error.response.status, error.response.data);
-        if (error.response.status === 401) setError('Session expired. Please sign in again.');
-        else setError(error.response.data?.error || 'Error with recipe service');
-      } else if (error.request) {
-        console.error('Network error');
-        setError('Network issue. Check your connection.');
-      } else {
-        console.error('Request setup error:', error.message);
-        setError('Failed to create request');
-      }
-      if (newRetryCount > maxRetries) toast.error('Service unavailable', { description: 'Try again later' });
-      setGenerating(false);
-    }
-  };
-
-  const retryGeneration = () => {
-    setGenerating(true);
-    setError('');
-    generateRecipes();
-  };
-
-  const getStepContent = () => {
-    switch (step) {
-      case 1:
-        return {
-          title: 'What ingredients do you have?',
-          description: 'Add main ingredients for your recipe.',
-          icon: <ShoppingBag className='h-6 w-6' />,
-          inputPlaceholder: 'Add an ingredient...',
-          inputValue: newIngredient,
-          setInputValue: setNewIngredient,
-          addItem: addIngredient,
-          items: ingredients,
-          removeItem: removeIngredient,
-          emptyMessage: 'No ingredients added yet',
-          badgeClassName: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
-          commonItems: COMMON_INGREDIENTS,
-          category: 'ingredients' as const,
-        };
-      case 2:
-        return {
-          title: 'What cooking equipment do you have?',
-          description: 'Add available kitchen equipment.',
-          icon: <Utensils className='h-6 w-6' />,
-          inputPlaceholder: 'Add equipment...',
-          inputValue: newEquipment,
-          setInputValue: setNewEquipment,
-          addItem: addEquipment,
-          items: equipment,
-          removeItem: removeEquipment,
-          emptyMessage: 'No equipment added yet',
-          badgeClassName: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-          commonItems: COMMON_EQUIPMENT,
-          category: 'equipment' as const,
-        };
-      case 3:
-        return {
-          title: 'What staples do you keep?',
-          description: 'Add pantry staples you have.',
-          icon: <ShoppingBag className='h-6 w-6' />,
-          inputPlaceholder: 'Add a staple...',
-          inputValue: newStaple,
-          setInputValue: setNewStaple,
-          addItem: addStaple,
-          items: staples,
-          removeItem: removeStaple,
-          emptyMessage: 'No staples added yet',
-          badgeClassName: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-          commonItems: COMMON_STAPLES,
-          category: 'staples' as const,
-        };
-      case 4:
-        return {
-          title: 'Any dietary preferences?',
-          description: 'Add dietary needs or preferences.',
-          icon: <AlertTriangle className='h-6 w-6' />,
-          inputPlaceholder: 'Add a preference...',
-          inputValue: newDietaryPref,
-          setInputValue: setNewDietaryPref,
-          addItem: addDietaryPref,
-          items: dietaryPrefs,
-          removeItem: removeDietaryPref,
-          emptyMessage: 'No preferences added yet',
-          badgeClassName: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-          commonItems: COMMON_DIETARY_PREFS,
-          category: 'dietary' as const,
-        };
-      default:
-        return {
-          title: '',
-          description: '',
-          icon: null,
-          inputPlaceholder: '',
-          inputValue: '',
-          setInputValue: () => {},
-          addItem: () => {},
-          items: [],
-          removeItem: () => {},
-          emptyMessage: '',
-          badgeClassName: '',
-          commonItems: [],
-          category: 'ingredients' as const,
-        };
-    }
-  };
-
-  const stepContent = getStepContent();
-
-  if (authLoading) {
-    return (
-      <div className='container mx-auto px-4 py-12 flex justify-center items-center'>
-        <Loader2 className='h-12 w-12 animate-spin text-emerald-600' />
-      </div>
-    );
-  }
-
-  return (
-    <div className='container mx-auto px-4 py-12'>
-      <Card className='max-w-2xl mx-auto'>
-        <CardHeader>
-          <div className='flex items-center justify-between mb-2'>
-            <CardTitle className='text-2xl font-bold flex items-center'>
-              <CookingPot className='mr-2 h-6 w-6 text-emerald-600' />
-              Generate Recipes
-            </CardTitle>
-            <div className='text-sm font-medium text-gray-500'>Step {step} of 4</div>
-          </div>
-          <Progress value={step * 25} className='h-2' />
-        </CardHeader>
-
-        {error && (
-          <div className='px-6'>
-            <Alert variant='destructive' className='mb-4 flex justify-between items-center'>
-              <div className='flex items-center'>
-                <AlertCircle className='h-4 w-4 mr-2' />
-                <AlertDescription>{error}</AlertDescription>
-              </div>
-              {retryCount > 0 && retryCount <= maxRetries && (
-                <Button variant='outline' size='sm' onClick={retryGeneration} className='ml-2 whitespace-nowrap'>
-                  <RefreshCw className='h-4 w-4 mr-1' />
-                  Retry
-                </Button>
-              )}
-            </Alert>
-          </div>
-        )}
-
-        <CardContent className='pt-6'>
-          <div className='space-y-6'>
-            <div className='flex items-start gap-4'>
-              <div className='h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0'>
-                {stepContent.icon}
-              </div>
-              <div>
-                <h3 className='text-lg font-medium mb-1'>{stepContent.title}</h3>
-                <p className='text-sm text-gray-500 dark:text-gray-400'>{stepContent.description}</p>
-              </div>
-            </div>
-
-            <div className='flex gap-2'>
-              <Input
-                type='text'
-                value={stepContent.inputValue}
-                onChange={(e) => stepContent.setInputValue(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && stepContent.addItem()}
-                placeholder={stepContent.inputPlaceholder}
-                className='flex-1'
-              />
-              <Button onClick={stepContent.addItem}>
-                <Plus className='h-4 w-4 mr-1' />
-                Add
-              </Button>
-              {speechSupported && step <= 3 && (
-                <Button
-                  variant={listening ? 'destructive' : 'outline'}
-                  onClick={listening ? stopVoiceRecognition : startVoiceRecognition}
-                  className={listening ? 'animate-pulse' : ''}
-                >
-                  {listening ? (
-                    <>
-                      <Square className='h-4 w-4 mr-1' />
-                      Stop
-                    </>
-                  ) : (
-                    <>
-                      <Mic className='h-4 w-4 mr-1' />
-                      Voice
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
-
-            {listening && (
-              <div className='mt-2 p-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-md'>
-                <div className='flex items-center space-x-2'>
-                  <span className='w-2 h-2 bg-red-500 rounded-full animate-pulse'></span>
-                  <p className='text-sm text-red-600 dark:text-red-400'>
-                    Listening... Say your {step === 1 ? 'ingredients' : step === 2 ? 'equipment' : 'staples'} and click Stop
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {transcript && !listening && (
-              <div className='mt-2'>
-                <p className='text-sm text-gray-600 dark:text-gray-400'>
-                  <span className='font-medium'>Last recording:</span> "{transcript}"
-                </p>
-              </div>
-            )}
-
-            <div className='mt-2'>
-              <h4 className='text-sm font-medium mb-2 text-gray-700 dark:text-gray-300'>
-                Common{' '}
-                {step === 1 ? 'Ingredients' : step === 2 ? 'Equipment' : step === 3 ? 'Staples' : 'Preferences'}
-              </h4>
-              <div className='flex flex-wrap gap-2'>
-                {stepContent.commonItems.map((item) => (
-                  <Button
-                    key={item}
-                    variant='outline'
-                    size='sm'
-                    onClick={() => addCommonItem(item, stepContent.category)}
-                    className={
-                      stepContent.items.includes(item)
-                        ? `bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 font-medium ${
-                            step === 1
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : step === 2
-                              ? 'text-blue-600 dark:text-blue-400'
-                              : step === 3
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-purple-600 dark:text-purple-400'
-                          }`
-                        : ''
-                    }
-                  >
-                    {item}
-                    {stepContent.items.includes(item) && <span className='ml-1'>✓</span>}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h4 className='text-sm font-medium mb-2 text-gray-700 dark:text-gray-300'>
-                {stepContent.items.length > 0
-                  ? `Your ${step === 1 ? 'ingredients' : step === 2 ? 'equipment' : step === 3 ? 'staples' : 'preferences'} (${
-                      stepContent.items.length
-                    })`
-                  : ''}
-              </h4>
-              <div className='flex flex-wrap gap-2'>
-                {stepContent.items.length === 0 ? (
-                  <p className='text-sm text-gray-500 italic'>{stepContent.emptyMessage}</p>
-                ) : (
-                  stepContent.items.map((item, index) => (
-                    <Badge key={index} variant='outline' className={stepContent.badgeClassName}>
-                      {item}
-                      <button
-                        type='button'
-                        onClick={() => stepContent.removeItem(index)}
-                        className='ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-1'
-                      >
-                        <X className='h-3 w-3' />
-                        <span className='sr-only'>Remove {item}</span>
-                      </button>
-                    </Badge>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-
-        <CardFooter className='flex justify-between pt-6'>
-          <Button variant='outline' onClick={prevStep} disabled={step === 1}>
-            <ChevronLeft className='h-4 w-4 mr-1' />
-            Back
-          </Button>
-          <Button onClick={nextStep} disabled={generating}>
-            {generating ? (
-              <>
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                Generating...
-              </>
-            ) : step < 4 ? (
-              <>
-                Next
-                <ChevronRight className='h-4 w-4 ml-1' />
-              </>
-            ) : (
-              <>
-                Generate Recipes
-                <CookingPot className='h-4 w-4 ml-1' />
-              </>
-            )}
-          </Button>
-        </CardFooter>
-      </Card>
-    </div>
-  );
-}
-
-export default function GenerateRecipesPage() {
-  return (
-    <AuthWrapper>
-      <MainLayout>
-        <GenerateRecipes />
-      </MainLayout>
-    </AuthWrapper>
-  );
-}
-export default function handler(req, res) {
+// Firebase Admin SDK initialization
+if (!getApps().length) {
   try {
-    // Your recipe generation logic
-    res.status(200).json({ recipes: [] });
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      const serviceAccount: ServiceAccount = JSON.parse(
+        Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY, 'base64').toString()
+      );
+      
+      initializeApp({
+        credential: cert(serviceAccount),
+      });
+      console.log("Firebase Admin initialized with service account");
+    } else {
+      initializeApp({
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      });
+      console.log("Firebase Admin initialized with project ID only");
+    }
   } catch (error) {
-    res.status(500).json({ message: 'Error generating recipes' });
+    console.error('Error initializing Firebase Admin:', error);
+    initializeApp({
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    });
+    console.log("Firebase Admin initialized with fallback after error");
   }
 }
 
+const adminAuth = getAuth();
+const adminDb = getFirestore();
 
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-}
+type RecipeResponse = {
+  recipes?: any[];
+  error?: string;
+  limitExceeded?: boolean;
+  apiInfo?: {
+    error?: string;
+    model?: string;
+  };
+  details?: string;
+};
 
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-}
+// Sample fallback recipes for when the API fails
+const SAMPLE_RECIPES = [
+  {
+    name: "Quick Chicken Stir-Fry",
+    ingredients: [
+      "2 boneless, skinless chicken breasts, cut into strips",
+      "2 cups mixed vegetables (bell peppers, carrots, broccoli)",
+      "3 cloves garlic, minced",
+      "2 tbsp soy sauce",
+      "1 tbsp vegetable oil",
+      "1 tsp ginger, minced",
+      "Salt and pepper to taste"
+    ],
+    instructions: [
+      "Heat oil in a large skillet or wok over medium-high heat.",
+      "Add chicken and cook until no longer pink, about 5-6 minutes.",
+      "Add garlic and ginger, cook for 30 seconds until fragrant.",
+      "Add vegetables and stir-fry for 3-4 minutes until crisp-tender.",
+      "Pour in soy sauce, stir well, and cook for another minute.",
+      "Season with salt and pepper to taste.",
+      "Serve hot over rice or noodles."
+    ],
+    nutritionalFacts: "Calories: ~300 per serving, Protein: 25g, Carbs: 15g, Fat: 12g",
+    servings: "Serves 2",
+    times: "Prep: 10 min | Cook: 15 min"
+  },
+  {
+    name: "Simple Pasta with Garlic and Olive Oil",
+    ingredients: [
+      "8 oz pasta (spaghetti or linguine)",
+      "1/4 cup olive oil",
+      "4 cloves garlic, thinly sliced",
+      "1/4 tsp red pepper flakes (optional)",
+      "2 tbsp fresh parsley, chopped",
+      "Salt and pepper to taste",
+      "Grated Parmesan cheese for serving"
+    ],
+    instructions: [
+      "Bring a large pot of salted water to boil and cook pasta according to package directions until al dente.",
+      "Meanwhile, in a large skillet, heat olive oil over medium-low heat.",
+      "Add sliced garlic and red pepper flakes, cook until garlic is golden (about 2 minutes).",
+      "Drain pasta, reserving 1/4 cup of pasta water.",
+      "Add pasta to the skillet with the garlic oil, toss to coat.",
+      "Add reserved pasta water as needed to create a light sauce.",
+      "Stir in parsley, season with salt and pepper.",
+      "Serve immediately with grated Parmesan cheese."
+    ],
+    nutritionalFacts: "Calories: ~400 per serving, Protein: 10g, Carbs: 50g, Fat: 18g",
+    servings: "Serves 2",
+    times: "Prep: 5 min | Cook: 15 min"
+  },
+  {
+    name: "Vegetable Frittata",
+    ingredients: [
+      "6 large eggs",
+      "1/4 cup milk",
+      "1 cup mixed vegetables (spinach, bell peppers, onions)",
+      "1/2 cup cheese, shredded (cheddar or mozzarella)",
+      "1 tbsp olive oil",
+      "Salt and pepper to taste",
+      "Fresh herbs (optional)"
+    ],
+    instructions: [
+      "Preheat oven to 375°F (190°C).",
+      "In a bowl, whisk together eggs and milk, season with salt and pepper.",
+      "Heat olive oil in an oven-safe skillet over medium heat.",
+      "Add vegetables and cook until softened, about 3-4 minutes.",
+      "Pour egg mixture over vegetables and cook until edges start to set, about 2 minutes.",
+      "Sprinkle cheese on top and transfer skillet to oven.",
+      "Bake for 10-12 minutes until eggs are set and top is lightly golden.",
+      "Let cool slightly before slicing and serving."
+    ],
+    nutritionalFacts: "Calories: ~250 per serving, Protein: 18g, Carbs: 5g, Fat: 18g",
+    servings: "Serves 4",
+    times: "Prep: 10 min | Cook: 20 min"
+  }
+];
 
-interface SpeechRecognitionResultList {
-  length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
+// Clean array input
+const cleanArrayInput = (arr: string[] | undefined): string[] => {
+  if (!arr || !Array.isArray(arr)) return [];
+  return arr.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+};
 
-interface SpeechRecognitionResult {
-  length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-  isFinal: boolean;
-}
+// Increment recipes generated count in user stats
+const incrementRecipesGenerated = async (userId: string): Promise<void> => {
+  try {
+    const userDocRef = adminDb.collection('users').doc(userId);
+    const userDoc = await userDocRef.get();
+    
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      if (!userData) return;
+      
+      const currentMonth = new Date().getMonth();
+      
+      // If the month has changed, reset the counter
+      if (!userData.usageStats || userData.usageStats.month !== currentMonth) {
+        await userDocRef.update({
+          "usageStats.month": currentMonth,
+          "usageStats.recipesGenerated": 1
+        });
+      } else {
+        // Otherwise increment the counter
+        await userDocRef.update({
+          "usageStats.recipesGenerated": (userData.usageStats.recipesGenerated || 0) + 1
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error incrementing recipes generated:", error);
+    // Continue even if this fails - it's not critical for the user experience
+  }
+};
 
-interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<RecipeResponse>
+) {
+  console.log("Recipe generation API called");
+  
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-interface SpeechRecognition extends EventTarget {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: ((event: Event) => void) | null;
-}
+  // Get auth token from request
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.split('Bearer ')[1];
 
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
+  if (!token) {
+    console.error("No token provided in request");
+    return res.status(401).json({ error: 'Unauthorized - No token provided' });
+  }
+
+  try {
+    console.log("Verifying token...");
+    // Verify the token
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    const userId = decodedToken.uid;
+    console.log(`Token verified successfully for user: ${userId}`);
+
+    // Get input data from request
+    const { ingredients, equipment, staples, dietaryPrefs } = req.body;
+    
+    // Clean the input data 
+    const cleanedIngredients = cleanArrayInput(ingredients);
+    const cleanedEquipment = cleanArrayInput(equipment);
+    const cleanedStaples = cleanArrayInput(staples);
+    const cleanedDietaryPrefs = cleanArrayInput(dietaryPrefs);
+    
+    console.log(`User provided: ${cleanedIngredients.length} ingredients, ${cleanedEquipment.length} equipment items,` + 
+      ` ${cleanedStaples.length} staples, and ${cleanedDietaryPrefs.length} dietary preferences`);
+    
+    // Update user stats in background (don't await this)
+    incrementRecipesGenerated(userId).catch(error => {
+      console.error("Background update of user stats failed:", error);
+    });
+
+    // Try to generate recipes with Gemini API
+    try {
+      console.log("Getting Gemini API key");
+      const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      
+      if (!apiKey) {
+        console.error("No Gemini API key found");
+        throw new Error("Gemini API key not found");
+      }
+
+      console.log("Initializing Gemini API with key (first 4 chars):", apiKey.substring(0, 4) + "...");
+      const genAI = new GoogleGenerativeAI(apiKey);
+      
+      // Use gemini-2.0-flash model
+      const modelName = "gemini-2.0-flash";
+      console.log(`Using Gemini model: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
+
+      // Build the prompt
+      let prompt = `Generate 3 original recipes based on these available ingredients, equipment, pantry staples, and dietary preferences.
+
+Available ingredients:
+${cleanedIngredients.join(", ")}
+
+Available equipment:
+${cleanedEquipment.join(", ")}
+
+Pantry staples:
+${cleanedStaples.join(", ")}
+
+Dietary preferences:
+${cleanedDietaryPrefs.join(", ")}
+
+For each recipe, provide:
+1. Name
+2. Ingredients list with measurements
+3. Step-by-step instructions
+4. Basic nutritional facts
+5. Serving size
+6. Preparation and cooking time
+
+Return ONLY a JSON array with exactly this format:
+[
+  {
+    "name": "Recipe Name",
+    "ingredients": ["ingredient 1", "ingredient 2", ...],
+    "instructions": ["step 1", "step 2", ...],
+    "nutritionalFacts": "Calories: X, Protein: Xg, etc.",
+    "servings": "Serves X",
+    "times": "Prep: X min | Cook: X min"
+  },
+  ...
+]`;
+
+      console.log("Sending request to Gemini API...");
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 4096,
+        },
+        safetySettings: [
+          {
+            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+          },
+          {
+            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+          },
+          {
+            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+          },
+          {
+            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+          },
+        ],
+      });
+
+      const response = result.response;
+      if (!response) {
+        console.error("Gemini API returned an empty response");
+        throw new Error("Empty response from Gemini API");
+      }
+
+      const text = response.text();
+      console.log("Successfully received response from Gemini API");
+      
+      // Parse the JSON response
+      try {
+        // Extract JSON from the text - look for anything that might be JSON
+        const jsonRegex = /\[\s*\{.*\}\s*\]/s;
+        const match = text.match(jsonRegex);
+        
+        if (!match) {
+          console.error("Failed to extract JSON from Gemini response");
+          throw new Error("Invalid response format");
+        }
+        
+        const jsonStr = match[0];
+        const recipes = JSON.parse(jsonStr);
+        
+        if (!Array.isArray(recipes) || recipes.length === 0) {
+          console.error("Invalid recipes format returned by Gemini");
+          throw new Error("Invalid recipes format");
+        }
+        
+        console.log(`Successfully parsed ${recipes.length} recipes from API response`);
+        return res.status(200).json({ recipes });
+      } catch (parseError) {
+        console.error("Error parsing Gemini response:", parseError);
+        throw new Error("Failed to parse recipe data");
+      }
+    } catch (geminiError) {
+      console.error("Gemini API error:", geminiError);
+      console.log("Using fallback recipe data instead");
+      
+      // Return sample recipes with API info
+      return res.status(200).json({ 
+        recipes: SAMPLE_RECIPES,
+        apiInfo: {
+          error: geminiError instanceof Error ? geminiError.message : String(geminiError),
+          model: "fallback"
+        }
+      });
+    }
+  } catch (error: any) {
+    console.error('Error in recipe generation:', error);
+    
+    // More specific error handling
+    if (error.code === 'auth/id-token-expired') {
+      return res.status(401).json({ error: 'Authentication token expired' });
+    }
+    if (error.code === 'auth/invalid-id-token') {
+      return res.status(401).json({ error: 'Invalid authentication token' });
+    }
+    
+    const errorMessage = typeof error.message === 'string' ? error.message : 'Unknown error';
+    console.error('Detailed error message:', errorMessage);
+    
+    return res.status(500).json({ 
+      error: 'Failed to generate recipes',
+      details: process.env.NODE_ENV === 'development' ? errorMessage : 'Internal server error' 
+    });
   }
 }
