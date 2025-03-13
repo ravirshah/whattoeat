@@ -501,8 +501,8 @@ function GenerateRecipes() {
       const token = await currentUser.getIdToken();
       
       // Call the API to generate recipes
-      const response = await axios.post('/api/generate-recipes', 
-        {
+// Update the API call to generate recipes
+const response = await axios.post(`${router.basePath}/api/generate-recipes`, {        {
           ingredients,
           equipment,
           staples,
