@@ -4,23 +4,35 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/ge
 import { checkUserUsage } from '@/lib/db';
 import { getAuth } from 'firebase-admin/auth';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { ServiceAccount } from 'firebase-admin';
 
 // Firebase Admin SDK initialization for server-side auth
 if (!getApps().length) {
   try {
-    const serviceAccount = JSON.parse(
-      Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '', 'base64').toString()
-    );
-    
-    initializeApp({
-      credential: cert(serviceAccount)
-    });
+    // For development, read from environment variable
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      const serviceAccount: ServiceAccount = JSON.parse(
+        Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY, 'base64').toString()
+      );
+      
+      initializeApp({
+        credential: cert(serviceAccount),
+      });
+      console.log("Firebase Admin initialized with service account");
+    } else {
+      // Fallback initialization with project ID
+      initializeApp({
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      });
+      console.log("Firebase Admin initialized with project ID only");
+    }
   } catch (error) {
     console.error('Error initializing Firebase Admin:', error);
     // Fallback initialization
     initializeApp({
       projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
     });
+    console.log("Firebase Admin initialized with fallback after error");
   }
 }
 
@@ -34,13 +46,15 @@ type RecipeResponse = {
 // Helper function to clean array input
 const cleanArrayInput = (arr: string[] | undefined): string[] => {
   if (!arr || !Array.isArray(arr)) return [];
-  return arr.filter(item => typeof item === 'string' && item.trim() !== '');
+  return arr.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
 };
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<RecipeResponse>
 ) {
+  console.log("Recipe generation API called");
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -50,18 +64,23 @@ export default async function handler(
   const token = authHeader?.split('Bearer ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    console.error("No token provided in request");
+    return res.status(401).json({ error: 'Unauthorized - No token provided' });
   }
 
   try {
+    console.log("Verifying token...");
     // Verify the token
     const decodedToken = await getAuth().verifyIdToken(token);
     const userId = decodedToken.uid;
+    console.log(`Token verified successfully for user: ${userId}`);
 
     // Check if user has exceeded their usage limit
+    console.log("Checking user usage limits...");
     const hasRemainingUsage = await checkUserUsage(userId);
     
     if (!hasRemainingUsage) {
+      console.log(`User ${userId} has exceeded their usage limit`);
       return res.status(403).json({ 
         error: 'You have reached your free tier limit of 5 recipes per month',
         limitExceeded: true 
@@ -78,19 +97,23 @@ export default async function handler(
 
     // Validate required inputs
     if (cleanedIngredients.length === 0) {
+      console.log("No ingredients provided");
       return res.status(400).json({ error: 'At least one ingredient is required' });
     }
 
     // Initialize Gemini API
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error('Gemini API key not found');
+      console.error("No Gemini API key found in environment variables");
+      throw new Error('Gemini API key not found in server environment');
     }
     
+    console.log("Initializing Gemini API...");
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Use gemini-pro as fallback if gemini-2.0-flash is not available
-    const modelName = "gemini-2.0-flash";
+    // Use gemini-pro model
+    const modelName = "gemini-pro";
+    console.log(`Using Gemini model: ${modelName}`);
     const model = genAI.getGenerativeModel({ model: modelName });
 
     // Construct the prompt
@@ -124,6 +147,7 @@ export default async function handler(
     `;
 
     // Generate response with safety settings
+    console.log("Sending request to Gemini API...");
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
@@ -152,12 +176,26 @@ export default async function handler(
       ],
     });
 
-    const response = await result.response;
+    const response = result.response;
+
+    if (!response) {
+        console.error("Gemini API returned an empty response.");
+        return res.status(500).json({ error: 'Failed to generate recipes - Gemini API returned empty response' });
+    }
+
     const text = response.text();
+    console.log("Successfully received response from Gemini API");
 
     // Parse the response
     const recipes = parseRecipes(text);
 
+    if (recipes.length === 0) {
+      console.error("Failed to parse any recipes from the response");
+      console.log("Response text (first 300 chars):", text.substring(0, 300));
+      return res.status(500).json({ error: 'Failed to parse recipes from AI response' });
+    }
+
+    console.log(`Successfully parsed ${recipes.length} recipes`);
     return res.status(200).json({ recipes });
   } catch (error: any) {
     console.error('Error generating recipes:', error);
@@ -166,11 +204,12 @@ export default async function handler(
     if (error.code === 'auth/id-token-expired') {
       return res.status(401).json({ error: 'Authentication token expired' });
     }
-    if (error.code === 'auth/invalid-token') {
+    if (error.code === 'auth/invalid-id-token') {
       return res.status(401).json({ error: 'Invalid authentication token' });
     }
     
     const errorMessage = typeof error.message === 'string' ? error.message : 'Unknown error';
+    console.error('Detailed error message:', errorMessage);
     
     if (errorMessage.includes('PERMISSION_DENIED')) {
       return res.status(403).json({ error: 'Permission denied to access AI service' });
@@ -183,7 +222,7 @@ export default async function handler(
   }
 }
 
-// Enhanced recipe parser with validation - FIXED REGEX without 's' flag
+// Enhanced recipe parser with validation
 function parseRecipes(text: string) {
   if (!text || typeof text !== 'string') {
     console.warn('Invalid input to parseRecipes:', text);
@@ -192,8 +231,8 @@ function parseRecipes(text: string) {
 
   const recipes = [];
   
-  // Split the text into recipe blocks - removed 'i' flag and using ignore case in regex
-  const recipeBlocks = text.split(/Recipe Name:|RECIPE \d+:/)
+  // Split the text into recipe blocks
+  const recipeBlocks = text.split(/Recipe Name:|RECIPE \d+:/i)
     .filter(block => block && block.trim().length > 0);
   
   if (recipeBlocks.length === 0) {
@@ -203,13 +242,13 @@ function parseRecipes(text: string) {
 
   for (const block of recipeBlocks) {
     try {
-      // Extract recipe components with safer pattern matching - replaced "s" flag with [\s\S]
-      const nameMatch = block.match(/^([\s\S]*?)(?=\s*\n\s*Ingredients:|\s*\n\s*INGREDIENTS:)/);
-      const ingredientsMatch = block.match(/(?:Ingredients:|INGREDIENTS:)([\s\S]*?)(?=\s*\n\s*Instructions:|\s*\n\s*INSTRUCTIONS:)/);
-      const instructionsMatch = block.match(/(?:Instructions:|INSTRUCTIONS:)([\s\S]*?)(?=\s*\n\s*Nutritional Facts:|\s*\n\s*NUTRITIONAL FACTS:)/);
-      const nutritionalMatch = block.match(/(?:Nutritional Facts:|NUTRITIONAL FACTS:)([\s\S]*?)(?=\s*\n\s*Servings:|\s*\n\s*SERVINGS:)/);
-      const servingsMatch = block.match(/(?:Servings:|SERVINGS:)([\s\S]*?)(?=\s*\n\s*Prep\/Cook Times:|\s*\n\s*PREP\/COOK TIMES:)/);
-      const timesMatch = block.match(/(?:Prep\/Cook Times:|PREP\/COOK TIMES:)([\s\S]*?)(?=\s*$)/);
+      // Extract recipe components with safer pattern matching
+      const nameMatch = block.match(/^(.*?)(?=\s*\n\s*Ingredients:|\s*\n\s*INGREDIENTS:)/s);
+      const ingredientsMatch = block.match(/(?:Ingredients:|INGREDIENTS:)(.*?)(?=\s*\n\s*Instructions:|\s*\n\s*INSTRUCTIONS:)/s);
+      const instructionsMatch = block.match(/(?:Instructions:|INSTRUCTIONS:)(.*?)(?=\s*\n\s*Nutritional Facts:|\s*\n\s*NUTRITIONAL FACTS:)/s);
+      const nutritionalMatch = block.match(/(?:Nutritional Facts:|NUTRITIONAL FACTS:)(.*?)(?=\s*\n\s*Servings:|\s*\n\s*SERVINGS:)/s);
+      const servingsMatch = block.match(/(?:Servings:|SERVINGS:)(.*?)(?=\s*\n\s*Prep\/Cook Times:|\s*\n\s*PREP\/COOK TIMES:)/s);
+      const timesMatch = block.match(/(?:Prep\/Cook Times:|PREP\/COOK TIMES:)(.*?)(?=\s*$)/s);
 
       // Process ingredients with proper null handling
       let ingredients: string[] = [];
@@ -235,7 +274,11 @@ function parseRecipes(text: string) {
 
       // Validate required fields
       if (!nameMatch || !ingredientsMatch || !instructionsMatch) {
-        console.warn('Missing required recipe fields in block');
+        console.warn('Missing required recipe fields in block:', { 
+          hasName: !!nameMatch, 
+          hasIngredients: !!ingredientsMatch, 
+          hasInstructions: !!instructionsMatch 
+        });
         continue;
       }
 
