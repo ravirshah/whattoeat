@@ -37,4 +37,8 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 =======
 
+##Welcome to What To Eat
+
+Turn whatever ingrediants, kitchen staples, and equipment you have on hand into your personal generator of tasty cuisines
+
 >>>>>>> 6434dada8249da18064d40bd3f62b15c36e9104a
