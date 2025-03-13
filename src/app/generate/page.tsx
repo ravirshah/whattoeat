@@ -36,9 +36,8 @@ import {
   AlertTriangle,
   Square
 } from 'lucide-react';
-import { withBasePath } from '@/lib/utils';
 
-// Common preset options - moved to the top for reusability
+// Common preset options
 const COMMON_INGREDIENTS = [
   'Chicken', 'Rice', 'Pasta', 'Potatoes', 'Onions', 'Garlic', 
   'Tomatoes', 'Eggs', 'Beef', 'Pork', 'Carrots', 'Bell Peppers', 
@@ -521,7 +520,7 @@ function GenerateRecipes() {
     
     if (!currentUser) {
       setError('You must be logged in to generate recipes');
-      router.push(withBasePath('/signin'));
+      router.push('/signin');
       return;
     }
     
@@ -562,13 +561,13 @@ function GenerateRecipes() {
       try {
         // First try the simpler endpoint (faster, returns sample recipes)
         console.log("Trying simplified API endpoint");
-        response = await axios.post(withBasePath('/api/generate-recipes-simple'), recipeData, apiOptions);
+        response = await axios.post('/api/generate-recipes-simple', recipeData, apiOptions);
       } catch (simpleError) {
         console.log("Simplified endpoint failed, falling back to main endpoint");
         console.error("Simple endpoint error:", simpleError);
         
         // Fall back to the original endpoint if the simple one fails
-        response = await axios.post(withBasePath('/api/generate-recipes'), recipeData, apiOptions);
+        response = await axios.post('/api/generate-recipes', recipeData, apiOptions);
       }
       
       console.log('API Response:', response.status, response.data);
@@ -582,8 +581,8 @@ function GenerateRecipes() {
         try {
           sessionStorage.setItem('generatedRecipes', JSON.stringify(response.data.recipes));
           
-          // Navigate to the results page with proper base path
-          router.push(withBasePath('/recipes/results'));
+          // Navigate to the results page - force absolute path
+          window.location.href = '/recipes/results';
         } catch (error) {
           console.error('Error storing recipes in session storage:', error);
           setError('Failed to save generated recipes. Please try again.');
@@ -605,7 +604,9 @@ function GenerateRecipes() {
         setError('API endpoint not found. This is likely a deployment configuration issue.');
       } else if (error.response?.status === 401) {
         setError('Authentication error. Please sign in again.');
-        setTimeout(() => router.push(withBasePath('/signin')), 2000);
+        setTimeout(() => {
+          window.location.href = '/signin';
+        }, 2000);
       } else if (error.response?.status === 403 && error.response?.data?.limitExceeded) {
         setError('You have reached your free tier limit. Please upgrade to continue.');
       } else if (error.response?.data?.error) {
@@ -910,62 +911,6 @@ function GenerateRecipes() {
           </Button>
         </CardFooter>
       </Card>
-      
-      {/* Debugging section */}
-      <BasePathDebugInfo />
-    </div>
-  );
-}
-
-// Debug component
-function BasePathDebugInfo() {
-  const [showDebug, setShowDebug] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<any>({});
-  
-  useEffect(() => {
-    if (showDebug && typeof window !== 'undefined') {
-      // Collect deployment information
-      const info = {
-        baseUrl: window.location.origin,
-        pathname: window.location.pathname,
-        href: window.location.href,
-        correctBasePath: window.location.pathname.startsWith('/whattoeat') ? '/whattoeat' : '',
-        apiEndpoint: withBasePath('/api/generate-recipes'),
-        resultsLink: withBasePath('/recipes/results'),
-        timestamp: new Date().toISOString()
-      };
-      
-      setDebugInfo(info);
-    }
-  }, [showDebug]);
-  
-  if (!showDebug) {
-    return (
-      <div className="text-center mt-8">
-        <button 
-          onClick={() => setShowDebug(true)}
-          className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-        >
-          Debug Info
-        </button>
-      </div>
-    );
-  }
-  
-  return (
-    <div className="mt-8 p-4 border border-gray-200 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-900 max-w-2xl mx-auto">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-sm font-medium">Base Path Debug Info</h3>
-        <button 
-          onClick={() => setShowDebug(false)}
-          className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-        >
-          Hide
-        </button>
-      </div>
-      <pre className="text-xs overflow-auto p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded">
-        {JSON.stringify(debugInfo, null, 2)}
-      </pre>
     </div>
   );
 }
