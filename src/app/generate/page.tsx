@@ -61,11 +61,66 @@ const COMMON_DIETARY_PREFS = [
   'Low-Carb', 'Keto', 'Paleo', 'Nut-Free', 'Low-Sugar'
 ];
 
+// Add this debug component to help diagnose deployment issues
+function DeploymentDebugInfo() {
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<any>({});
+  
+  useEffect(() => {
+    if (showDebug) {
+      // Collect deployment information
+      const info = {
+        baseUrl: window.location.origin,
+        pathname: window.location.pathname,
+        href: window.location.href,
+        basePath: window.location.pathname.startsWith('/whattoeat') ? '/whattoeat' : '',
+        nextPublicApiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'Set' : 'Not Set',
+        nextPublicAuthDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ? 'Set' : 'Not Set',
+        nextPublicProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ? 'Set' : 'Not Set',
+        timestamp: new Date().toISOString()
+      };
+      
+      setDebugInfo(info);
+    }
+  }, [showDebug]);
+  
+  if (!showDebug) {
+    return (
+      <div className="text-center mt-8">
+        <button 
+          onClick={() => setShowDebug(true)}
+          className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        >
+          Debug Info
+        </button>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="mt-8 p-4 border border-gray-200 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-900">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-sm font-medium">Deployment Debug Info</h3>
+        <button 
+          onClick={() => setShowDebug(false)}
+          className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        >
+          Hide
+        </button>
+      </div>
+      <pre className="text-xs overflow-auto p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded">
+        {JSON.stringify(debugInfo, null, 2)}
+      </pre>
+    </div>
+  );
+}
+
 export default function GenerateRecipesPage() {
   return (
     <AuthWrapper>
       <MainLayout>
         <GenerateRecipes />
+        {process.env.NODE_ENV !== 'production' && <DeploymentDebugInfo />}
       </MainLayout>
     </AuthWrapper>
   );
@@ -549,8 +604,13 @@ function GenerateRecipes() {
       // Get the user's ID token for authentication
       const token = await currentUser.getIdToken();
       
-      // Call the API to generate recipes
-      const response = await axios.post('/api/generate-recipes', {
+      // Get base path and construct API URL correctly
+      const basePath = typeof window !== 'undefined' 
+        ? window.location.pathname.startsWith('/whattoeat') ? '/whattoeat' : '' 
+        : '';
+        
+      // Call the API to generate recipes with the correct path
+      const response = await axios.post(`${basePath}/api/generate-recipes`, {
         ingredients,
         equipment,
         staples,
@@ -562,7 +622,9 @@ function GenerateRecipes() {
         timeout: 60000 // 60 second timeout for recipe generation
       });
       
-      if (!response.data.recipes || response.data.recipes.length === 0) {
+      console.log('API Response:', response.status, response.data);
+      
+      if (!response.data || !response.data.recipes || response.data.recipes.length === 0) {
         throw new Error('No recipes were generated');
       }
       
@@ -571,8 +633,9 @@ function GenerateRecipes() {
         try {
           sessionStorage.setItem('generatedRecipes', JSON.stringify(response.data.recipes));
           
-          // Navigate to the results page
-          router.push('/recipes/results');
+          // Navigate to the results page - be sure to include the base path
+          const basePath = window.location.pathname.startsWith('/whattoeat') ? '/whattoeat' : '';
+          router.push(`${basePath}/recipes/results`);
         } catch (error) {
           console.error('Error storing recipes in session storage:', error);
           setError('Failed to save generated recipes. Please try again.');
@@ -582,10 +645,23 @@ function GenerateRecipes() {
     } catch (error: any) {
       console.error('Error generating recipes:', error);
       
+      // Add detailed logging for debugging
+      if (error.response) {
+        console.error('Error response status:', error.response.status);
+        console.error('Error response data:', error.response.data);
+        console.error('Request URL:', error.config?.url);
+      }
+      
       // Check for specific error responses
-      if (error.response?.status === 401) {
+      if (error.response?.status === 404) {
+        setError('API endpoint not found. This is likely a deployment configuration issue.');
+      } else if (error.response?.status === 401) {
         setError('Authentication error. Please sign in again.');
-        setTimeout(() => router.push('/signin'), 2000);
+        
+        // Include base path in navigation
+        const basePath = typeof window !== 'undefined' && window.location.pathname.startsWith('/whattoeat') 
+          ? '/whattoeat' : '';
+        setTimeout(() => router.push(`${basePath}/signin`), 2000);
       } else if (error.response?.status === 403 && error.response?.data?.limitExceeded) {
         setError('You have reached your free tier limit. Please upgrade to continue.');
       } else if (error.response?.data?.error) {
