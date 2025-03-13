@@ -1,34 +1,21 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+// src/app/layout.tsx
+import './globals.css';
+import type { Metadata } from 'next';
 import { Providers } from './providers';
 
-// Load fonts with display: 'swap' for better performance
-const geistSans = Geist({
-  subsets: ["latin"],
-  display: 'swap',
-  variable: "--font-geist-sans",
-});
-
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
-  display: 'swap',
-  variable: "--font-geist-mono",
-});
-
 export const metadata: Metadata = {
-  title: "WhatToEat",
-  description: "Generate recipes based on ingredients you have",
+  title: 'WhatToEat - Generate Recipes With Your Ingredients',
+  description: 'Generate delicious recipes based on the ingredients you have at hand.',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body>
         <Providers>{children}</Providers>
       </body>
     </html>
