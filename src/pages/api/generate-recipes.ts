@@ -1,15 +1,15 @@
 // src/pages/api/generate-recipes.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
-import { checkUserUsage } from '@/lib/db';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { ServiceAccount } from 'firebase-admin';
 
 // Firebase Admin SDK initialization for server-side auth
 if (!getApps().length) {
   try {
-    // For development, read from environment variable
+    // Try to initialize with service account if available
     if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
       const serviceAccount: ServiceAccount = JSON.parse(
         Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY, 'base64').toString()
@@ -20,7 +20,7 @@ if (!getApps().length) {
       });
       console.log("Firebase Admin initialized with service account");
     } else {
-      // Fallback initialization with project ID
+      // Fall back to project ID initialization
       initializeApp({
         projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       });
@@ -28,13 +28,16 @@ if (!getApps().length) {
     }
   } catch (error) {
     console.error('Error initializing Firebase Admin:', error);
-    // Fallback initialization
     initializeApp({
       projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
     });
     console.log("Firebase Admin initialized with fallback after error");
   }
 }
+
+// Get admin instances
+const adminAuth = getAuth();
+const adminDb = getFirestore();
 
 type RecipeResponse = {
   recipes?: any[];
@@ -47,6 +50,98 @@ type RecipeResponse = {
 const cleanArrayInput = (arr: string[] | undefined): string[] => {
   if (!arr || !Array.isArray(arr)) return [];
   return arr.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+};
+
+// Function to check user usage - modified to work with direct Firestore access and error handling
+const checkUserUsage = async (userId: string): Promise<boolean> => {
+  try {
+    // Get user document from Firestore
+    const userDocRef = adminDb.collection('users').doc(userId);
+    const userDoc = await userDocRef.get();
+    
+    if (!userDoc.exists) {
+      console.log(`User document ${userId} not found`);
+      return true; // Allow usage if document doesn't exist
+    }
+    
+    const userData = userDoc.data();
+    if (!userData) {
+      console.log(`User data is empty for ${userId}`);
+      return true; // Allow usage if data is empty
+    }
+    
+    // If user has a subscription, they have unlimited usage
+    if (userData.subscription && userData.subscription.isActive) {
+      return true;
+    }
+    
+    // Check if user has usage stats
+    if (!userData.usageStats) {
+      // Initialize usage stats if they don't exist
+      await userDocRef.update({
+        usageStats: {
+          month: new Date().getMonth(),
+          recipesGenerated: 0
+        }
+      });
+      return true;
+    }
+    
+    // Check if the user has exceeded the free tier limit (5 recipes per month)
+    const currentMonth = new Date().getMonth();
+    
+    // If it's a new month, reset the counter
+    if (userData.usageStats.month !== currentMonth) {
+      await userDocRef.update({
+        "usageStats.month": currentMonth,
+        "usageStats.recipesGenerated": 0
+      });
+      return true;
+    }
+    
+    // Check if user has reached the limit
+    if (userData.usageStats.recipesGenerated >= 5) {
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error checking user usage:", error);
+    // If there's an error, we'll allow the user to generate recipes
+    // to prevent blocking legitimate users due to backend issues
+    return true;
+  }
+};
+
+// Function to increment recipes generated count
+const incrementRecipesGenerated = async (userId: string): Promise<void> => {
+  try {
+    const userDocRef = adminDb.collection('users').doc(userId);
+    const userDoc = await userDocRef.get();
+    
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      if (!userData) return;
+      
+      const currentMonth = new Date().getMonth();
+      
+      // If the month has changed, reset the counter
+      if (!userData.usageStats || userData.usageStats.month !== currentMonth) {
+        await userDocRef.update({
+          "usageStats.month": currentMonth,
+          "usageStats.recipesGenerated": 1
+        });
+      } else {
+        // Otherwise increment the counter
+        await userDocRef.update({
+          "usageStats.recipesGenerated": (userData.usageStats.recipesGenerated || 0) + 1
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error incrementing recipes generated:", error);
+    // We'll continue even if this fails
+  }
 };
 
 export default async function handler(
@@ -71,7 +166,7 @@ export default async function handler(
   try {
     console.log("Verifying token...");
     // Verify the token
-    const decodedToken = await getAuth().verifyIdToken(token);
+    const decodedToken = await adminAuth.verifyIdToken(token);
     const userId = decodedToken.uid;
     console.log(`Token verified successfully for user: ${userId}`);
 
@@ -111,8 +206,8 @@ export default async function handler(
     console.log("Initializing Gemini API...");
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Use gemini-pro model
-    const modelName = "gemini-pro";
+    // Use gemini-2.0 flash model
+    const modelName = "gemini-2.0-flash";
     console.log(`Using Gemini model: ${modelName}`);
     const model = genAI.getGenerativeModel({ model: modelName });
 
@@ -194,6 +289,9 @@ export default async function handler(
       console.log("Response text (first 300 chars):", text.substring(0, 300));
       return res.status(500).json({ error: 'Failed to parse recipes from AI response' });
     }
+
+    // Update usage stats after successful generation
+    await incrementRecipesGenerated(userId);
 
     console.log(`Successfully parsed ${recipes.length} recipes`);
     return res.status(200).json({ recipes });
