@@ -37,12 +37,9 @@ import {
   CookingPot,
   Utensils,
   ShoppingBag,
-  AlertTriangle
+  AlertTriangle,
+  Square
 } from 'lucide-react';
-// Remove this line since Mic is already imported above
-import { Square } from 'lucide-react';
-
-
 
 // Common preset options - moved to the top for reusability
 const COMMON_INGREDIENTS = [
@@ -179,32 +176,7 @@ function GenerateRecipes() {
     setDietaryPrefs(dietaryPrefs.filter((_, i) => i !== index));
   };
 
-  // New function to add common preset items
-  const addCommonItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary') => {
-    switch (category) {
-      case 'ingredients':
-        if (!ingredients.includes(item)) {
-          setIngredients([...ingredients, item]);
-        }
-        break;
-      case 'equipment':
-        if (!equipment.includes(item)) {
-          setEquipment([...equipment, item]);
-        }
-        break;
-      case 'staples':
-        if (!staples.includes(item)) {
-          setStaples([...staples, item]);
-        }
-        break;
-      case 'dietary':
-        if (!dietaryPrefs.includes(item)) {
-          setDietaryPrefs([...dietaryPrefs, item]);
-        }
-        break;
-    }
-  };
-  
+  // Modified function to start voice recognition for any category
   const startVoiceRecognition = () => {
     // Check browser compatibility
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -218,7 +190,7 @@ function GenerateRecipes() {
     
     // Configure recognition settings
     recognition.lang = 'en-US';
-    recognition.continuous = true; // Changed to true for longer listening sessions
+    recognition.continuous = true;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     
@@ -229,6 +201,16 @@ function GenerateRecipes() {
     setListening(true);
     setTranscript('');
     
+    // Get the current category based on step
+    let category: 'ingredients' | 'equipment' | 'staples' = 'ingredients';
+    if (step === 2) category = 'equipment';
+    if (step === 3) category = 'staples';
+    
+    // Get category-specific display name for toast messages
+    const categoryDisplayName = 
+      category === 'ingredients' ? 'ingredient' : 
+      category === 'equipment' ? 'equipment item' : 'staple item';
+    
     // Handle recognition results
     recognition.onresult = (event: any) => {
       // Get the last result (most recent utterance)
@@ -237,33 +219,46 @@ function GenerateRecipes() {
       
       setTranscript(transcript);
       
-      // Parse ingredients from transcript
-      const parsedIngredients = parseIngredientsFromText(transcript);
+      // Parse items from transcript based on current category
+      const parsedItems = parseItemsFromText(transcript, category);
       
-      if (parsedIngredients.length > 0) {
-        // Add unique ingredients to the list
-        setIngredients((prevIngredients) => {
-          // Create a set of existing ingredients for faster lookup
-          const existingIngredientsSet = new Set(prevIngredients.map(i => i.toLowerCase()));
-          
-          // Only add ingredients that don't already exist (case insensitive)
-          const newIngredients = parsedIngredients.filter(
-            ingredient => !existingIngredientsSet.has(ingredient.toLowerCase())
-          );
-          
-          // Return combined list with properly cased ingredients
-          return [...prevIngredients, ...newIngredients.map(capitalizeFirstLetter)];
-        });
+      if (parsedItems.length > 0) {
+        // Add unique items to the appropriate list based on category
+        if (category === 'ingredients') {
+          setIngredients((prevItems) => {
+            const existingItemsSet = new Set(prevItems.map(i => i.toLowerCase()));
+            const newItems = parsedItems.filter(
+              item => !existingItemsSet.has(item.toLowerCase())
+            );
+            return [...prevItems, ...newItems.map(capitalizeFirstLetter)];
+          });
+        } else if (category === 'equipment') {
+          setEquipment((prevItems) => {
+            const existingItemsSet = new Set(prevItems.map(i => i.toLowerCase()));
+            const newItems = parsedItems.filter(
+              item => !existingItemsSet.has(item.toLowerCase())
+            );
+            return [...prevItems, ...newItems.map(capitalizeFirstLetter)];
+          });
+        } else if (category === 'staples') {
+          setStaples((prevItems) => {
+            const existingItemsSet = new Set(prevItems.map(i => i.toLowerCase()));
+            const newItems = parsedItems.filter(
+              item => !existingItemsSet.has(item.toLowerCase())
+            );
+            return [...prevItems, ...newItems.map(capitalizeFirstLetter)];
+          });
+        }
         
-        // Show success message with the ingredients that were added
-        if (parsedIngredients.length > 0) {
+        // Show success message with the items that were added
+        if (parsedItems.length > 0) {
           toast.success(
-            `Added ${parsedIngredients.length} ingredient${parsedIngredients.length === 1 ? '' : 's'}: ${parsedIngredients.join(', ')}`,
+            `Added ${parsedItems.length} ${categoryDisplayName}${parsedItems.length === 1 ? '' : 's'}: ${parsedItems.join(', ')}`,
             { duration: 4000 }
           );
         }
       } else {
-        toast.error('No ingredients detected. Please try again.');
+        toast.error(`No ${categoryDisplayName}s detected. Please try again.`);
       }
     };
     
@@ -312,6 +307,109 @@ function GenerateRecipes() {
     }
   }
 
+  // More flexible parsing function that adapts based on category
+  const parseItemsFromText = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string[] => {
+    // Normalize text: convert to lowercase
+    let normalizedText = text.toLowerCase();
+    
+    // Different parsing strategies based on category
+    if (category === 'ingredients') {
+      // Replace common fraction words with symbols for ingredients
+      normalizedText = normalizedText
+        .replace(/\bhalf\b/g, '1/2')
+        .replace(/\bhalf a\b/g, '1/2')
+        .replace(/\bquarter\b/g, '1/4')
+        .replace(/\bthird\b/g, '1/3')
+        .replace(/\bthree quarters\b/g, '3/4');
+      
+      // Convert number words to digits but keep them as standalone words
+      normalizedText = normalizedText
+        .replace(/\bone\b/g, '1')
+        .replace(/\btwo\b/g, '2')
+        .replace(/\bthree\b/g, '3')
+        .replace(/\bfour\b/g, '4')
+        .replace(/\bfive\b/g, '5')
+        .replace(/\bsix\b/g, '6')
+        .replace(/\bseven\b/g, '7')
+        .replace(/\beight\b/g, '8')
+        .replace(/\bnine\b/g, '9')
+        .replace(/\bten\b/g, '10');
+    }
+    
+    // Split by common delimiters for all categories
+    const explicitSplits = normalizedText.split(/(?:,|\band\b|\balso\b|\bplus\b|\bthen\b)\s*/i);
+    
+    // Array to hold the parsed items
+    let items: string[] = [];
+    
+    // Process each chunk that might contain multiple items
+    for (let chunk of explicitSplits) {
+      // Remove filler words
+      chunk = chunk.replace(/\b(?:uhh?|umm?|err?|like|maybe|i think|i have|i've got|got|have)\b/gi, '');
+      
+      if (category === 'ingredients') {
+        // More detailed parsing for ingredients
+        
+        // Identify if the chunk might contain multiple ingredients indicated by "some" keyword
+        const someBasedChunks = chunk.split(/\bsome\b/i).map(part => part.trim()).filter(Boolean);
+        
+        if (someBasedChunks.length > 1) {
+          // If "some" was used as a separator, process each part
+          for (let part of someBasedChunks) {
+            if (part) items.push(cleanItem(part, category));
+          }
+        } else {
+          // Check if this chunk might contain a quantity followed by an ingredient
+          const quantityMatch = chunk.match(/^(\d+(?:\/\d+)?)\s+([a-z\s]+)$/);
+          
+          if (quantityMatch) {
+            // We found a quantity followed by an ingredient
+            const quantity = quantityMatch[1];
+            const ingredientText = quantityMatch[2].trim();
+            items.push(`${quantity} ${ingredientText}`);
+          } else {
+            // No quantity pattern found, just clean it normally
+            const cleaned = cleanItem(chunk, category);
+            if (cleaned) items.push(cleaned);
+          }
+        }
+      } else {
+        // Simpler parsing for equipment and staples
+        const cleaned = cleanItem(chunk, category);
+        if (cleaned) items.push(cleaned);
+      }
+    }
+    
+    return items.filter(i => i.length > 0);
+  };
+
+  // Helper function to clean up individual item text based on category
+  const cleanItem = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string => {
+    // Remove common articles from the beginning for all categories
+    let cleaned = text.replace(/^\s*(?:a|an|the|some|few|little)\s+/i, '');
+    
+    if (category === 'ingredients') {
+      // Handle "head of" pattern for ingredients (e.g., "head of broccoli" -> "broccoli")
+      cleaned = cleaned.replace(/\b(head|bunch|clove|piece)s?\s+of\s+/i, '');
+      
+      // Handle common quantity expressions for ingredients
+      cleaned = cleaned.replace(/\ba\s+(?:little|bit\s+of)\s+/i, '');
+    } else if (category === 'equipment') {
+      // Clean up equipment-specific patterns
+      cleaned = cleaned.replace(/\bmy\s+/i, '');
+      cleaned = cleaned.replace(/\bi\s+(?:use|have|own)\s+(?:a|an|the)?\s*/i, '');
+    } else if (category === 'staples') {
+      // Clean up staples-specific patterns
+      cleaned = cleaned.replace(/\balways\s+(?:have|keep)\s+/i, '');
+      cleaned = cleaned.replace(/\bin\s+(?:my|the)\s+pantry\b/i, '');
+    }
+    
+    // Clean up any extra whitespace for all categories
+    cleaned = cleaned.trim();
+    
+    return cleaned;
+  };
+
   // Helper function to capitalize first letter of each word
   const capitalizeFirstLetter = (string: string): string => {
     return string.split(' ')
@@ -319,89 +417,31 @@ function GenerateRecipes() {
       .join(' ');
   };
 
-  // Function to parse ingredients from text
-  const parseIngredientsFromText = (text: string): string[] => {
-    // Normalize text: convert to lowercase
-    let normalizedText = text.toLowerCase();
-    
-    // Replace common fraction words with symbols
-    normalizedText = normalizedText
-      .replace(/\bhalf\b/g, '1/2')
-      .replace(/\bhalf a\b/g, '1/2')
-      .replace(/\bquarter\b/g, '1/4')
-      .replace(/\bthird\b/g, '1/3')
-      .replace(/\bthree quarters\b/g, '3/4');
-    
-    // Convert number words to digits but keep them as standalone words
-    // This helps prevent merging quantities with ingredients
-    normalizedText = normalizedText
-      .replace(/\bone\b/g, '1')
-      .replace(/\btwo\b/g, '2')
-      .replace(/\bthree\b/g, '3')
-      .replace(/\bfour\b/g, '4')
-      .replace(/\bfive\b/g, '5')
-      .replace(/\bsix\b/g, '6')
-      .replace(/\bseven\b/g, '7')
-      .replace(/\beight\b/g, '8')
-      .replace(/\bnine\b/g, '9')
-      .replace(/\bten\b/g, '10');
-      
-    // First, split by explicit delimiters (commas and conjunctions)
-    let ingredients: string[] = [];
-    
-    // Split by common delimiters
-    const explicitSplits = normalizedText.split(/(?:,|\band\b|\balso\b|\bplus\b|\bthen\b)\s*/i);
-    
-    // Process each chunk that might contain multiple ingredients
-    for (let chunk of explicitSplits) {
-      // Remove filler words
-      chunk = chunk.replace(/\b(?:uhh?|umm?|err?|like|maybe|i think|i have|i've got|got|have)\b/gi, '');
-      
-      // Identify if the chunk might contain multiple ingredients indicated by "some" keyword
-      const someBasedChunks = chunk.split(/\bsome\b/i).map(part => part.trim()).filter(Boolean);
-      
-      if (someBasedChunks.length > 1) {
-        // If "some" was used as a separator, process each part
-        for (let part of someBasedChunks) {
-          if (part) ingredients.push(cleanIngredient(part));
+  // New function to add common preset items
+  const addCommonItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary') => {
+    switch (category) {
+      case 'ingredients':
+        if (!ingredients.includes(item)) {
+          setIngredients([...ingredients, item]);
         }
-      } else {
-        // Check if this chunk might contain a quantity followed by an ingredient
-        const quantityMatch = chunk.match(/^(\d+(?:\/\d+)?)\s+([a-z\s]+)$/);
-        
-        if (quantityMatch) {
-          // We found a quantity followed by an ingredient
-          const quantity = quantityMatch[1];
-          const ingredientText = quantityMatch[2].trim();
-          ingredients.push(`${quantity} ${ingredientText}`);
-        } else {
-          // No quantity pattern found, just clean it normally
-          const cleaned = cleanIngredient(chunk);
-          if (cleaned) ingredients.push(cleaned);
+        break;
+      case 'equipment':
+        if (!equipment.includes(item)) {
+          setEquipment([...equipment, item]);
         }
-      }
+        break;
+      case 'staples':
+        if (!staples.includes(item)) {
+          setStaples([...staples, item]);
+        }
+        break;
+      case 'dietary':
+        if (!dietaryPrefs.includes(item)) {
+          setDietaryPrefs([...dietaryPrefs, item]);
+        }
+        break;
     }
-    
-    return ingredients.filter(i => i.length > 0);
   };
-
-  // Helper function to clean up individual ingredient text
-  const cleanIngredient = (text: string): string => {
-    // Remove common articles from the beginning
-    let cleaned = text.replace(/^\s*(?:a|an|the|some|few|little)\s+/i, '');
-    
-    // Handle "head of" pattern (e.g., "head of broccoli" -> "broccoli")
-    cleaned = cleaned.replace(/\b(head|bunch|clove|piece)s?\s+of\s+/i, '');
-    
-    // Handle common quantity expressions
-    cleaned = cleaned.replace(/\ba\s+(?:little|bit\s+of)\s+/i, '');
-    
-    // Clean up any extra whitespace
-    cleaned = cleaned.trim();
-    
-    return cleaned;
-  };
-
   
   const nextStep = async () => {
     if (step === 1 && ingredients.length === 0) {
@@ -649,46 +689,47 @@ function GenerateRecipes() {
                 Add
               </Button>
               
-              {step === 1 && (
-  <Button 
-    variant={listening ? "destructive" : "outline"}
-    onClick={listening ? stopVoiceRecognition : startVoiceRecognition}
-    className={listening ? "animate-pulse" : ""}
-  >
-    {listening ? (
-      <>
-        <Square className="h-4 w-4 mr-1" />
-        Stop
-      </>
-    ) : (
-      <>
-        <Mic className="h-4 w-4 mr-1" />
-        Voice
-      </>
-    )}
-  </Button>
-)}
+              {/* Voice button appears in steps 1-3 (ingredients, equipment, staples) instead of just step 1 */}
+              {step <= 3 && (
+                <Button 
+                  variant={listening ? "destructive" : "outline"}
+                  onClick={listening ? stopVoiceRecognition : startVoiceRecognition}
+                  className={listening ? "animate-pulse" : ""}
+                >
+                  {listening ? (
+                    <>
+                      <Square className="h-4 w-4 mr-1" />
+                      Stop
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="h-4 w-4 mr-1" />
+                      Voice
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
             
-            {/* Add this below the flex container with the input and buttons */}
-{listening && (
-  <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-md">
-    <div className="flex items-center space-x-2">
-      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-      <p className="text-sm text-red-600 dark:text-red-400">
-        Listening... Say your ingredients and click Stop when done
-      </p>
-    </div>
-  </div>
-)}
+            {/* Listening indicator and transcript feedback */}
+            {listening && (
+              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-md">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    Listening... Say your {step === 1 ? 'ingredients' : step === 2 ? 'equipment' : 'staples'} and click Stop when done
+                  </p>
+                </div>
+              </div>
+            )}
 
-{transcript && !listening && (
-  <div className="mt-2">
-    <p className="text-sm text-gray-600 dark:text-gray-400">
-      <span className="font-medium">Last recording:</span> "{transcript}"
-    </p>
-  </div>
-)}
+            {transcript && !listening && (
+              <div className="mt-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="font-medium">Last recording:</span> "{transcript}"
+                </p>
+              </div>
+            )}
 
             {/* Common Items Section - This must always appear regardless of preference loading state */}
             <div className="mt-2">
