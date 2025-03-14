@@ -128,11 +128,16 @@ Prep/Cook Times: ${recipe.times}
         .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
         .join('\n\n');
       const token = await currentUser.getIdToken();
-      const response = await axios.post(
-        getApiUrl('/api/chat-with-recipe'),
-        { message: input, recipeContext, conversationHistory },
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
-      );
+      const response = await axios.post('/whattoeat/api/chat-with-recipe', {
+        message: input,
+        recipeContext,
+        conversationHistory
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+    
       const assistantMessage: ChatMessage = {
         role: 'assistant',
         content: response.data.reply,

@@ -36,7 +36,7 @@ export default function DebugPage() {
       const token = await currentUser.getIdToken();
       
       // Call debug auth API
-      const response = await axios.post(getApiUrl('/api/debug-auth'), {}, {
+      const response = await axios.post('/whattoeat/api/debug-auth', {}, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -580,7 +580,7 @@ function GenerateRecipes() {
       // First try the main API endpoint with a timeout
       let recipeData;
       try {
-        const response = await axios.post(getApiUrl('/api/generate-recipes'), 
+        const response = await axios.post('/whattoeat/api/generate-recipes', 
           requestData,
           {
             headers: {
@@ -590,13 +590,14 @@ function GenerateRecipes() {
             timeout: 60000 // 60 second timeout
           }
         );
+      
         recipeData = response.data;
       } catch (mainApiError) {
         console.error("Error with main API, trying fallback:", mainApiError);
         
         // If the main API fails, try the simplified endpoint as a fallback
         try {
-          const fallbackResponse = await axios.post(getApiUrl('/api/generate-recipes-simple'), 
+          const fallbackResponse = await axios.post('/whattoeat/api/generate-recipes-simple', 
             requestData,
             {
               headers: {
