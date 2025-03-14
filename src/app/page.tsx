@@ -105,7 +105,7 @@ export default function Home() {
               <div className="absolute -inset-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 opacity-30 blur-xl" />
               <div className="relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
                 <Image 
-                  src={`${basePath}/landingpage.png`}
+                  src="/landingpage.png"
                   alt="WhatToEat App Interface"
                   width={800}
                   height={600}                
