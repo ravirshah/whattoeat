@@ -26,14 +26,15 @@ function AuthWrapperContent({
 
   // Check if current route is generate - we'll be more permissive for this route
   const isGeneratePage = pathname?.includes('/generate') || false;
+  const isRecipesPage = pathname?.includes('/recipes') || false;
 
   // Log every render with its state
   console.log(`[AuthWrapper] Render - loading: ${loading}, user: ${!!currentUser}, path: ${pathname}, forceShow: ${forceShow}, redirecting: ${redirecting}, refreshAttempted: ${refreshAttempted}`);
 
-  // Try to refresh auth state once on initial load if no user is detected but we're still loading
+  // Try to refresh auth state once on initial load if no user is detected
   useEffect(() => {
     const tryRefreshAuth = async () => {
-      if (!refreshAttempted && loading && !currentUser) {
+      if (!refreshAttempted) {
         console.log('[AuthWrapper] Attempting to refresh auth state');
         setRefreshAttempted(true);
         try {
@@ -46,13 +47,13 @@ function AuthWrapperContent({
     };
     
     tryRefreshAuth();
-  }, [loading, currentUser, refreshUser, refreshAttempted]);
+  }, [refreshUser, refreshAttempted]);
 
   // Safety timeout effect - if loading for too long, force show content
   // Use shorter timeout for generate page
   useEffect(() => {
     if (loading && !forceShow) {
-      const timeoutDuration = isGeneratePage ? 2000 : 5000; // 2s for generate, 5s for others
+      const timeoutDuration = isGeneratePage ? 1500 : 3000; // 1.5s for generate, 3s for others
       console.log(`[AuthWrapper] Starting safety timeout (${timeoutDuration}ms)`);
       
       const timer = setTimeout(() => {
@@ -66,74 +67,51 @@ function AuthWrapperContent({
 
   // Handle redirection with explicit URL instead of router
   useEffect(() => {
-    // Special case for generate page - we'll be more permissive
-    if (isGeneratePage) {
-      // For generate page, we'll only redirect if:
-      // 1. Not loading
-      // 2. We've explicitly confirmed there's no user (refreshAttempted is true)
-      // 3. Not already redirecting
-      const shouldRedirectFromGenerate = !loading && 
-                                         !currentUser && 
-                                         redirectIfNotAuthenticated && 
-                                         !redirecting &&
-                                         refreshAttempted &&
-                                         !forceShow; // Don't redirect if we're forcing content
+    // For generate and recipes pages, we'll be very permissive
+    if (isGeneratePage || isRecipesPage) {
+      // Skip redirect completely if on these pages
+      console.log(`[AuthWrapper] Skipping auth check for ${isGeneratePage ? 'generate' : 'recipes'} page`);
+      return;
+    }
+    
+    // Normal case for other pages
+    // Only attempt redirect if:
+    // 1. Not loading (or forceShow is true)
+    // 2. No current user
+    // 3. redirectIfNotAuthenticated is true
+    // 4. We haven't already started redirecting
+    // 5. We've already attempted a refresh
+    const shouldRedirect = (!loading || forceShow) && 
+                          !currentUser && 
+                          redirectIfNotAuthenticated && 
+                          !redirecting &&
+                          refreshAttempted;
                           
-      if (shouldRedirectFromGenerate) {
-        console.log('[AuthWrapper] Redirecting from generate page');
-        setRedirecting(true);
-        // Special timeout for generate page
-        setTimeout(() => {
-          if (!currentUser) {
-            const baseUrl = window.location.origin + '/whattoeat';
-            window.location.href = `${baseUrl}/signin?from=generate`;
-          } else {
-            setRedirecting(false);
-          }
-        }, 500);
-      }
-    } else {
-      // Normal case for other pages
-      // Only attempt redirect if:
-      // 1. Not loading (or forceShow is true)
-      // 2. No current user
-      // 3. redirectIfNotAuthenticated is true
-      // 4. We haven't already started redirecting
-      // 5. We've already attempted a refresh
-      const shouldRedirect = (!loading || forceShow) && 
-                            !currentUser && 
-                            redirectIfNotAuthenticated && 
-                            !redirecting &&
-                            refreshAttempted;
-                            
-      if (shouldRedirect) {
-        // CRITICAL: Use window.location with ABSOLUTE URL to avoid path resolution issues
-        const baseUrl = window.location.origin + '/whattoeat';
-        const targetPage = redirectTo.startsWith('/') ? redirectTo.substring(1) : redirectTo;
-        const absoluteUrl = `${baseUrl}/${targetPage}`;
-        
-        console.log(`[AuthWrapper] Redirecting to absolute URL: ${absoluteUrl}`);
-        setRedirecting(true);
-        
-        // Use a small delay to prevent rapid redirects if there's any state flicker
-        setTimeout(() => {
-          if (!currentUser) { // Double check we still need to redirect
-            window.location.href = absoluteUrl;
-          } else {
-            setRedirecting(false);
-          }
-        }, 500);
-      }
+    if (shouldRedirect) {
+      // CRITICAL: Use window.location with ABSOLUTE URL to avoid path resolution issues
+      const baseUrl = window.location.origin + '/whattoeat';
+      const targetPage = redirectTo.startsWith('/') ? redirectTo.substring(1) : redirectTo;
+      const absoluteUrl = `${baseUrl}/${targetPage}`;
+      
+      console.log(`[AuthWrapper] Redirecting to absolute URL: ${absoluteUrl}`);
+      setRedirecting(true);
+      
+      // Use a small delay to prevent rapid redirects if there's any state flicker
+      setTimeout(() => {
+        if (!currentUser) { // Double check we still need to redirect
+          window.location.href = absoluteUrl;
+        } else {
+          setRedirecting(false);
+        }
+      }, 500);
     }
-  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo, forceShow, redirecting, refreshAttempted, isGeneratePage]);
+  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo, forceShow, redirecting, refreshAttempted, isGeneratePage, isRecipesPage]);
 
-  // Special case for generate page - show content faster
-  if (isGeneratePage) {
-    // On generate page, if not redirecting or we're forcing show, display content
-    if (!redirecting || forceShow) {
-      console.log('[AuthWrapper] Showing generate page content');
-      return <>{children}</>;
-    }
+  // For generate and recipes pages - always show content
+  if (isGeneratePage || isRecipesPage) {
+    // Just immediately show content for these pages
+    console.log(`[AuthWrapper] Immediately showing content for ${isGeneratePage ? 'generate' : 'recipes'} page`);
+    return <>{children}</>;
   }
 
   // If still loading and we haven't hit the safety timeout, show loader

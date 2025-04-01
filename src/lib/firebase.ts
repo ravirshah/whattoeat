@@ -1,6 +1,6 @@
 // src/lib/firebase.ts
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
-import { getAuth, Auth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { getAuth, Auth, setPersistence, browserLocalPersistence, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, Firestore, connectFirestoreEmulator } from "firebase/firestore";
 
 // Create stable instances
@@ -30,6 +30,12 @@ try {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   auth = getAuth(app);
   
+  // Force a loading check to ensure authentication state is correctly loaded early
+  if (typeof window !== 'undefined') {
+    console.log("Firebase auth - checking current user on initialization:", !!auth.currentUser);
+    // Don't attach an onAuthStateChanged here, as that would duplicate the global listener in AuthContext
+  }
+  
   // Initialize Firestore with error handling
   try {
     db = getFirestore(app);
@@ -44,6 +50,13 @@ try {
   setPersistence(auth, browserLocalPersistence)
     .then(() => {
       console.log("Firebase persistence set to LOCAL");
+      
+      // Attempt to reload the auth state to ensure it's fresh
+      if (typeof window !== 'undefined' && auth.currentUser) {
+        auth.currentUser.reload()
+          .then(() => console.log("Reloaded auth user after setting persistence"))
+          .catch(err => console.error("Error reloading auth user:", err));
+      }
     })
     .catch((error) => {
       console.error("Error setting persistence:", error);

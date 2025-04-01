@@ -44,6 +44,18 @@ try {
 // Use a flag to track if we're on the initial render or not
 let isFirstRender = true;
 
+// Attempt to get a fresher token on startup
+try {
+  if (typeof window !== 'undefined' && auth.currentUser) {
+    console.log("[AuthContext-Global] Attempting to get fresher token on initialization");
+    auth.currentUser.getIdToken(true)
+      .then(() => console.log("[AuthContext-Global] Successfully refreshed token on initialization"))
+      .catch(err => console.error("[AuthContext-Global] Failed to refresh token on initialization:", err));
+  }
+} catch (e) {
+  console.error("[AuthContext-Global] Error during token refresh attempt:", e);
+}
+
 // Attach the listener *once* globally
 console.log("[AuthContext-Global] Setting up global onAuthStateChanged listener...");
 onAuthStateChanged(auth, 
@@ -119,10 +131,22 @@ console.log("[AuthContext] React Module loaded.");
  */
 async function refreshCurrentUser(): Promise<User | null> {
   try {
+    console.log("[AuthContext] Refreshing current user");
     // Force auth to refresh
     const auth = getAuth();
     await auth.authStateReady();
     const freshUser = auth.currentUser;
+    
+    if (freshUser) {
+      try {
+        // Also refresh the token to ensure it's up-to-date
+        console.log("[AuthContext] Refreshing token for user:", freshUser.uid);
+        await freshUser.getIdToken(true);
+      } catch (tokenError) {
+        console.error("[AuthContext] Error refreshing token:", tokenError);
+        // Continue anyway
+      }
+    }
     
     // Update global state if needed
     if ((freshUser && !globalUser) || (!freshUser && globalUser) || 

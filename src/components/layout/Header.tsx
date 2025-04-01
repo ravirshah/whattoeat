@@ -27,6 +27,23 @@ function HeaderContent() {
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
   const [forceShowButtons, setForceShowButtons] = useState(false);
+  const [headerMounted, setHeaderMounted] = useState(false);
+
+  // Log auth state when header loads
+  useEffect(() => {
+    console.log("[Header] Component mounted - Auth state:", 
+      loading ? "loading" : currentUser ? `User ${currentUser.uid}` : "no user");
+    setHeaderMounted(true);
+  }, []);
+
+  // Log changes to auth state
+  useEffect(() => {
+    if (headerMounted) {
+      console.log("[Header] Auth state changed:", 
+        loading ? "loading" : currentUser ? `User ${currentUser.uid}` : "no user",
+        "forceShowButtons:", forceShowButtons);
+    }
+  }, [loading, currentUser, forceShowButtons, headerMounted]);
 
   // Handle scroll effect for header
   useEffect(() => {
@@ -42,19 +59,21 @@ function HeaderContent() {
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (loading) {
-        console.log("[Header] Force showing buttons after timeout");
+        console.log("[Header] Force showing buttons after timeout - current state:", 
+          loading ? "loading" : currentUser ? "user authenticated" : "no user");
         setForceShowButtons(true);
       }
     }, 3000); // 3 seconds
 
     return () => clearTimeout(timeout);
-  }, [loading]);
+  }, [loading, currentUser]);
 
   const handleSignOut = async () => {
     try {
+      console.log("[Header] Sign out requested");
       await signOut();
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('[Header] Error signing out:', error);
       router.push('/');
     }
   };
