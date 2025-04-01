@@ -40,6 +40,37 @@ import {
 } from 'lucide-react';
 import { getApiUrl } from '@/lib/utils';
 
+// Add Speech Recognition types
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
+// Basic SpeechRecognition interface
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => any) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message: string;
+}
+
 // Common preset options
 const COMMON_INGREDIENTS = [
   'Chicken', 'Rice', 'Pasta', 'Potatoes', 'Onions', 'Garlic', 
@@ -830,6 +861,20 @@ export default function GenerateRecipesPage() {
   const [preferences, setPreferences] = useState<PreferencesData | null>(null);
   const [loadingPreferences, setLoadingPreferences] = useState(true);
   const [preferencesError, setPreferencesError] = useState(false);
+  const [forceContinue, setForceContinue] = useState(false);
+
+  // Force continue after 5 seconds if still loading (safety measure)
+  useEffect(() => {
+    const forceTimeout = setTimeout(() => {
+      if (loadingPreferences) {
+        console.log("[GeneratePage] Force continuing after timeout");
+        setForceContinue(true);
+        setLoadingPreferences(false);
+      }
+    }, 5000);
+
+    return () => clearTimeout(forceTimeout);
+  }, [loadingPreferences]);
 
   // useEffect to load preferences after auth is complete
   useEffect(() => {
@@ -846,7 +891,7 @@ export default function GenerateRecipesPage() {
       setLoadingPreferences(true);
       setPreferencesError(false);
       
-      const loadTimeoutMs = 10000; // 10 second timeout
+      const loadTimeoutMs = 5000; // 5 second timeout (reduced from 10s)
       let timeoutId: NodeJS.Timeout | null = null;
 
       try {
@@ -873,12 +918,21 @@ export default function GenerateRecipesPage() {
         if (timeoutId) clearTimeout(timeoutId); // Clear timeout if it's still pending on error
         
         console.error(`[GeneratePage] Preference load failed for user: ${userUid}`, error);
-        setPreferencesError(true);
-        // Use the timeout error message specifically if that was the cause
-        toast.error(error.message === "Loading user data timed out." ? error.message : 'Failed to load your preferences', {
-          description: 'Please refresh the page or try again later.'
-        });
-        setPreferences(null); // Set preferences to null on error to avoid rendering form with bad data
+        
+        // Don't show error for timeout - just proceed with empty preferences
+        if (error.message === "Loading user data timed out.") {
+          console.log("[GeneratePage] Using empty preferences after timeout");
+          setPreferences({ 
+            ingredients: [], equipment: [], staples: [], dietaryPrefs: [], 
+            cuisine: undefined, cookTime: undefined, difficulty: undefined
+          });
+        } else {
+          setPreferencesError(true);
+          toast.error('Failed to load your preferences', {
+            description: 'Please refresh the page or try again later.'
+          });
+          setPreferences(null); // Set preferences to null on error to avoid rendering form with bad data
+        }
       } finally {
         console.log(`[GeneratePage] Setting loadingPreferences to false for user: ${userUid}`);
         setLoadingPreferences(false);
@@ -886,20 +940,33 @@ export default function GenerateRecipesPage() {
     };
 
     console.log(`[GeneratePage] Effect check - authLoading: ${authLoading}, currentUser: ${!!currentUser}`);
-    if (!authLoading && currentUser) {
+    
+    // If auth isn't loading anymore, or we need to force continue
+    if ((!authLoading && currentUser) || forceContinue) {
       loadUserPreferences();
     } else if (!authLoading && !currentUser) {
       console.log("[GeneratePage] Auth loaded, no user. Setting loadingPreferences false.");
       setLoadingPreferences(false);
     }
-  }, [authLoading, currentUser]); 
+  }, [authLoading, currentUser, forceContinue]); 
+
+  // If we need to force continue without preferences, create empty ones
+  useEffect(() => {
+    if (forceContinue && !preferences) {
+      console.log("[GeneratePage] Force continuing with empty preferences");
+      setPreferences({ 
+        ingredients: [], equipment: [], staples: [], dietaryPrefs: [], 
+        cuisine: undefined, cookTime: undefined, difficulty: undefined
+      });
+    }
+  }, [forceContinue, preferences]);
 
   // AuthWrapper handles the main auth loading/redirect
   return (
     <AuthWrapper>
       <MainLayout>
         {/* Show loader while preferences are loading */}
-        {loadingPreferences && (
+        {loadingPreferences && !forceContinue && (
            <div className="container mx-auto px-4 py-8 max-w-4xl flex justify-center items-center min-h-[400px]"> 
               <div className="flex flex-col items-center space-y-4">
                 <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
@@ -909,7 +976,7 @@ export default function GenerateRecipesPage() {
         )}
 
         {/* Show error if preferences failed to load */}
-        {!loadingPreferences && preferencesError && (
+        {!loadingPreferences && preferencesError && !forceContinue && (
           <div className="container mx-auto px-4 py-8 max-w-4xl">
             <Alert variant="destructive" className="mt-4">
               <AlertTriangle className="h-4 w-4" />
@@ -920,10 +987,10 @@ export default function GenerateRecipesPage() {
           </div>
         )}
 
-        {/* Render GenerateRecipes only when preferences are loaded successfully */}
-        {!loadingPreferences && !preferencesError && preferences && (
+        {/* Render GenerateRecipes when preferences are loaded or we're forcing render with empty preferences */}
+        {(!loadingPreferences && !preferencesError && preferences) || (forceContinue && preferences) ? (
           <GenerateRecipes initialPreferences={preferences} />
-        )}
+        ) : null}
       </MainLayout>
     </AuthWrapper>
   );

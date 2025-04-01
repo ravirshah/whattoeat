@@ -27,6 +27,9 @@ export function setGlobalAuthUser(user: User | null) {
   notifyAuthSubscribers();
 }
 
+// Use a flag to track if we're on the initial render or not
+let isFirstRender = true;
+
 // Attach the listener *once* globally
 console.log("[AuthContext-Global] Setting up global onAuthStateChanged listener...");
 onAuthStateChanged(auth, 
@@ -34,20 +37,36 @@ onAuthStateChanged(auth,
     // Success callback
     console.log("[AuthContext-Global] Listener success callback executed.", user ? `User ID: ${user.uid}` : "No user");
     globalUser = user;
+    
     if (!globalInitialAuthCheckComplete) {
       console.log("[AuthContext-Global] Initial auth check complete.");
       globalInitialAuthCheckComplete = true;
+      
+      // If this is the first render and we're in the browser, use a small timeout
+      // to ensure subscribers have had a chance to register
+      if (isFirstRender && typeof window !== 'undefined') {
+        isFirstRender = false;
+        console.log("[AuthContext-Global] First render detected, delaying notification to allow subscribers to register");
+        setTimeout(() => {
+          console.log("[AuthContext-Global] Delayed notification triggered");
+          notifyAuthSubscribers();
+        }, 100);
+        return; // Don't notify immediately
+      }
     }
+    
     notifyAuthSubscribers();
   },
   (error) => {
     // Error callback
     console.error("[AuthContext-Global] Listener error callback executed:", error);
     globalUser = null;
+    
     if (!globalInitialAuthCheckComplete) {
-      console.log("[AuthContext-Global] Initial auth check complete (due to error).", );
+      console.log("[AuthContext-Global] Initial auth check complete (due to error).");
       globalInitialAuthCheckComplete = true;
     }
+    
     notifyAuthSubscribers();
   }
 );
@@ -87,6 +106,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // This function will run whenever the global state changes (via notification)
     const handleAuthChange = () => {
       console.log("[AuthContext-Provider] handleAuthChange triggered by notification.");
+      console.log("[AuthContext-Provider] Global state:", globalUser ? `User ID: ${globalUser.uid}` : "No user", "Loading:", !globalInitialAuthCheckComplete);
+      
       // Update React state from global state
       setCurrentUser(globalUser);
       setLoading(!globalInitialAuthCheckComplete); 
