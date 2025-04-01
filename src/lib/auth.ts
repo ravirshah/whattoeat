@@ -8,7 +8,8 @@ import {
   } from "firebase/auth";
   import { auth, db } from "./firebase";
   import { doc, setDoc, getDoc } from "firebase/firestore";
-  
+  import { setGlobalAuthUser } from './context/AuthContext';
+
   // Register with email and password
   export const registerWithEmail = async (email: string, password: string) => {
     console.log("Starting registration with email:", email);
@@ -49,6 +50,9 @@ import {
       const provider = new GoogleAuthProvider();
       const userCredential = await signInWithPopup(auth, provider);
       console.log("Google signin successful:", userCredential.user.uid);
+      
+      // IMPORTANT: Force update the global auth state
+      setGlobalAuthUser(userCredential.user);
       
       // Check if user document exists, create if it doesn't
       const userDocRef = doc(db, "users", userCredential.user.uid);
