@@ -25,6 +25,7 @@ export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
+  const [forceShowButtons, setForceShowButtons] = useState(false);
 
   // Handle scroll effect for header
   useEffect(() => {
@@ -35,6 +36,18 @@ export default function Header() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Force show the buttons if loading takes too long
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (loading) {
+        console.log("[Header] Force showing buttons after timeout");
+        setForceShowButtons(true);
+      }
+    }, 3000); // 3 seconds
+
+    return () => clearTimeout(timeout);
+  }, [loading]);
 
   const handleSignOut = async () => {
     try {
@@ -83,7 +96,7 @@ export default function Header() {
 
         {/* Auth Actions */}
         <div className="hidden md:flex items-center space-x-4">
-          {loading ? (
+          {loading && !forceShowButtons ? (
             <div className="h-9 w-24 bg-gray-200 animate-pulse rounded-md dark:bg-gray-700"></div>
           ) : currentUser ? (
             <DropdownMenu>
@@ -180,7 +193,7 @@ export default function Header() {
               </div>
               
               <div className="py-6 border-t border-gray-200 dark:border-gray-700">
-                {!loading && (
+                {(!loading || forceShowButtons) && (
                   currentUser ? (
                     <div className="space-y-4">
                       <div className="flex items-center">

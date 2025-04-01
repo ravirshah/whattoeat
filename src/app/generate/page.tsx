@@ -412,11 +412,36 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
   // Generate recipes
   const generateRecipes = async () => {
     if (ingredients.length === 0) { setError('Please add at least one ingredient'); setStep(1); return; }
-    if (!currentUser) { setError('You must be logged in to generate recipes'); router.push('/signin'); return; }
+    
+    // Skip this check since user is already authenticated at this point
+    // if (!currentUser) { setError('You must be logged in to generate recipes'); router.push('/signin'); return; }
+    
     setGenerating(true); setError(''); setRetryCount(0);
     try {
-      try { incrementRecipesGenerated(currentUser.uid).catch(err => console.error("Failed to increment recipe count:", err)); } catch (statsError) { console.error("Error updating stats:", statsError); }
-      let token; try { token = await currentUser.getIdToken(); if (!token) throw new Error("Failed to get authentication token"); } catch (tokenError) { console.error("Error getting auth token:", tokenError); setError('Authentication error. Please try signing in again.'); setGenerating(false); return; }
+      try { 
+        if (currentUser?.uid) {
+          incrementRecipesGenerated(currentUser.uid).catch(err => console.error("Failed to increment recipe count:", err)); 
+        }
+      } catch (statsError) { console.error("Error updating stats:", statsError); }
+      
+      let token;
+      try { 
+        if (!currentUser) {
+          // Just reset loading if no user
+          setError("User authentication required. Please try refreshing the page.");
+          setGenerating(false);
+          return;
+        }
+        
+        token = await currentUser.getIdToken(); 
+        if (!token) throw new Error("Failed to get authentication token"); 
+      } catch (tokenError) { 
+        console.error("Error getting auth token:", tokenError); 
+        setError('Authentication error. Please try refreshing the page.'); 
+        setGenerating(false); 
+        return; 
+      }
+      
       const requestData = { ingredients, equipment, staples, dietaryPrefs, cuisine, cookTime, difficulty, userId: currentUser.uid };
       console.log("Sending API request with data:", { ingredientsCount: ingredients.length, equipmentCount: equipment.length, staplesCount: staples.length, dietaryPrefsCount: dietaryPrefs.length });
       let recipeData; try {
@@ -444,7 +469,10 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
       const newRetryCount = retryCount + 1; setRetryCount(newRetryCount);
       if (error.response) {
         console.error("Server error:", error.response.status, error.response.data);
-        if (error.response.status === 401) { setError("Your session has expired. Please sign in again."); setTimeout(() => router.push('/signin'), 2000); } 
+        if (error.response.status === 401) { 
+          // Don't redirect to signin, just show an error
+          setError("Authentication error. Please refresh the page and try again."); 
+        } 
         else if (error.response.data && error.response.data.error) { setError(error.response.data.error); } 
         else { setError("Error communicating with the recipe service. Please try again."); }
       } else if (error.request) { console.error("Network error, no response received"); setError("Network issue. Please check your connection and try again."); }
