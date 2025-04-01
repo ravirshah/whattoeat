@@ -1,8 +1,8 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, getAuth } from 'firebase/auth';
-import { app } from '../firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth } from '../firebase';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -25,53 +25,62 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     console.log("[AuthContext] useEffect triggered.");
     
-    // Add safety timeout
-    const safetyTimeoutId = setTimeout(() => {
-      console.log("[AuthContext] Safety timeout triggered. Force completing auth check.");
+    // Direct auth state check first (current state)
+    console.log("[AuthContext] Direct currentUser check:", auth.currentUser?.uid || "No user");
+    
+    // This is critical: If Firebase thinks user is already logged in, update state immediately
+    if (auth.currentUser) {
+      console.log("[AuthContext] Setting initial user from direct check:", auth.currentUser.uid);
+      setCurrentUser(auth.currentUser);
       setLoading(false);
-    }, 5000); // 5 seconds timeout
+    }
+    
+    // Safety timeout - don't block app forever if auth is broken
+    const safetyTimeout = setTimeout(() => {
+      console.log("[AuthContext] Safety timeout triggered - forcing auth complete");
+      setLoading(false);
+    }, 5000);
+    
+    let unsubscribed = false;
     
     try {
-      const auth = getAuth(app);
-      console.log("[AuthContext] Auth instance:", auth);
-      
-      // Direct check for current user first
-      const currentUser = auth.currentUser;
-      console.log("[AuthContext] Direct currentUser check:", currentUser?.uid || "No user");
-      
-      if (currentUser) {
-        console.log("[AuthContext] User already authenticated, skipping listener");
-        setCurrentUser(currentUser);
-        setLoading(false);
-        clearTimeout(safetyTimeoutId);
-        return;
-      }
-      
-      // Set up auth state listener
-      const unsubscribe = auth.onAuthStateChanged((user) => {
-        console.log("[AuthContext] Auth state changed:", user?.uid || "No user");
-        setCurrentUser(user);
-        setLoading(false);
-        clearTimeout(safetyTimeoutId);
-      }, (error) => {
-        console.error("[AuthContext] Auth state change error:", error);
-        setLoading(false);
-        clearTimeout(safetyTimeoutId);
-      });
+      // Auth state listener for changes
+      const unsubscribe = onAuthStateChanged(auth, 
+        (user) => {
+          if (unsubscribed) return;
+          
+          console.log("[AuthContext] Auth state changed:", user?.uid || "No user");
+          setCurrentUser(user);
+          setLoading(false);
+          clearTimeout(safetyTimeout);
+        }, 
+        (error) => {
+          if (unsubscribed) return;
+          
+          console.error("[AuthContext] Auth error:", error);
+          setLoading(false);
+          clearTimeout(safetyTimeout);
+        }
+      );
       
       return () => {
+        unsubscribed = true;
+        clearTimeout(safetyTimeout);
         unsubscribe();
-        clearTimeout(safetyTimeoutId);
       };
     } catch (error) {
-      console.error("[AuthContext] Error in auth setup:", error);
+      console.error("[AuthContext] Setup error:", error);
       setLoading(false);
-      clearTimeout(safetyTimeoutId);
+      clearTimeout(safetyTimeout);
+      return () => {}; // empty cleanup if setup failed
     }
   }, []);
 
-  console.log(`[AuthContext] Current state - Loading: ${loading}, User: ${!!currentUser}`);
-  
+  // Debug logging
+  useEffect(() => {
+    console.log(`[AuthContext] State updated - Loading: ${loading}, User: ${currentUser?.uid || "null"}`);
+  }, [loading, currentUser]);
+
   return (
     <AuthContext.Provider value={{ currentUser, loading }}>
       {children}
