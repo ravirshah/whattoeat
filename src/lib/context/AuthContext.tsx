@@ -2,95 +2,86 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from 'firebase/auth';
-import { auth } from '../firebase';
+import { onAuthStateChanged, User, getAuth, Auth } from 'firebase/auth'; // Import getAuth
+import { app } from '../firebase'; // Import the initialized FirebaseApp instance
 
-// Create a global auth state to bypass React re-render issues
-let globalAuthState: { user: User | null } = { user: null };
-
-// Manual auth state setter that we'll export to force updates
-export function setGlobalAuthUser(user: User | null) {
-  console.log("[AuthContext] Manual auth update:", user?.uid || "null");
-  globalAuthState.user = user;
-  // Notify all subscribers (implemented below)
-  notifyAuthSubscribers();
-}
-
-// Simple pub/sub system to notify components of auth changes
-const authSubscribers: Function[] = [];
-function notifyAuthSubscribers() {
-  authSubscribers.forEach(callback => callback(globalAuthState.user));
-}
-
-// Check for existing user immediately
-if (auth.currentUser) {
-  console.log("[AuthContext] Found existing user on init:", auth.currentUser.uid);
-  globalAuthState.user = auth.currentUser;
-}
-
-// Set up the auth listener at module level (outside React)
-auth.onAuthStateChanged((user) => {
-  console.log("[AuthContext] Global auth state changed:", user?.uid || "null");
-  globalAuthState.user = user;
-  notifyAuthSubscribers();
-});
-
-// Context type
 interface AuthContextType {
   currentUser: User | null;
-  loading: boolean;
+  loading: boolean; // True = initial auth state unknown; False = initial state known
 }
 
-// Create the context
 const AuthContext = createContext<AuthContextType>({
   currentUser: null,
-  loading: false,
+  loading: true, // Start loading
 });
 
 export const useAuth = () => useContext(AuthContext);
 
-// Provider component
+console.log("[AuthContext] Module loaded.");
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [authState, setAuthState] = useState<AuthContextType>(() => ({
-    // Initialize from global state
-    currentUser: globalAuthState.user,
-    loading: false
-  }));
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // State specifically for whether the listener setup is complete
+  const [initialAuthCheckComplete, setInitialAuthCheckComplete] = useState(false);
 
-  // Subscribe to auth changes
   useEffect(() => {
-    console.log("[AuthContext] Setting up subscription");
+    console.log("[AuthContext] useEffect triggered.");
     
-    // Update from current global state
-    setAuthState({
-      currentUser: globalAuthState.user,
-      loading: false
-    });
-    
-    // Subscribe to future changes
-    function handleAuthChange(user: User | null) {
-      console.log("[AuthContext] Subscriber received auth change:", user?.uid || "null");
-      setAuthState({
-        currentUser: user,
-        loading: false
-      });
+    let authInstance: Auth;
+    try {
+      // Get the Auth instance directly using the initialized app
+      authInstance = getAuth(app); 
+      console.log("[AuthContext] Successfully obtained Auth instance.");
+    } catch (error) {
+        console.error("[AuthContext] FATAL: Failed to get Auth instance:", error);
+        setInitialAuthCheckComplete(true); // Mark as complete (failed)
+        return; // Stop
     }
-    
-    // Add subscriber
-    authSubscribers.push(handleAuthChange);
-    
-    // Cleanup
-    return () => {
-      const index = authSubscribers.indexOf(handleAuthChange);
-      if (index > -1) authSubscribers.splice(index, 1);
-    };
-  }, []);
 
-  console.log(`[AuthContext] Rendering with user=${authState.currentUser?.uid || "null"}`);
-  
-  return (
-    <AuthContext.Provider value={authState}>
-      {children}
-    </AuthContext.Provider>
-  );
+    console.log("[AuthContext] Attaching onAuthStateChanged listener...");
+    let isSubscribed = true; // Prevent state updates after unmount
+
+    const unsubscribe = onAuthStateChanged(authInstance, // Use the obtained instance
+      (user) => {
+        // SUCCESS CALLBACK
+        if (!isSubscribed) {
+          console.log("[AuthContext] Listener success callback fired AFTER unmount. Ignoring.");
+          return;
+        }
+        console.log("[AuthContext] Listener success callback executed.", user ? `User ID: ${user.uid}` : "No user");
+        setCurrentUser(user);
+        setInitialAuthCheckComplete(true); // Mark check as complete
+      },
+      (error) => {
+        // ERROR CALLBACK
+        if (!isSubscribed) {
+          console.log("[AuthContext] Listener error callback fired AFTER unmount. Ignoring.");
+          return;
+        }
+        console.error("[AuthContext] Listener error callback executed:", error);
+        setCurrentUser(null);
+        setInitialAuthCheckComplete(true); // Mark check as complete (failed)
+      }
+    );
+
+    console.log("[AuthContext] Listener attached.");
+
+    // Cleanup function
+    return () => {
+      console.log("[AuthContext] useEffect cleanup: Unsubscribing...");
+      isSubscribed = false;
+      unsubscribe();
+    };
+
+    // Run only once on mount, as we get the auth instance inside.
+  }, []); // Empty dependency array
+
+  // Derive the public 'loading' state based on whether the initial check completed
+  const loading = !initialAuthCheckComplete;
+
+  const value = { currentUser, loading };
+
+  console.log(`[AuthContext] Rendering Provider - Derived Loading: ${loading}, User: ${!!currentUser}, CheckComplete: ${initialAuthCheckComplete}`);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
