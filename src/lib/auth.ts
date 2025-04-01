@@ -80,8 +80,9 @@ export async function signInWithGoogle() {
     try {
       await createUserDocument(result.user);
     } catch (error) {
-      console.error("[Auth] Error creating/updating user document:", error);
-      // Continue anyway - don't block authentication for DB errors
+      console.error("[Auth] CRITICAL: Error creating/updating user document:", error);
+      // Temporarily re-throw the error to prevent continuation
+      throw new Error("Failed to initialize user profile in database."); 
     }
     
     // Update global auth state

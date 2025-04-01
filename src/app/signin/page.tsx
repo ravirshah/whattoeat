@@ -41,11 +41,11 @@ function SignInContent() {
     // }
     
     // console.log(`[SignIn] Sign in successful, user: ${user.uid}`); // Can't log user.uid anymore
-    console.log(`[SignIn] Sign in process successful, navigating to /whattoeat/generate`);
+    console.log(`[SignIn] Sign in process successful, navigating to /generate`);
     
     // Navigate programmatically to the generate page
     // console.log(`[SignIn] Sign in successful, navigating to /whattoeat/generate`); // Redundant log
-    router.push('/whattoeat/generate');
+    router.push('/generate');
   };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {

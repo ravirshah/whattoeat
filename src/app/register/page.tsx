@@ -61,9 +61,9 @@ function RegisterContent() {
       // Call the auth function, don't expect redirect
       await registerWithEmail(email, password);
       // Manually refresh user and navigate on success
-      console.log("[Register] Registration successful, refreshing user and navigating");
+      console.log("[Register] Registration successful, refreshing user and navigating to /generate");
       await refreshUser(); // Ensure AuthContext is updated
-      router.push('/whattoeat/generate'); // Navigate using router
+      router.push('/generate'); // Navigate using router
     } catch (error: any) {
       // Try to provide a more user-friendly error message
       const errorCode = error.code;
