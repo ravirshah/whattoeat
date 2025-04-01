@@ -16,39 +16,51 @@ import { setGlobalAuthUser } from './context/AuthContext';
 
 // Register with email and password
 export const registerWithEmail = async (email: string, password: string) => {
-  console.log("Starting registration with email:", email);
+  console.log("[Auth] Starting registration with email:", email);
   
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    console.log("User registered successfully:", userCredential.user.uid);
+    console.log("[Auth] User registered successfully:", userCredential.user.uid);
     
     // Create user document in Firestore
     await createUserDocument(userCredential.user);
     
-    // IMPORTANT: Force update the global auth state
-    setGlobalAuthUser(userCredential.user);
+    // Force token refresh immediately after registration
+    await userCredential.user.getIdToken(true);
+    console.log("[Auth] Successfully refreshed user token for new registration");
+    
+    // Force direct navigation to generate page
+    console.log("[Auth] Registration successful, redirecting to generate page");
+    const baseUrl = window.location.origin + '/whattoeat';
+    window.location.href = `${baseUrl}/generate`;
     
     return userCredential.user;
   } catch (error) {
-    console.error("Error registering user:", error);
+    console.error("[Auth] Error registering user:", error);
     throw error;
   }
 };
 
 // Sign in with email and password
 export const signInWithEmail = async (email: string, password: string) => {
-  console.log("Starting signin with email:", email);
+  console.log("[Auth] Starting signin with email:", email);
   
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    console.log("User signed in successfully:", userCredential.user.uid);
+    console.log("[Auth] User signed in successfully:", userCredential.user.uid);
     
-    // IMPORTANT: Force update the global auth state
-    setGlobalAuthUser(userCredential.user);
+    // Force token refresh immediately after sign-in
+    await userCredential.user.getIdToken(true);
+    console.log("[Auth] Successfully refreshed user token for email sign-in");
+    
+    // Force direct navigation to generate page
+    console.log("[Auth] Email sign-in successful, redirecting to generate page");
+    const baseUrl = window.location.origin + '/whattoeat';
+    window.location.href = `${baseUrl}/generate`;
     
     return userCredential.user;
   } catch (error) {
-    console.error("Error signing in:", error);
+    console.error("[Auth] Error signing in with email:", error);
     throw error;
   }
 };
@@ -86,11 +98,12 @@ export async function signInWithGoogle() {
     const urlParams = new URLSearchParams(window.location.search);
     const fromGenerate = urlParams.get('from') === 'generate';
     
-    console.log("[Auth] Reloading page with destination:", fromGenerate ? "generate page" : "home page");
+    console.log("[Auth] Reloading page with destination: generate page");
     
     // Use direct navigation to ensure clean state
     const baseUrl = window.location.origin + '/whattoeat';
-    window.location.href = fromGenerate ? `${baseUrl}/generate` : baseUrl;
+    // Always redirect to generate page after sign-in, regardless of where we came from
+    window.location.href = `${baseUrl}/generate`;
     
     return true;
   } catch (error: unknown) {

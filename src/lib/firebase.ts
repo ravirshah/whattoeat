@@ -42,6 +42,20 @@ try {
         const currentUser = auth.currentUser;
         console.log('[Firebase] Initial auth state:', currentUser ? `User logged in: ${currentUser.uid}` : 'No user logged in');
         
+        // Set up auth state changed listener to log all auth state changes
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            console.log('[Firebase] Auth state changed: User logged in:', user.uid);
+            
+            // Force a token refresh when auth state changes to logged in
+            user.getIdToken(true)
+              .then(() => console.log('[Firebase] Token refreshed after auth state change'))
+              .catch(err => console.error('[Firebase] Error refreshing token after auth state change:', err));
+          } else {
+            console.log('[Firebase] Auth state changed: No user logged in');
+          }
+        });
+        
         // Force onAuthStateChanged to fire by refreshing token if needed
         if (currentUser) {
           currentUser.getIdToken(true)

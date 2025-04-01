@@ -58,9 +58,9 @@ function RegisterContent() {
     console.log(`[Register] Attempting to register with email: ${email}`);
 
     try {
+      // The registerWithEmail function now handles redirect
       await registerWithEmail(email, password);
-      console.log(`[Register] Registration successful`);
-      await handleSuccessfulRegistration();
+      // We shouldn't reach this point as page will be redirected
     } catch (error: any) {
       // Try to provide a more user-friendly error message
       const errorCode = error.code;
@@ -76,7 +76,6 @@ function RegisterContent() {
       
       console.error(`[Register] Registration error: ${errorCode} - ${errorMessage}`);
       setError(errorMessage);
-    } finally {
       setLoading(false);
     }
   };

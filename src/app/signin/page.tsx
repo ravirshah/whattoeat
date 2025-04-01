@@ -38,27 +38,24 @@ function SignInContent() {
     
     console.log(`[SignIn] Sign in successful, user: ${user.uid}`);
     
-    // Navigate to the appropriate page
-    const redirectPath = fromGenerate ? '/generate' : '/generate';
-    console.log(`[SignIn] Sign in successful, redirecting to ${redirectPath}`);
+    // Always navigate to generate page
+    console.log(`[SignIn] Sign in successful, redirecting to /generate`);
     
     // Use direct navigation for most reliable page transition
     // Forcing a complete page reload to ensure auth state is fully updated
-    window.location.href = window.location.origin + '/whattoeat' + redirectPath;
+    window.location.href = window.location.origin + '/whattoeat/generate';
   };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    console.log(`[SignIn] Attempting to sign in with email: ${email}, fromGenerate: ${fromGenerate}`);
+    console.log(`[SignIn] Attempting to sign in with email: ${email}`);
   
     try {
-      const user = await signInWithEmail(email, password);
-      console.log("[SignIn] Sign in successful:", user.uid);
-      
-      // Use the common success handler
-      await handleSuccessfulSignIn();
+      // The signInWithEmail function now handles redirection
+      await signInWithEmail(email, password);
+      // We should never reach here as the page will redirect
     } catch (error: any) {
       console.error("[SignIn] Sign in error:", error);
   
@@ -77,7 +74,6 @@ function SignInContent() {
       }
       
       setError(errorMessage);
-    } finally {
       setLoading(false);
     }
   };
