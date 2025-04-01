@@ -31,7 +31,7 @@ export const registerWithEmail = async (email: string, password: string) => {
     
     // Force direct navigation to generate page
     console.log("[Auth] Registration successful, redirecting to generate page");
-    const baseUrl = window.location.origin + '/whattoeat';
+    const baseUrl = window.location.origin;
     window.location.href = `${baseUrl}/generate`;
     
     return userCredential.user;
@@ -55,7 +55,7 @@ export const signInWithEmail = async (email: string, password: string) => {
     
     // Force direct navigation to generate page
     console.log("[Auth] Email sign-in successful, redirecting to generate page");
-    const baseUrl = window.location.origin + '/whattoeat';
+    const baseUrl = window.location.origin;
     window.location.href = `${baseUrl}/generate`;
     
     return userCredential.user;
@@ -101,7 +101,7 @@ export async function signInWithGoogle() {
     console.log("[Auth] Reloading page with destination: generate page");
     
     // Use direct navigation to ensure clean state
-    const baseUrl = window.location.origin + '/whattoeat';
+    const baseUrl = window.location.origin;
     // Always redirect to generate page after sign-in, regardless of where we came from
     window.location.href = `${baseUrl}/generate`;
     
@@ -142,7 +142,7 @@ export const signOut = async () => {
 
     // Force a page reload to clear any in-memory state
     console.log("[Auth] Forcing page reload after sign out");
-    window.location.href = window.location.origin + '/whattoeat';
+    window.location.href = window.location.origin;
     
     return true;
   } catch (error) {

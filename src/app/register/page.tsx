@@ -35,7 +35,7 @@ function RegisterContent() {
     console.log(`[Register] Registration successful, redirecting to /generate`);
     
     // Use direct navigation for reliable page transition
-    window.location.href = window.location.origin + '/whattoeat/generate';
+    window.location.href = window.location.origin + '/generate';
   };
 
   const handleRegister = async (e: React.FormEvent) => {

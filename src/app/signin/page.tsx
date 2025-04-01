@@ -8,6 +8,8 @@ import { useAuth } from '@/lib/context/AuthContext';
 import MainLayout from '@/components/layout/MainLayout';
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Alert, AlertDescription } from '@/components/ui';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 // Component that uses useSearchParams
 function SignInContent() {
@@ -43,7 +45,7 @@ function SignInContent() {
     
     // Use direct navigation for most reliable page transition
     // Forcing a complete page reload to ensure auth state is fully updated
-    window.location.href = window.location.origin + '/whattoeat/generate';
+    window.location.href = window.location.origin + '/generate';
   };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
@@ -98,6 +100,31 @@ function SignInContent() {
   const handleCreateTestAccount = async () => {
     setEmail('test@example.com');
     setPassword('password123');
+  };
+  
+  // Emergency direct authentication bypassing redirects
+  const handleEmergencyDirectAuth = async () => {
+    try {
+      setLoading(true);
+      console.log("[SignIn] EMERGENCY: Attempting direct Google auth with page reload");
+      
+      // Create Google auth provider
+      const provider = new GoogleAuthProvider();
+      provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+      provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+      provider.setCustomParameters({ prompt: 'select_account' });
+      
+      // Sign in directly
+      const result = await signInWithPopup(auth, provider);
+      console.log("[SignIn] EMERGENCY: Google sign-in successful, reloading to generate page");
+      
+      // Force direct reload to generate page - simplest possible approach
+      window.location.href = "/generate";
+    } catch (error) {
+      console.error("[SignIn] EMERGENCY auth failed:", error);
+      setLoading(false);
+      setError("Emergency sign-in failed. Please try the normal sign-in options.");
+    }
   };
 
   return (
@@ -199,6 +226,20 @@ function SignInContent() {
             onClick={handleCreateTestAccount}
           >
             Use test account credentials
+          </Button>
+          
+          {/* Emergency direct auth button */}
+          <Button
+            variant="destructive"
+            className="w-full mt-4"
+            onClick={handleEmergencyDirectAuth}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              "EMERGENCY: Direct Google Sign-In"
+            )}
           </Button>
         </CardContent>
         

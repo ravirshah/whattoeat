@@ -89,7 +89,7 @@ function AuthWrapperContent({
                           
     if (shouldRedirect) {
       // CRITICAL: Use window.location with ABSOLUTE URL to avoid path resolution issues
-      const baseUrl = window.location.origin + '/whattoeat';
+      const baseUrl = window.location.origin;
       const targetPage = redirectTo.startsWith('/') ? redirectTo.substring(1) : redirectTo;
       const absoluteUrl = `${baseUrl}/${targetPage}`;
       
@@ -136,7 +136,7 @@ function AuthWrapperContent({
       console.log('[AuthWrapper] User not authenticated for generate page, redirecting to sign in');
       
       // Use direct window.location redirection for reliability
-      const baseUrl = window.location.origin + '/whattoeat';
+      const baseUrl = window.location.origin;
       window.location.href = `${baseUrl}/signin?from=generate`;
       
       // Show loading while redirecting
