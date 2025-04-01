@@ -30,10 +30,28 @@ try {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   auth = getAuth(app);
   
-  // Force a loading check to ensure authentication state is correctly loaded early
+  // IMPORTANT: Set persistence to LOCAL immediately to ensure the user stays logged in
+  // This must be done before any auth operations
   if (typeof window !== 'undefined') {
-    console.log("Firebase auth - checking current user on initialization:", !!auth.currentUser);
-    // Don't attach an onAuthStateChanged here, as that would duplicate the global listener in AuthContext
+    // Set persistence and wait for it to complete
+    setPersistence(auth, browserLocalPersistence)
+      .then(() => {
+        console.log('[Firebase] Successfully set persistence to LOCAL');
+        
+        // Check current auth state immediately
+        const currentUser = auth.currentUser;
+        console.log('[Firebase] Initial auth state:', currentUser ? `User logged in: ${currentUser.uid}` : 'No user logged in');
+        
+        // Force onAuthStateChanged to fire by refreshing token if needed
+        if (currentUser) {
+          currentUser.getIdToken(true)
+            .then(() => console.log('[Firebase] Refreshed token for initial user'))
+            .catch(err => console.error('[Firebase] Error refreshing token:', err));
+        }
+      })
+      .catch((error) => {
+        console.error('[Firebase] Failed to set persistence:', error);
+      });
   }
   
   // Initialize Firestore with error handling
@@ -45,22 +63,6 @@ try {
     // Create placeholder Firestore
     db = {} as Firestore;
   }
-
-  // Set persistence to LOCAL to ensure the user stays logged in
-  setPersistence(auth, browserLocalPersistence)
-    .then(() => {
-      console.log("Firebase persistence set to LOCAL");
-      
-      // Attempt to reload the auth state to ensure it's fresh
-      if (typeof window !== 'undefined' && auth.currentUser) {
-        auth.currentUser.reload()
-          .then(() => console.log("Reloaded auth user after setting persistence"))
-          .catch(err => console.error("Error reloading auth user:", err));
-      }
-    })
-    .catch((error) => {
-      console.error("Error setting persistence:", error);
-    });
 
   console.log("Firebase initialized successfully");
 } catch (error) {

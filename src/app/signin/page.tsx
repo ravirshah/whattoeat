@@ -82,27 +82,19 @@ function SignInContent() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setError('');
+  const handleGoogleSignIn = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
     setLoading(true);
-    console.log(`[SignIn] Attempting Google sign in, fromGenerate: ${fromGenerate}`);
-
+    
     try {
-      // Sign in with Google
-      const googleUser = await signInWithGoogle();
-      console.log(`[SignIn] Google sign in successful: ${googleUser.uid}`);
-      
-      // MOST IMPORTANT: Force a complete page reload to the destination
-      // This ensures Firebase auth state is fully initialized on the new page
-      const redirectPath = fromGenerate ? '/generate' : '/generate';
-      const fullUrl = window.location.origin + '/whattoeat' + redirectPath;
-      
-      console.log(`[SignIn] Reloading page to ${fullUrl}`);
-      window.location.replace(fullUrl); // replace() is more reliable than href=
-    } catch (error: any) {
-      setError(error.message || 'Failed to sign in with Google');
-      console.error("[SignIn] Google sign in error:", error);
+      console.log("Starting Google sign-in process");
+      await signInWithGoogle();
+      // No need to handle the redirect here anymore - 
+      // it's handled directly in the signInWithGoogle function
+    } catch (error) {
+      console.error("Error during Google sign-in:", error);
       setLoading(false);
+      setError("Failed to sign in with Google. Please try again.");
     }
   };
   

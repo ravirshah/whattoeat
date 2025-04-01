@@ -107,31 +107,54 @@ function AuthWrapperContent({
     }
   }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo, forceShow, redirecting, refreshAttempted, isGeneratePage, isRecipesPage]);
 
-  // For generate and recipes pages - always show content
+  // For generate and recipes pages
   if (isGeneratePage || isRecipesPage) {
-    // Check if we need to redirect to sign in for the generate page when not authenticated
-    if (isGeneratePage && !currentUser && !loading && refreshAttempted) {
-      console.log('[AuthWrapper] User not authenticated for generate page, redirecting to sign in');
+    // For generate page, ALWAYS require authentication
+    if (isGeneratePage) {
+      if (!currentUser) {
+        // If not yet loaded, show loading
+        if (loading && !forceShow) {
+          return (
+            <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
+              <div className="flex flex-col items-center space-y-4">
+                <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Verifying Access...
+                </p>
+              </div>
+            </div>
+          );
+        }
+        
+        // If loaded and no user found, redirect to sign in
+        if (!loading || forceShow) {
+          console.log('[AuthWrapper] User not authenticated for generate page, redirecting to sign in');
+          
+          // Use direct window.location redirection for reliability
+          const baseUrl = window.location.origin + '/whattoeat';
+          window.location.href = `${baseUrl}/signin?from=generate`;
+          
+          // Show loading while redirecting
+          return (
+            <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
+              <div className="flex flex-col items-center space-y-4">
+                <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Redirecting to sign in...
+                </p>
+              </div>
+            </div>
+          );
+        }
+      }
       
-      // Redirect to sign in page with from=generate parameter for callback
-      const baseUrl = window.location.origin + '/whattoeat';
-      window.location.href = `${baseUrl}/signin?from=generate`;
-      
-      // Show loading while redirecting
-      return (
-        <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
-          <div className="flex flex-col items-center space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Redirecting to sign in...
-            </p>
-          </div>
-        </div>
-      );
+      // If user is authenticated, show generate page
+      console.log('[AuthWrapper] User authenticated for generate page, showing content');
+      return <>{children}</>;
     }
     
-    // For recipes pages, or if user is authenticated for generate page
-    console.log(`[AuthWrapper] Showing content for ${isGeneratePage ? 'generate' : 'recipes'} page`);
+    // For recipes pages, we're more permissive
+    console.log('[AuthWrapper] Showing content for recipes page');
     return <>{children}</>;
   }
 

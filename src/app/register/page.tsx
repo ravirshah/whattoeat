@@ -81,20 +81,19 @@ function RegisterContent() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setError('');
+  const handleGoogleSignUp = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
     setLoading(true);
-    console.log(`[Register] Attempting Google sign in`);
-
+    
     try {
+      console.log("Starting Google sign-up process");
       await signInWithGoogle();
-      console.log(`[Register] Google sign in successful`);
-      await handleSuccessfulRegistration();
-    } catch (error: any) {
-      console.error(`[Register] Google sign in error:`, error);
-      setError(error.message || 'Failed to sign in with Google');
-    } finally {
+      // No need to handle the redirect here anymore - 
+      // it's handled directly in the signInWithGoogle function
+    } catch (error) {
+      console.error("Error during Google sign-up:", error);
       setLoading(false);
+      setError("Failed to sign up with Google. Please try again.");
     }
   };
 
@@ -180,7 +179,7 @@ function RegisterContent() {
             variant="outline" 
             className="w-full"
             disabled={loading}
-            onClick={handleGoogleSignIn}
+            onClick={handleGoogleSignUp}
           >
             {loading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
