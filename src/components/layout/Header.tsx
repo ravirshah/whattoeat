@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
@@ -18,9 +18,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui';
-import { Menu, User, ChefHat, LogOut, Home, BookOpen } from 'lucide-react';
+import { Menu, User, ChefHat, LogOut, Home, BookOpen, Loader2 } from 'lucide-react';
 
-export default function Header() {
+// Component that uses usePathname
+function HeaderContent() {
   const { currentUser, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -239,5 +240,30 @@ export default function Header() {
         </Sheet>
       </div>
     </header>
+  );
+}
+
+// Fallback for Suspense
+function HeaderFallback() {
+  return (
+    <header className="sticky top-0 z-50 w-full bg-white dark:bg-gray-900">
+      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <ChefHat className="h-8 w-8 text-emerald-600" />
+          <span className="text-xl font-bold tracking-tight">WhatToEat</span>
+        </div>
+        <div className="flex items-center">
+          <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
+        </div>
+      </div>
+    </header>
+  );
+}
+
+export default function Header() {
+  return (
+    <Suspense fallback={<HeaderFallback />}>
+      <HeaderContent />
+    </Suspense>
   );
 }

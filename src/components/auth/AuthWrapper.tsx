@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, ReactNode } from 'react';
+import { useEffect, useState, ReactNode, Suspense } from 'react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -11,7 +11,8 @@ interface AuthWrapperProps {
   redirectTo?: string;
 }
 
-export default function AuthWrapper({
+// Component to handle pathname with suspense
+function AuthWrapperContent({
   children,
   redirectIfNotAuthenticated = true,
   redirectTo = '/signin'
@@ -167,5 +168,34 @@ export default function AuthWrapper({
         <p className="text-sm text-gray-500 dark:text-gray-400">Redirecting...</p>
       </div>
     </div>
+  );
+}
+
+// Fallback for Suspense
+function AuthWrapperFallback() {
+  return (
+    <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="flex flex-col items-center space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function AuthWrapper({
+  children,
+  redirectIfNotAuthenticated = true,
+  redirectTo = '/signin'
+}: AuthWrapperProps) {
+  return (
+    <Suspense fallback={<AuthWrapperFallback />}>
+      <AuthWrapperContent
+        redirectIfNotAuthenticated={redirectIfNotAuthenticated}
+        redirectTo={redirectTo}
+      >
+        {children}
+      </AuthWrapperContent>
+    </Suspense>
   );
 }
