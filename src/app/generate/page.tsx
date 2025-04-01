@@ -34,7 +34,9 @@ import {
   ShoppingBag,
   AlertTriangle,
   Square,
-  RefreshCw
+  RefreshCw,
+  Clock,
+  ChefHat
 } from 'lucide-react';
 import { getApiUrl } from '@/lib/utils';
 
@@ -62,6 +64,19 @@ const COMMON_DIETARY_PREFS = [
   'Low-Carb', 'Keto', 'Paleo', 'Nut-Free', 'Low-Sugar'
 ];
 
+const POPULAR_CUISINES = [
+  'Italian', 'Chinese', 'Mexican', 'Indian', 'Japanese', 
+  'Thai', 'American', 'French', 'Mediterranean', 'Korean'
+];
+
+const COOK_TIMES = [
+  'Under 30 mins', 'Under 1 hour', '1 hour+'
+];
+
+const DIFFICULTIES = [
+  'Easy', 'Medium', 'Hard'
+];
+
 function GenerateRecipes() {
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -78,6 +93,9 @@ function GenerateRecipes() {
   const [newStaple, setNewStaple] = useState('');
   const [dietaryPrefs, setDietaryPrefs] = useState<string[]>([]);
   const [newDietaryPref, setNewDietaryPref] = useState('');
+  const [cuisine, setCuisine] = useState<string>('');
+  const [cookTime, setCookTime] = useState<'Under 30 mins' | 'Under 1 hour' | '1 hour+' | ''>('');
+  const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | ''>('');
   
   // UI states
   const [generating, setGenerating] = useState(false);
@@ -132,6 +150,9 @@ function GenerateRecipes() {
           setEquipment(prefs.equipment || []);
           setStaples(prefs.staples || []);
           setDietaryPrefs(prefs.dietaryPrefs || []);
+          setCuisine(prefs.cuisine || '');
+          setCookTime(prefs.cookTime || '');
+          setDifficulty(prefs.difficulty || '');
         }
       } catch (error) {
         console.error('Error loading preferences:', error);
@@ -208,126 +229,112 @@ function GenerateRecipes() {
   const startVoiceRecognition = () => {
     if (typeof window === 'undefined') return;
     
-    // Check browser compatibility
     if (!speechSupported) {
       toast.error('Voice recognition is not supported in your browser');
       return;
     }
     
     try {
-      // Create speech recognition instance
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      // Use \'(window as any)\' to access browser-specific API constructor
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       
       if (!SpeechRecognition) {
         toast.error('Voice recognition is not available');
         return;
       }
       
-      const recognition = new SpeechRecognition();
-      
-      // Store in ref for cleanup
+      // Assuming SpeechRecognition constructor type is handled by \'(window as any)\'
+      const recognition = new SpeechRecognition(); 
       recognitionRef.current = recognition;
       
-      // Configure recognition settings
       recognition.lang = 'en-US';
-      recognition.continuous = true;
-      recognition.interimResults = false;
+      recognition.continuous = true; 
+      recognition.interimResults = false; 
       recognition.maxAlternatives = 1;
       
-      // Set listening state
       setListening(true);
       setTranscript('');
       
-      // Get the current category based on step
       let category: 'ingredients' | 'equipment' | 'staples' = 'ingredients';
       if (step === 2) category = 'equipment';
       if (step === 3) category = 'staples';
-      
-      // Get category-specific display name for toast messages
       const categoryDisplayName = 
         category === 'ingredients' ? 'ingredient' : 
         category === 'equipment' ? 'equipment item' : 'staple item';
-      
-      // Handle recognition results
-      recognition.onresult = (event) => {
-        // Get the last result (most recent utterance)
-        const lastResultIndex = event.results.length - 1;
-        const transcriptText = event.results[lastResultIndex][0].transcript;
-        
-        setTranscript(transcriptText);
-        
-        // Parse items from transcript based on current category
-        const parsedItems = parseItemsFromText(transcriptText, category);
-        
-        if (parsedItems.length > 0) {
-          // Add unique items to the appropriate list based on category
-          if (category === 'ingredients') {
-            setIngredients((prevItems) => {
-              const existingItemsSet = new Set(prevItems.map(i => i.toLowerCase()));
-              const newItems = parsedItems.filter(
-                item => !existingItemsSet.has(item.toLowerCase())
-              );
-              return [...prevItems, ...newItems.map(capitalizeFirstLetter)];
-            });
-          } else if (category === 'equipment') {
-            setEquipment((prevItems) => {
-              const existingItemsSet = new Set(prevItems.map(i => i.toLowerCase()));
-              const newItems = parsedItems.filter(
-                item => !existingItemsSet.has(item.toLowerCase())
-              );
-              return [...prevItems, ...newItems.map(capitalizeFirstLetter)];
-            });
-          } else if (category === 'staples') {
-            setStaples((prevItems) => {
-              const existingItemsSet = new Set(prevItems.map(i => i.toLowerCase()));
-              const newItems = parsedItems.filter(
-                item => !existingItemsSet.has(item.toLowerCase())
-              );
-              return [...prevItems, ...newItems.map(capitalizeFirstLetter)];
-            });
+
+      // Define event types locally or ensure they come from a lib
+      // Assuming types like SpeechRecognitionEvent are available globally 
+      // or via tsconfig settings (e.g., \"dom\")
+      recognition.onresult = (event: SpeechRecognitionEvent) => { 
+        let finalTranscriptCombined = '';
+        // Check if results exist and have length
+        if (event.results && event.results.length > event.resultIndex) {
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal && event.results[i][0]) {
+              finalTranscriptCombined += event.results[i][0].transcript.trim() + ' ';
+            }
           }
-          
-          // Show success message with the items that were added
-          if (parsedItems.length > 0) {
-            toast.success(
-              `Added ${parsedItems.length} ${categoryDisplayName}${parsedItems.length === 1 ? '' : 's'}: ${parsedItems.join(', ')}`,
-              { duration: 4000 }
-            );
-          }
-        } else {
-          toast.error(`No ${categoryDisplayName}s detected. Please try again.`);
+        }
+        finalTranscriptCombined = finalTranscriptCombined.trim();
+        
+        if (finalTranscriptCombined) {
+           setTranscript(prev => prev ? `${prev}, ${finalTranscriptCombined}` : finalTranscriptCombined);
+           const itemsToAdd = parseItemsFromText(finalTranscriptCombined, category);
+           if (itemsToAdd.length > 0) {
+             // Add unique items (case-insensitive check)
+             let addedCount = 0;
+             itemsToAdd.forEach(newItem => {
+                let alreadyExists = false;
+                const newItemLower = newItem.toLowerCase();
+                if (category === 'ingredients') {
+                    alreadyExists = ingredients.some(existing => existing.toLowerCase() === newItemLower);
+                    if (!alreadyExists) setIngredients(prev => [...prev, capitalizeFirstLetter(newItem)]);
+                } else if (category === 'equipment') {
+                    alreadyExists = equipment.some(existing => existing.toLowerCase() === newItemLower);
+                    if (!alreadyExists) setEquipment(prev => [...prev, capitalizeFirstLetter(newItem)]);
+                } else if (category === 'staples') {
+                    alreadyExists = staples.some(existing => existing.toLowerCase() === newItemLower);
+                    if (!alreadyExists) setStaples(prev => [...prev, capitalizeFirstLetter(newItem)]);
+                }
+                if (!alreadyExists) addedCount++;
+             });
+             if (addedCount > 0) {
+                toast.success(`Added ${addedCount} ${categoryDisplayName}(s) from voice`);
+             }
+           }
         }
       };
-      
-      // Handle errors
-      recognition.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-        setListening(false);
-        recognitionRef.current = null;
-        
-        // Provide helpful error messages based on the error type
-        if (event.error === 'not-allowed') {
-          toast.error('Microphone access denied. Please allow microphone permissions.');
-        } else if (event.error === 'no-speech') {
-          toast.error('No speech detected. Please try again.');
-        } else {
-          toast.error('Voice recognition error. Please try again.');
+
+      // Assuming SpeechRecognitionErrorEvent is available
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        let errorMsg = `Speech recognition error: ${event.error}`;
+        if (event.error === 'no-speech') {
+          errorMsg = "No speech detected. Please try speaking again.";
+        } else if (event.error === 'audio-capture') {
+          errorMsg = "Audio capture failed. Check microphone permissions.";
+        } else if (event.error === 'not-allowed') {
+          errorMsg = "Microphone access denied. Please allow access in browser settings.";
         }
+        toast.error(errorMsg);
+        stopVoiceRecognition();
       };
-      
-      // Handle end of recognition
+
       recognition.onend = () => {
-        setListening(false);
-        recognitionRef.current = null;
+        if (recognitionRef.current) { 
+            setListening(false);
+        }
       };
       
-      // Start recognition with error handling
       recognition.start();
-    } catch (error) {
-      console.error('Speech recognition error', error);
+    } catch (e) {
+      console.error("Failed to start voice recognition:", e);
+      toast.error("Could not start voice recognition.");
       setListening(false);
-      recognitionRef.current = null;
-      toast.error('Could not start voice recognition. Please check your microphone permissions.');
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch {} 
+        recognitionRef.current = null;
+      }
     }
   };
   
@@ -461,24 +468,16 @@ function GenerateRecipes() {
   const addCommonItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary') => {
     switch (category) {
       case 'ingredients':
-        if (!ingredients.includes(item)) {
-          setIngredients([...ingredients, item]);
-        }
+        if (!ingredients.includes(item)) setIngredients([...ingredients, item]);
         break;
       case 'equipment':
-        if (!equipment.includes(item)) {
-          setEquipment([...equipment, item]);
-        }
+        if (!equipment.includes(item)) setEquipment([...equipment, item]);
         break;
       case 'staples':
-        if (!staples.includes(item)) {
-          setStaples([...staples, item]);
-        }
+        if (!staples.includes(item)) setStaples([...staples, item]);
         break;
       case 'dietary':
-        if (!dietaryPrefs.includes(item)) {
-          setDietaryPrefs([...dietaryPrefs, item]);
-        }
+        if (!dietaryPrefs.includes(item)) setDietaryPrefs([...dietaryPrefs, item]);
         break;
     }
   };
@@ -490,26 +489,31 @@ function GenerateRecipes() {
       return;
     }
     
-    // Save preferences at each step
+    // Save preferences on moving from the respective steps
     if (currentUser) {
       try {
-        await updateUserPreferences(currentUser.uid, {
-          ingredients,
-          equipment,
-          staples,
-          dietaryPrefs
-        });
-      } catch (error) {
-        console.error('Error saving preferences:', error);
-        // Continue despite error - user experience is more important
+        if (step === 1) await updateUserPreferences(currentUser.uid, { ingredients });
+        if (step === 2) await updateUserPreferences(currentUser.uid, { equipment });
+        if (step === 3) await updateUserPreferences(currentUser.uid, { staples });
+        if (step === 4) await updateUserPreferences(currentUser.uid, { dietaryPrefs });
+        if (step === 5) { 
+            await updateUserPreferences(currentUser.uid, { 
+                cuisine: cuisine || undefined, 
+                cookTime: cookTime || undefined, 
+                difficulty: difficulty || undefined 
+            });
+        }
+      } catch (e) {
+        console.error("Error saving preferences:", e);
+        toast.warning("Could not save preferences for next time.");
       }
     }
     
-    if (step < 4) {
+    if (step < 6) {
       setStep(step + 1);
       setError('');
     } else {
-      generateRecipes();
+      await generateRecipes();
     }
   };
   
@@ -524,6 +528,7 @@ function GenerateRecipes() {
   const generateRecipes = async () => {
     if (ingredients.length === 0) {
       setError('Please add at least one ingredient');
+      setStep(1); // Go back to ingredient step
       return;
     }
   
@@ -535,6 +540,7 @@ function GenerateRecipes() {
   
     setGenerating(true);
     setError('');
+    setRetryCount(0); // Reset retry count for new generation attempt
   
     try {
       // Try to update user stats in background (don't await)
@@ -567,7 +573,11 @@ function GenerateRecipes() {
         ingredients, 
         equipment, 
         staples, 
-        dietaryPrefs
+        dietaryPrefs,
+        cuisine,
+        cookTime,
+        difficulty,
+        userId: currentUser.uid // Pass userId for potential personalization later
       };
   
       console.log("Sending API request with data:", {
@@ -691,323 +701,430 @@ function GenerateRecipes() {
   
   // Also replace the retryGeneration function with this improved version
   const retryGeneration = () => {
-    // Incremental backoff based on retry count (500ms, 1000ms, 1500ms, etc.)
-    const backoffTime = Math.min(500 * retryCount, 2000);
-    
-    setError(`Retrying in ${backoffTime/1000} seconds...`);
-    
-    setTimeout(() => {
-      setGenerating(true);
-      setError('');
-      generateRecipes();
-    }, backoffTime);
+    if (retryCount >= maxRetries) {
+        toast.error("Maximum retries already reached.");
+        return;
+    }
+    setGenerating(true);
+    setError('');
+    setRetryCount(retryCount + 1);
+    toast.info(`Manual retry initiated... (${retryCount + 1}/${maxRetries})`);
+    generateRecipes();
   };
   
-
   // Get the current step details
-  const getStepContent = () => {
+  const getStepContent = (): JSX.Element | null => {
     switch (step) {
       case 1:
-        return {
-          title: "What ingredients do you have?",
-          description: "Add the main ingredients you want to use in your recipe.",
-          icon: <ShoppingBag className="h-6 w-6" />,
-          inputPlaceholder: "Add an ingredient...",
-          inputValue: newIngredient,
-          setInputValue: setNewIngredient,
-          addItem: addIngredient,
-          items: ingredients,
-          removeItem: removeIngredient,
-          emptyMessage: "No ingredients added yet",
-          badgeClassName: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
-          commonItems: COMMON_INGREDIENTS,
-          category: 'ingredients' as const
-        };
+        return (
+          <CardContent className="space-y-6">
+            <div>
+              <label htmlFor="ingredient" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                What ingredients do you have?
+              </label>
+              <div className="flex gap-2 mb-3">
+                <Input
+                  id="ingredient"
+                  placeholder="Add an ingredient..."
+                  value={newIngredient}
+                  onChange={(e) => setNewIngredient(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addIngredient()}
+                />
+                <Button onClick={addIngredient}>
+                  <Plus className="h-4 w-4 mr-1" /> Add
+                </Button>
+              </div>
+              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Common Ingredients</h4>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {COMMON_INGREDIENTS.map((item) => (
+                  <Button
+                    key={item}
+                    variant={ingredients.includes(item) ? 'secondary' : 'outline'}
+                    size="sm"
+                    onClick={() => addCommonItem(item, 'ingredients')}
+                  >
+                    {item}
+                  </Button>
+                ))}
+              </div>
+              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Your Ingredients ({ingredients.length})</h4>
+              <div className="flex flex-wrap gap-2">
+                {ingredients.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic">No ingredients added yet</p>
+                ) : (
+                  ingredients.map((item, index) => (
+                    <Badge
+                      key={index}
+                      variant="outline"
+                      className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+                    >
+                      {item}
+                      <X
+                        className="ml-1 h-3 w-3 cursor-pointer rounded-full hover:bg-gray-300 dark:hover:bg-gray-600"
+                        onClick={() => removeIngredient(index)}
+                      />
+                    </Badge>
+                  ))
+                )}
+              </div>
+            </div>
+          </CardContent>
+        );
       
       case 2:
-        return {
-          title: "What cooking equipment do you have?",
-          description: "Add the kitchen equipment you have available.",
-          icon: <Utensils className="h-6 w-6" />,
-          inputPlaceholder: "Add equipment...",
-          inputValue: newEquipment,
-          setInputValue: setNewEquipment,
-          addItem: addEquipment,
-          items: equipment,
-          removeItem: removeEquipment,
-          emptyMessage: "No equipment added yet",
-          badgeClassName: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-          commonItems: COMMON_EQUIPMENT,
-          category: 'equipment' as const
-        };
+        return (
+          <CardContent className="space-y-6">
+            <div>
+              <label htmlFor="equipment" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                What cooking equipment do you have?
+              </label>
+              <div className="flex gap-2 mb-3">
+                <Input
+                  id="equipment"
+                  placeholder="Add equipment..."
+                  value={newEquipment}
+                  onChange={(e) => setNewEquipment(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addEquipment()}
+                />
+                <Button onClick={addEquipment}>
+                  <Plus className="h-4 w-4 mr-1" /> Add
+                </Button>
+              </div>
+              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Common Equipment</h4>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {COMMON_EQUIPMENT.map((item) => (
+                  <Button
+                    key={item}
+                    variant={equipment.includes(item) ? 'secondary' : 'outline'}
+                    size="sm"
+                    onClick={() => addCommonItem(item, 'equipment')}
+                  >
+                    {item}
+                  </Button>
+                ))}
+              </div>
+              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Your Equipment ({equipment.length})</h4>
+              <div className="flex flex-wrap gap-2">
+                {equipment.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic">No equipment added yet</p>
+                ) : (
+                  equipment.map((item, index) => (
+                    <Badge
+                      key={index}
+                      variant="outline"
+                      className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                    >
+                      {item}
+                      <X
+                        className="ml-1 h-3 w-3 cursor-pointer rounded-full hover:bg-gray-300 dark:hover:bg-gray-600"
+                        onClick={() => removeEquipment(index)}
+                      />
+                    </Badge>
+                  ))
+                )}
+              </div>
+            </div>
+          </CardContent>
+        );
       
       case 3:
-        return {
-          title: "What staples do you keep in your pantry?",
-          description: "Add basic ingredients you typically have on hand.",
-          icon: <ShoppingBag className="h-6 w-6" />,
-          inputPlaceholder: "Add a staple...",
-          inputValue: newStaple,
-          setInputValue: setNewStaple,
-          addItem: addStaple,
-          items: staples,
-          removeItem: removeStaple,
-          emptyMessage: "No staples added yet",
-          badgeClassName: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-          commonItems: COMMON_STAPLES,
-          category: 'staples' as const
-        };
+        return (
+          <CardContent className="space-y-6">
+            <div>
+              <label htmlFor="staple" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                What staples do you keep in your pantry?
+              </label>
+              <div className="flex gap-2 mb-3">
+                <Input
+                  id="staple"
+                  placeholder="Add a staple..."
+                  value={newStaple}
+                  onChange={(e) => setNewStaple(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addStaple()}
+                />
+                <Button onClick={addStaple}>
+                  <Plus className="h-4 w-4 mr-1" /> Add
+                </Button>
+              </div>
+              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Common Staples</h4>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {COMMON_STAPLES.map((item) => (
+                  <Button
+                    key={item}
+                    variant={staples.includes(item) ? 'secondary' : 'outline'}
+                    size="sm"
+                    onClick={() => addCommonItem(item, 'staples')}
+                  >
+                    {item}
+                  </Button>
+                ))}
+              </div>
+              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Your Staples ({staples.length})</h4>
+              <div className="flex flex-wrap gap-2">
+                {staples.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic">No staples added yet</p>
+                ) : (
+                  staples.map((item, index) => (
+                    <Badge
+                      key={index}
+                      variant="outline"
+                      className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                    >
+                      {item}
+                      <X
+                        className="ml-1 h-3 w-3 cursor-pointer rounded-full hover:bg-gray-300 dark:hover:bg-gray-600"
+                        onClick={() => removeStaple(index)}
+                      />
+                    </Badge>
+                  ))
+                )}
+              </div>
+            </div>
+          </CardContent>
+        );
       
       case 4:
-        return {
-          title: "Any dietary preferences or restrictions?",
-          description: "Add any dietary needs or preferences you have.",
-          icon: <AlertTriangle className="h-6 w-6" />,
-          inputPlaceholder: "Add a dietary preference...",
-          inputValue: newDietaryPref,
-          setInputValue: setNewDietaryPref,
-          addItem: addDietaryPref,
-          items: dietaryPrefs,
-          removeItem: removeDietaryPref,
-          emptyMessage: "No dietary preferences added yet",
-          badgeClassName: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-          commonItems: COMMON_DIETARY_PREFS,
-          category: 'dietary' as const
-        };
+        return (
+          <CardContent className="space-y-6">
+            <div>
+              <label htmlFor="dietaryPref" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Any dietary preferences or restrictions?
+              </label>
+              <div className="flex gap-2 mb-3">
+                <Input
+                  id="dietaryPref"
+                  placeholder="Add a dietary preference..."
+                  value={newDietaryPref}
+                  onChange={(e) => setNewDietaryPref(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addDietaryPref()}
+                />
+                <Button onClick={addDietaryPref}>
+                  <Plus className="h-4 w-4 mr-1" /> Add
+                </Button>
+              </div>
+              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Common Preferences</h4>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {COMMON_DIETARY_PREFS.map((item) => (
+                  <Button
+                    key={item}
+                    variant={dietaryPrefs.includes(item) ? 'secondary' : 'outline'}
+                    size="sm"
+                    onClick={() => addCommonItem(item, 'dietary')}
+                  >
+                    {item}
+                  </Button>
+                ))}
+              </div>
+              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Your Preferences ({dietaryPrefs.length})</h4>
+              <div className="flex flex-wrap gap-2">
+                {dietaryPrefs.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic">No dietary preferences added yet</p>
+                ) : (
+                  dietaryPrefs.map((item, index) => (
+                    <Badge
+                      key={index}
+                      variant="outline"
+                      className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                    >
+                      {item}
+                      <X
+                        className="ml-1 h-3 w-3 cursor-pointer rounded-full hover:bg-gray-300 dark:hover:bg-gray-600"
+                        onClick={() => removeDietaryPref(index)}
+                      />
+                    </Badge>
+                  ))
+                )}
+              </div>
+            </div>
+          </CardContent>
+        );
+      
+      case 5:
+        return (
+          <CardContent className="space-y-8">
+            <div>
+              <label htmlFor="cuisine" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Cuisine Preference (Optional)
+              </label>
+              <Input
+                id="cuisine"
+                placeholder="e.g., Italian, Mexican, Any"
+                value={cuisine}
+                onChange={(e) => setCuisine(e.target.value)}
+                className="mb-3"
+              />
+              <div className="flex flex-wrap gap-2">
+                {POPULAR_CUISINES.map((c) => (
+                  <Button 
+                    key={c} 
+                    variant={cuisine === c ? "default" : "outline"}
+                    size="sm" 
+                    onClick={() => setCuisine(c)}
+                    className="transition-all"
+                  >
+                    {c}
+                  </Button>
+                ))}
+                 <Button 
+                    variant={cuisine === '' ? "secondary" : "outline"}
+                    size="sm" 
+                    onClick={() => setCuisine('')}
+                    className="transition-all text-xs"
+                  >
+                    Any / Clear
+                  </Button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Cook Time Preference (Optional)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {COOK_TIMES.map((t) => (
+                  <Button 
+                    key={t} 
+                    variant={cookTime === t ? "default" : "outline"}
+                    size="sm" 
+                    onClick={() => setCookTime(t as 'Under 30 mins' | 'Under 1 hour' | '1 hour+')}
+                    className="transition-all"
+                  >
+                    <Clock className="mr-2 h-4 w-4" /> {t}
+                  </Button>
+                ))}
+                <Button 
+                    variant={cookTime === '' ? "secondary" : "outline"}
+                    size="sm" 
+                    onClick={() => setCookTime('')}
+                    className="transition-all text-xs"
+                  >
+                    Any / Clear
+                  </Button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Difficulty Preference (Optional)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {DIFFICULTIES.map((d) => (
+                  <Button 
+                    key={d} 
+                    variant={difficulty === d ? "default" : "outline"}
+                    size="sm" 
+                    onClick={() => setDifficulty(d as 'Easy' | 'Medium' | 'Hard')}
+                    className="transition-all"
+                  >
+                    <ChefHat className="mr-2 h-4 w-4" /> {d}
+                  </Button>
+                ))}
+                 <Button 
+                    variant={difficulty === '' ? "secondary" : "outline"}
+                    size="sm" 
+                    onClick={() => setDifficulty('')}
+                    className="transition-all text-xs"
+                  >
+                    Any / Clear
+                  </Button>
+              </div>
+            </div>
+          </CardContent>
+        );
       
       default:
-        return {
-          title: "",
-          description: "",
-          icon: null,
-          inputPlaceholder: "",
-          inputValue: "",
-          setInputValue: () => {},
-          addItem: () => {},
-          items: [],
-          removeItem: () => {},
-          emptyMessage: "",
-          badgeClassName: "",
-          commonItems: [],
-          category: 'ingredients' as const
-        };
+        return null;
     }
   };
   
   const stepContent = getStepContent();
   
   // Render loading state
-  if (authLoading) {
+  if (authLoading || loadingPreferences) {
     return (
-      <div className="container mx-auto px-4 py-12 flex justify-center items-center">
-        <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
-      </div>
+      <MainLayout>
+        <div className="flex justify-center items-center h-screen">
+          <Loader2 className="h-16 w-16 animate-spin text-emerald-600" />
+        </div>
+      </MainLayout>
     );
   }
   
-  return (
-    <div className="container mx-auto px-4 py-12">
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <div className="flex items-center justify-between mb-2">
-            <CardTitle className="text-2xl font-bold flex items-center">
-              <CookingPot className="mr-2 h-6 w-6 text-emerald-600" />
-              Generate Recipes
-            </CardTitle>
-            <div className="text-sm font-medium text-gray-500">
-              Step {step} of 4
-            </div>
-          </div>
-          <Progress value={step * 25} className="h-2" />
-        </CardHeader>
-        
-        {error && (
-          <div className="px-6">
-            <Alert variant="destructive" className="mb-4 flex justify-between items-center">
-              <div className="flex items-center">
-                <AlertCircle className="h-4 w-4 mr-2" />
-                <AlertDescription>{error}</AlertDescription>
-              </div>
-              {retryCount > 0 && retryCount <= maxRetries && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={retryGeneration}
-                  className="ml-2 whitespace-nowrap"
-                >
-                  <RefreshCw className="h-4 w-4 mr-1" />
-                  Retry
-                </Button>
-              )}
-            </Alert>
-          </div>
-        )}
-        
-        <CardContent className="pt-6">
-          <div className="space-y-6">
-            <div className="flex items-start gap-4">
-              <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
-                {stepContent.icon}
-              </div>
-              <div>
-                <h3 className="text-lg font-medium mb-1">{stepContent.title}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{stepContent.description}</p>
-              </div>
-            </div>
-            
-            <div className="flex gap-2">
-              <Input
-                type="text"
-                value={stepContent.inputValue}
-                onChange={(e) => stepContent.setInputValue(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && stepContent.addItem()}
-                placeholder={stepContent.inputPlaceholder}
-                className="flex-1"
-              />
-              <Button onClick={stepContent.addItem}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add
-              </Button>
-              
-              {/* Voice button only shows if speech is supported and in steps 1-3 */}
-              {speechSupported && step <= 3 && (
-                <Button 
-                  variant={listening ? "destructive" : "outline"}
-                  onClick={listening ? stopVoiceRecognition : startVoiceRecognition}
-                  className={listening ? "animate-pulse" : ""}
-                >
-                  {listening ? (
-                    <>
-                      <Square className="h-4 w-4 mr-1" />
-                      Stop
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="h-4 w-4 mr-1" />
-                      Voice
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
-            
-            {/* Listening indicator and transcript feedback */}
-            {listening && (
-              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-md">
-                <div className="flex items-center space-x-2">
-                  <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    Listening... Say your {step === 1 ? 'ingredients' : step === 2 ? 'equipment' : 'staples'} and click Stop when done
-                  </p>
-                </div>
-              </div>
-            )}
+  if (preferencesError) {
+     return (
+      <MainLayout>
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <Alert variant="destructive" className="mt-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Error loading your saved preferences. Please refresh the page or try again later. You can still generate recipes with default settings.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </MainLayout>
+    );
+  }
 
-            {transcript && !listening && (
-              <div className="mt-2">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  <span className="font-medium">Last recording:</span> "{transcript}"
+  return (
+    <AuthWrapper>
+      <MainLayout>
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <Card className="shadow-lg border-gray-200 dark:border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-center text-gray-800 dark:text-white">
+                Generate Your Recipe
+              </CardTitle>
+              <div className="pt-4">
+                <Progress value={(step / 6) * 100} className="w-full" />
+                <p className="text-sm text-center mt-2 text-gray-600 dark:text-gray-400">
+                  Step {step} of 6
                 </p>
               </div>
-            )}
-
-            {/* Common Items Section */}
-            <div className="mt-2">
-              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                Common {step === 1 ? 'Ingredients' : step === 2 ? 'Equipment' : step === 3 ? 'Staples' : 'Preferences'}
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {stepContent.commonItems.map((item) => (
-                  <Button
-                    key={item}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addCommonItem(item, stepContent.category)}
-                    className={`${
-                      stepContent.items.includes(item) 
-                        ? `bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 font-medium ${
-                          step === 1 ? 'text-emerald-600 dark:text-emerald-400' :
-                          step === 2 ? 'text-blue-600 dark:text-blue-400' :
-                          step === 3 ? 'text-amber-600 dark:text-amber-400' :
-                          'text-purple-600 dark:text-purple-400'
-                        }`
-                        : ''
-                    }`}
-                  >
-                    {item}
-                    {stepContent.items.includes(item) && (
-                      <span className="ml-1">✓</span>
-                    )}
-                  </Button>
-                ))}
-              </div>
-            </div>
+            </CardHeader>
             
-            <div>
-              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                {stepContent.items.length > 0 ? `Your ${step === 1 ? 'ingredients' : step === 2 ? 'equipment' : step === 3 ? 'staples' : 'preferences'} (${stepContent.items.length})` : ''}
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {stepContent.items.length === 0 ? (
-                  <p className="text-sm text-gray-500 italic">{stepContent.emptyMessage}</p>
-                ) : (
-                  stepContent.items.map((item, index) => (
-                    <Badge
-                      key={index}
-                      variant="outline"
-                      className={stepContent.badgeClassName}
-                    >
-                      {item}
-                      <button
-                        type="button"
-                        onClick={() => stepContent.removeItem(index)}
-                        className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-1"
-                      >
-                        <X className="h-3 w-3" />
-                        <span className="sr-only">Remove {item}</span>
-                      </button>
-                    </Badge>
-                  ))
-                )}
+            {/* Render step content */}
+            {stepContent}
+
+            <CardFooter className="flex flex-col items-center space-y-4 pt-6">
+              {error && (
+                <Alert variant="destructive" className="w-full">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                  {/* Add retry button if applicable */}
+                  {error.includes("Failed to generate recipes") && retryCount < maxRetries && (
+                     <Button onClick={retryGeneration} variant="outline" size="sm" className="mt-2">
+                       <RefreshCw className="mr-2 h-4 w-4" /> Retry Generation
+                     </Button>
+                  )}
+                </Alert>
+              )}
+
+              <div className="flex justify-between w-full">
+                <Button 
+                  onClick={prevStep} 
+                  disabled={step === 1 || generating}
+                  variant="outline"
+                >
+                  <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+                </Button>
+                
+                <Button 
+                  onClick={nextStep} 
+                  disabled={generating}
+                >
+                  {generating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    step === 6 ? 'Generate Recipe' : 'Next'
+                  )}
+                  {step < 6 && <ChevronRight className="ml-2 h-4 w-4" />}
+                </Button>
               </div>
-            </div>
-          </div>
-        </CardContent>
-        
-        <CardFooter className="flex justify-between pt-6">
-          <Button
-            variant="outline"
-            onClick={prevStep}
-            disabled={step === 1}
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-          
-          <Button
-            onClick={nextStep}
-            disabled={generating}
-          >
-            {generating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : step < 4 ? (
-              <>
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </>
-            ) : (
-              <>
-                Generate Recipes
-                <CookingPot className="h-4 w-4 ml-1" />
-              </>
-            )}
-          </Button>
-        </CardFooter>
-      </Card>
-    </div>
+            </CardFooter>
+          </Card>
+        </div>
+      </MainLayout>
+    </AuthWrapper>
   );
 }
 
@@ -1019,52 +1136,4 @@ export default function GenerateRecipesPage() {
       </MainLayout>
     </AuthWrapper>
   );
-}
-
-// TypeScript interfaces for Speech Recognition API
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-}
-
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionResultList {
-  length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionResult {
-  length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-  isFinal: boolean;
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
-
-interface SpeechRecognition extends EventTarget {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: ((event: Event) => void) | null;
-}
-
-// Extend the Window interface to include SpeechRecognition
-declare global {
-  interface Window { 
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
-  }
 }

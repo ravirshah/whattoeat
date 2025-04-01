@@ -1,6 +1,6 @@
 // src/pages/api/generate-recipes.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, GenerationConfig } from '@google/generative-ai';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
@@ -181,24 +181,54 @@ export default async function handler(
     return res.status(401).json({ error: 'Unauthorized - No token provided' });
   }
 
+  let userId: string;
   try {
     console.log("Verifying token...");
-    // Verify the token
     const decodedToken = await adminAuth.verifyIdToken(token);
-    const userId = decodedToken.uid;
+    userId = decodedToken.uid;
     console.log(`Token verified successfully for user: ${userId}`);
+  } catch (error) {
+     console.error("Token verification failed:", error);
+     return res.status(401).json({ error: 'Unauthorized - Invalid token' });
+  }
 
-    // Get input data from request
-    const { ingredients, equipment, staples, dietaryPrefs } = req.body;
+  try {
+    // Get input data from request, including new fields
+    const { 
+        ingredients, 
+        equipment, 
+        staples, 
+        dietaryPrefs,
+        cuisine, // New field
+        cookTime, // New field
+        difficulty // New field
+    } = req.body;
     
-    // Clean the input data 
+    // Clean the array input data 
     const cleanedIngredients = cleanArrayInput(ingredients);
     const cleanedEquipment = cleanArrayInput(equipment);
     const cleanedStaples = cleanArrayInput(staples);
     const cleanedDietaryPrefs = cleanArrayInput(dietaryPrefs);
+
+    // Basic cleaning/validation for new string fields (optional)
+    const cleanedCuisine = typeof cuisine === 'string' ? cuisine.trim() : '';
+    // Cook time and difficulty are more constrained by frontend types
+    const cleanedCookTime = typeof cookTime === 'string' && ['Under 30 mins', 'Under 1 hour', '1 hour+'].includes(cookTime) ? cookTime : '';
+    const cleanedDifficulty = typeof difficulty === 'string' && ['Easy', 'Medium', 'Hard'].includes(difficulty) ? difficulty : '';
     
-    console.log(`User provided: ${cleanedIngredients.length} ingredients, ${cleanedEquipment.length} equipment items,` + 
-      ` ${cleanedStaples.length} staples, and ${cleanedDietaryPrefs.length} dietary preferences`);
+    console.log(`User provided:`);
+    console.log(`  - Ingredients: ${cleanedIngredients.length > 0 ? cleanedIngredients.join(', ') : 'None'}`);
+    console.log(`  - Equipment: ${cleanedEquipment.length > 0 ? cleanedEquipment.join(', ') : 'None'}`);
+    console.log(`  - Staples: ${cleanedStaples.length > 0 ? cleanedStaples.join(', ') : 'None'}`);
+    console.log(`  - Dietary Prefs: ${cleanedDietaryPrefs.length > 0 ? cleanedDietaryPrefs.join(', ') : 'None'}`);
+    console.log(`  - Cuisine: ${cleanedCuisine || 'Any'}`);
+    console.log(`  - Cook Time: ${cleanedCookTime || 'Any'}`);
+    console.log(`  - Difficulty: ${cleanedDifficulty || 'Any'}`);
+
+    if (cleanedIngredients.length === 0) {
+        console.log("Request rejected: No ingredients provided.");
+        return res.status(400).json({ error: 'Please provide at least one ingredient.' });
+    }
     
     // Update user stats in background (don't await this)
     incrementRecipesGenerated(userId).catch(error => {
@@ -206,150 +236,158 @@ export default async function handler(
     });
 
     // Try to generate recipes with Gemini API
+    let apiError: string | undefined = undefined;
+    let modelUsed: string | undefined = undefined;
     try {
       console.log("Getting Gemini API key");
       const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
       
       if (!apiKey) {
         console.error("No Gemini API key found");
-        throw new Error("Gemini API key not found");
+        throw new Error("API key configuration error"); // More generic error for user
       }
 
-      console.log("Initializing Gemini API with key (first 4 chars):", apiKey.substring(0, 4) + "...");
+      console.log("Initializing Gemini API..."); // Simplified log
       const genAI = new GoogleGenerativeAI(apiKey);
       
-      // Use gemini-2.0-flash model
-      const modelName = "gemini-2.0-flash";
-      console.log(`Using Gemini model: ${modelName}`);
-      const model = genAI.getGenerativeModel({ model: modelName });
+      // Use gemini-1.5-flash-latest (recommended over specific versions)
+      modelUsed = "gemini-1.5-flash-latest";
+      console.log(`Using Gemini model: ${modelUsed}`);
+      const model = genAI.getGenerativeModel({ model: modelUsed });
 
-      // Build the prompt
-      let prompt = `Generate 3 original recipes based on these available ingredients, equipment, pantry staples, and dietary preferences.
+      // Build the prompt with conditional preferences
+      let prompt = `Generate 3 creative and distinct recipes based on the following details. Focus on using the listed ingredients effectively.
 
 Available ingredients:
 ${cleanedIngredients.join(", ")}
 
 Available equipment:
-${cleanedEquipment.join(", ")}
+${cleanedEquipment.length > 0 ? cleanedEquipment.join(", ") : 'Standard kitchen equipment assumed'}
 
-Pantry staples:
-${cleanedStaples.join(", ")}
+Pantry staples (can be used if needed):
+${cleanedStaples.length > 0 ? cleanedStaples.join(", ") : 'Basic staples like salt, pepper, oil assumed available'}
 
-Dietary preferences:
-${cleanedDietaryPrefs.join(", ")}
+Dietary preferences/restrictions:
+${cleanedDietaryPrefs.length > 0 ? cleanedDietaryPrefs.join(", ") : 'None specified'}
+`;
 
-For each recipe, provide:
-1. Name
-2. Ingredients list with measurements
-3. Step-by-step instructions
-4. Basic nutritional facts
-5. Serving size
-6. Preparation and cooking time
+      // Add optional preferences to prompt
+      if (cleanedCuisine) {
+        prompt += `
+Cuisine Preference: ${cleanedCuisine}
+`;
+      }
+      if (cleanedCookTime) {
+        prompt += `
+Desired Cook Time: ${cleanedCookTime}
+`;
+      }
+      if (cleanedDifficulty) {
+        prompt += `
+Desired Difficulty: ${cleanedDifficulty}
+`;
+      }
 
-Return ONLY a JSON array with exactly this format:
-[
-  {
-    "name": "Recipe Name",
-    "ingredients": ["ingredient 1", "ingredient 2", ...],
-    "instructions": ["step 1", "step 2", ...],
-    "nutritionalFacts": "Calories: X, Protein: Xg, etc.",
-    "servings": "Serves X",
-    "times": "Prep: X min | Cook: X min"
-  },
-  ...
-]`;
+      prompt += `
+Instructions for the AI:
+- Adhere strictly to the dietary preferences/restrictions.
+- Prioritize using the \"Available ingredients\". Use \"Pantry staples\" only as needed to complete the recipe.
+- If cuisine, cook time, or difficulty are specified, try your best to match them.
+- Ensure recipes are distinct from each other.
+- Provide clear measurements and step-by-step instructions.
 
+Output Format: Return ONLY a valid JSON array containing exactly 3 recipe objects. Each object must follow this structure precisely:
+{
+  "name": "Recipe Name",
+  "ingredients": ["Quantity Unit Ingredient", "..."],
+  "instructions": ["Step 1", "Step 2", "..."],
+  "nutritionalFacts": "Approximate nutritional information (e.g., Calories: X, Protein: Yg)",
+  "servings": "Number of servings (e.g., Serves 2-3)",
+  "times": "Prep and cook time (e.g., Prep: 15 min | Cook: 30 min)"
+}
+
+Do not include any introductory text, explanations, or markdown formatting around the JSON array.
+`;
+
+      console.log("Generated prompt for Gemini:", prompt.substring(0, 300) + "..."); // Log beginning of prompt
+
+      // Define safety settings
+      const safetySettings = [
+        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+      ];
+
+      // Define generation config including safety settings
+      const generationConfig: GenerationConfig = {
+        // Optional settings:
+        // temperature: 0.7,
+        // maxOutputTokens: 4096,
+        // responseMimeType: "application/json", 
+      };
+      
       console.log("Sending request to Gemini API...");
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 4096,
-        },
-        safetySettings: [
-          {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-          },
-        ],
+      const result = await model.generateContent(prompt, { 
+          generationConfig, 
+          safetySettings 
       });
-
       const response = result.response;
-      if (!response) {
-        console.error("Gemini API returned an empty response");
-        throw new Error("Empty response from Gemini API");
+      
+      console.log("Received response from Gemini API.");
+      // Basic check for response text existence
+      if (!response || !response.text) {
+         console.error("Gemini response missing text content.");
+         throw new Error("Received an empty response from the generation service.");
+      }
+      
+      const text = response.text();
+      console.log("Gemini Raw Response Text (first 300 chars):", text.substring(0, 300) + "...");
+
+      // Attempt to parse the response as JSON
+      let parsedRecipes;
+      try {
+        // Clean potential markdown fences
+        const cleanedText = text.replace(/^```json\n?|```$/g, '').trim();
+        parsedRecipes = JSON.parse(cleanedText);
+        
+        // Basic validation of the parsed structure
+        if (!Array.isArray(parsedRecipes) || parsedRecipes.length === 0 || typeof parsedRecipes[0] !== 'object' || !parsedRecipes[0].name) {
+           console.error("Parsed JSON is not in the expected recipe array format.");
+           throw new Error('API returned data in an unexpected format.');
+        }
+
+        console.log(`Successfully parsed ${parsedRecipes.length} recipes from API response.`);
+        return res.status(200).json({ 
+            recipes: parsedRecipes, 
+            apiInfo: { ...(modelUsed && { model: modelUsed }) }
+        });
+
+      } catch (parseError: any) {
+        console.error("Failed to parse Gemini response as JSON:", parseError);
+        console.error("Raw text that failed parsing:", text); // Log the raw text
+        throw new Error('Failed to process the generated recipes. The format might be incorrect.');
       }
 
-      const text = response.text();
-      console.log("Successfully received response from Gemini API");
-      
-      // Parse the JSON response
-      try {
-        // Extract JSON from the text - look for anything that might be JSON
-        const jsonRegex = /\[\s*\{.*\}\s*\]/s;
-        const match = text.match(jsonRegex);
-        
-        if (!match) {
-          console.error("Failed to extract JSON from Gemini response");
-          throw new Error("Invalid response format");
-        }
-        
-        const jsonStr = match[0];
-        const recipes = JSON.parse(jsonStr);
-        
-        if (!Array.isArray(recipes) || recipes.length === 0) {
-          console.error("Invalid recipes format returned by Gemini");
-          throw new Error("Invalid recipes format");
-        }
-        
-        console.log(`Successfully parsed ${recipes.length} recipes from API response`);
-        return res.status(200).json({ recipes });
-      } catch (parseError) {
-        console.error("Error parsing Gemini response:", parseError);
-        throw new Error("Failed to parse recipe data");
-      }
-    } catch (geminiError) {
-      console.error("Gemini API error:", geminiError);
-      console.log("Using fallback recipe data instead");
-      
-      // Return sample recipes with API info
-      return res.status(200).json({ 
-        recipes: SAMPLE_RECIPES,
-        apiInfo: {
-          error: geminiError instanceof Error ? geminiError.message : String(geminiError),
-          model: "fallback"
-        }
-      });
+    } catch (error: any) {
+      console.error("Error during Gemini API call or processing:", error);
+      apiError = error.message || 'An unknown error occurred during recipe generation.';
+       // Fallback to sample recipes if API fails
+       console.log("Falling back to sample recipes due to API error.");
+       return res.status(500).json({
+          recipes: SAMPLE_RECIPES,
+          error: "Failed to generate recipes using AI. Here are some sample ideas.",
+          details: apiError, // Provide specific API error detail
+          apiInfo: { 
+              ...(apiError && { error: apiError }),
+              ...(modelUsed && { model: modelUsed })
+          }
+       });
     }
+
   } catch (error: any) {
-    console.error('Error in recipe generation:', error);
-    
-    // More specific error handling
-    if (error.code === 'auth/id-token-expired') {
-      return res.status(401).json({ error: 'Authentication token expired' });
-    }
-    if (error.code === 'auth/invalid-id-token') {
-      return res.status(401).json({ error: 'Invalid authentication token' });
-    }
-    
-    const errorMessage = typeof error.message === 'string' ? error.message : 'Unknown error';
-    console.error('Detailed error message:', errorMessage);
-    
-    return res.status(500).json({ 
-      error: 'Failed to generate recipes',
-      details: process.env.NODE_ENV === 'development' ? errorMessage : 'Internal server error' 
-    });
+    // Catch errors related to input processing or unexpected issues before API call
+    console.error("Unhandled error in API handler:", error);
+    return res.status(500).json({ error: error.message || 'An unexpected server error occurred.' });
   }
 }

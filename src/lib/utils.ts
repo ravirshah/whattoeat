@@ -8,10 +8,10 @@ export function cn(...inputs: ClassValue[]) {
 
 export function getBasePath(): string {
   if (typeof window === 'undefined') {
-    return process.env.NEXT_PUBLIC_BASE_PATH || '';
+    return process.env.NEXT_PUBLIC_BASE_PATH || '/whattoeat';
   }
-  // Assume root deployment on Vercel unless specified otherwise
-  return '';
+  // If client-side, use the actual base path
+  return '/whattoeat';
 }
 
 export function withBasePath(path: string): string {
@@ -19,6 +19,11 @@ export function withBasePath(path: string): string {
   if (basePath && path.startsWith(basePath)) return path;
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${basePath}${normalizedPath}`;
+}
+
+// NEW FUNCTION: Use this for API calls
+export function getApiUrl(path: string): string {
+  return withBasePath(path);
 }
 
 export function navigateTo(path: string, router?: any): void {

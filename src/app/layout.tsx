@@ -8,6 +8,7 @@ const inter = Inter({
   variable: '--font-inter',
 });
 
+
 export const metadata: Metadata = {
   title: 'WhatToEat - Generate Recipes With Your Ingredients',
   description: 'Generate delicious recipes based on the ingredients you have at hand.',
@@ -21,9 +22,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="min-h-screen bg-gray-50 font-sans antialiased dark:bg-gray-950 dark:text-gray-50">
-        <Providers>{children}</Providers>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

@@ -21,6 +21,9 @@ import {
     equipment: string[];
     staples: string[];
     dietaryPrefs: string[];
+    cuisine?: string;
+    cookTime?: 'Under 30 mins' | 'Under 1 hour' | '1 hour+';
+    difficulty?: 'Easy' | 'Medium' | 'Hard';
   }
   
   interface Recipe {
@@ -41,7 +44,16 @@ import {
       
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        return userData.preferences as UserPreferences;
+        const prefs = userData.preferences || {};
+        return {
+          ingredients: prefs.ingredients || [],
+          equipment: prefs.equipment || [],
+          staples: prefs.staples || [],
+          dietaryPrefs: prefs.dietaryPrefs || [],
+          cuisine: prefs.cuisine || undefined,
+          cookTime: prefs.cookTime || undefined,
+          difficulty: prefs.difficulty || undefined,
+        };
       }
       
       return null;
@@ -54,14 +66,23 @@ import {
   // Update user preferences
   export const updateUserPreferences = async (
     userId: string, 
-    preferences: UserPreferences
+    preferences: Partial<UserPreferences>
   ): Promise<void> => {
     try {
       const userDocRef = doc(db, "users", userId);
       
-      await updateDoc(userDocRef, {
-        preferences: preferences
-      });
+      const userDoc = await getDoc(userDocRef);
+      if (!userDoc.exists()) {
+        await setDoc(userDocRef, { preferences });
+      } else {
+        const updateData: { [key: string]: any } = {};
+        for (const key in preferences) {
+          if (Object.prototype.hasOwnProperty.call(preferences, key)) {
+            updateData[`preferences.${key}`] = (preferences as any)[key];
+          }
+        }
+        await updateDoc(userDocRef, updateData);
+      }
     } catch (error) {
       console.error("Error updating user preferences:", error);
       throw error;
