@@ -1,8 +1,8 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '../firebase';
+import { onAuthStateChanged, User, getAuth, Auth } from 'firebase/auth';
+import { app } from '../firebase';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -24,9 +24,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     console.log("[AuthContext] useEffect triggered.");
-
-    if (!auth) {
-      console.error("[AuthContext] FATAL: Firebase auth object is null/undefined in useEffect. Auth will not work.");
+    
+    let authInstance: Auth;
+    try {
+      authInstance = getAuth(app);
+      console.log("[AuthContext] Successfully obtained Auth instance.");
+    } catch (error) {
+      console.error("[AuthContext] FATAL: Failed to get Auth instance:", error);
       setInitialAuthCheckComplete(true);
       return;
     }
@@ -34,7 +38,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log("[AuthContext] Attaching onAuthStateChanged listener...");
     let isSubscribed = true;
 
-    const unsubscribe = onAuthStateChanged(auth, 
+    const unsubscribe = onAuthStateChanged(authInstance,
       (user) => {
         if (!isSubscribed) {
           console.log("[AuthContext] Listener success callback fired AFTER unmount. Ignoring.");
@@ -63,7 +67,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       unsubscribe();
     };
 
-  }, [auth]);
+  }, []);
 
   const loading = !initialAuthCheckComplete;
 
