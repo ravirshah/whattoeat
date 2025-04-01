@@ -103,6 +103,7 @@ function GenerateRecipes() {
   const [step, setStep] = useState(1);
   const [loadingPreferences, setLoadingPreferences] = useState(true);
   const [preferencesError, setPreferencesError] = useState(false);
+  const totalSteps = 5; // Define total steps consistently
   
   // Voice recognition states
   const [listening, setListening] = useState(false);
@@ -533,7 +534,8 @@ function GenerateRecipes() {
       }
     }
     
-    if (step < 6) {
+    // Check against totalSteps
+    if (step < totalSteps) { 
       setStep(step + 1);
       setError('');
     } else {
@@ -1061,22 +1063,23 @@ function GenerateRecipes() {
     }
   };
   
-  const stepContent = getStepContent();
-  
-  // Render loading state
-  if (authLoading || loadingPreferences) {
+  // Render loading state ONLY for preferences, rely on AuthWrapper for auth loading
+  if (loadingPreferences) { 
+    // Show a smaller loader, perhaps centered within the container 
+    // where the card would normally be, instead of full screen.
     return (
-      <MainLayout>
-        <div className="flex justify-center items-center h-screen">
-          <Loader2 className="h-16 w-16 animate-spin text-emerald-600" />
+      <div className="container mx-auto px-4 py-8 max-w-4xl flex justify-center items-center min-h-[400px]"> 
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+          <p className="text-sm text-gray-500 dark:text-gray-400">Loading Preferences...</p>
         </div>
-      </MainLayout>
+      </div>
     );
   }
   
   if (preferencesError) {
+      // Keep the error return as is
      return (
-      <MainLayout>
         <div className="container mx-auto px-4 py-8 max-w-4xl">
           <Alert variant="destructive" className="mt-4">
             <AlertTriangle className="h-4 w-4" />
@@ -1085,70 +1088,64 @@ function GenerateRecipes() {
             </AlertDescription>
           </Alert>
         </div>
-      </MainLayout>
     );
   }
 
+  // If not loading preferences and no error, render the main content
   return (
-    <AuthWrapper>
-      <MainLayout>
-        <div className="container mx-auto px-4 py-8 max-w-4xl">
-          <Card className="shadow-lg border-gray-200 dark:border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold text-center text-gray-800 dark:text-white">
-                Generate Your Recipe
-              </CardTitle>
-              <div className="pt-4">
-                <Progress value={(step / 6) * 100} className="w-full" />
-                <p className="text-sm text-center mt-2 text-gray-600 dark:text-gray-400">
-                  Step {step} of 6
-                </p>
-              </div>
-            </CardHeader>
-            
-            {/* Render step content */}
-            {stepContent}
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <Card className="shadow-lg border-gray-200 dark:border-gray-700">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center text-gray-800 dark:text-white">
+            Generate Your Recipe
+          </CardTitle>
+          <div className="pt-4">
+            <Progress value={(step / totalSteps) * 100} className="w-full" />
+            <p className="text-sm text-center mt-2 text-gray-600 dark:text-gray-400">
+              Step {step} of {totalSteps}
+            </p>
+          </div>
+        </CardHeader>
+        
+        {getStepContent()}
 
-            <CardFooter className="flex flex-col items-center space-y-4 pt-6">
-              {error && (
-                <Alert variant="destructive" className="w-full">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                  {/* Add retry button if applicable */}
-                  {error.includes("Failed to generate recipes") && retryCount < maxRetries && (
-                     <Button onClick={retryGeneration} variant="outline" size="sm" className="mt-2">
-                       <RefreshCw className="mr-2 h-4 w-4" /> Retry Generation
-                     </Button>
-                  )}
-                </Alert>
+        <CardFooter className="flex flex-col items-center space-y-4 pt-6">
+          {error && (
+            <Alert variant="destructive" className="w-full">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+              {error.includes("Failed to generate recipes") && retryCount < maxRetries && (
+                 <Button onClick={retryGeneration} variant="outline" size="sm" className="mt-2">
+                   <RefreshCw className="mr-2 h-4 w-4" /> Retry Generation
+                 </Button>
               )}
+            </Alert>
+          )}
 
-              <div className="flex justify-between w-full">
-                <Button 
-                  onClick={prevStep} 
-                  disabled={step === 1 || generating}
-                  variant="outline"
-                >
-                  <ChevronLeft className="mr-2 h-4 w-4" /> Previous
-                </Button>
-                
-                <Button 
-                  onClick={nextStep} 
-                  disabled={generating}
-                >
-                  {generating ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    step === 6 ? 'Generate Recipe' : 'Next'
-                  )}
-                  {step < 6 && <ChevronRight className="ml-2 h-4 w-4" />}
-                </Button>
-              </div>
-            </CardFooter>
-          </Card>
-        </div>
-      </MainLayout>
-    </AuthWrapper>
+          <div className="flex justify-between w-full">
+            <Button 
+              onClick={prevStep} 
+              disabled={step === 1 || generating}
+              variant="outline"
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+            </Button>
+            
+            <Button 
+              onClick={nextStep} 
+              disabled={generating}
+            >
+              {generating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                step === totalSteps ? 'Generate Recipe' : 'Next'
+              )}
+              {step < totalSteps && <ChevronRight className="ml-2 h-4 w-4" />}
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
+    </div>
   );
 }
 
