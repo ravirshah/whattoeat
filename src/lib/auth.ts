@@ -64,48 +64,44 @@ import {
         prompt: 'select_account'
       });
       
+      // Step 1: Perform the popup sign-in
+      console.log("Opening Google sign-in popup");
       const userCredential = await signInWithPopup(auth, provider);
-      console.log("Google signin successful:", userCredential.user.uid);
+      console.log("Google signin popup closed successfully, user:", userCredential.user.uid);
       
-      // Get a fresh ID token immediately - this helps ensure the token is available right away
-      try {
-        const token = await userCredential.user.getIdToken(true);
-        console.log("Fresh token obtained after Google sign-in, length:", token.length);
-      } catch (tokenError) {
-        console.error("Error getting fresh token after Google sign-in:", tokenError);
-        // Continue anyway as we've already authenticated
-      }
+      // Step 2: Get a fresh token immediately
+      console.log("Getting fresh token");
+      const token = await userCredential.user.getIdToken(true);
+      console.log("Fresh token obtained, length:", token.length);
       
-      // IMPORTANT: Force update the global auth state
+      // Step 3: Explicitly update auth state and wait for it to complete
+      console.log("Updating global auth state");
       setGlobalAuthUser(userCredential.user);
       
-      // Add a small delay to let auth state propagate through the system
+      // Step 4: Add a delay to ensure state propagates
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Check if user document exists, create if it doesn't
-      try {
-        const userDocRef = doc(db, "users", userCredential.user.uid);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (!userDoc.exists()) {
-          console.log("Creating new user document for Google user");
-          await createUserDocument(userCredential.user);
-        }
-      } catch (dbError) {
-        console.error("Error checking/creating user document:", dbError);
-        // Continue anyway as we've already authenticated
+      // Step 5: Check if the user document exists, create if needed
+      console.log("Checking for user document");
+      const userDocRef = doc(db, "users", userCredential.user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (!userDoc.exists()) {
+        console.log("Creating new user document");
+        await createUserDocument(userCredential.user);
+      } else {
+        console.log("User document already exists");
       }
       
-      // Reload the user object to ensure we have the latest user data
-      try {
-        await userCredential.user.reload();
-        console.log("User data reloaded after Google sign-in");
-      } catch (reloadError) {
-        console.error("Error reloading user after Google sign-in:", reloadError);
-        // Continue anyway as we've already authenticated
+      // Final verification
+      console.log("Verifying authentication state");
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.error("Auth state verification failed - user not present in auth.currentUser");
+      } else {
+        console.log("Auth state verified, user ID:", currentUser.uid);
       }
       
-      // Return the user after all operations
       return userCredential.user;
     } catch (error: any) {
       console.error("Error signing in with Google:", error);

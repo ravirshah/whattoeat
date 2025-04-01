@@ -28,6 +28,27 @@ export function setGlobalAuthUser(user: User | null) {
   globalUser = user;
   globalInitialAuthCheckComplete = true; // Also mark auth check as complete when manually setting user
   
+  // Save to localStorage for persistence
+  if (typeof window !== 'undefined') {
+    try {
+      if (user) {
+        // We can't store the full user object, so just store basic info for detection
+        localStorage.setItem('whattoeat_user', JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          timestamp: Date.now()
+        }));
+        console.log("[AuthContext-Global] Saved user data to localStorage");
+      } else {
+        localStorage.removeItem('whattoeat_user');
+        console.log("[AuthContext-Global] Removed user data from localStorage");
+      }
+    } catch (e) {
+      console.error("[AuthContext-Global] Error accessing localStorage:", e);
+    }
+  }
+  
   // Make sure we notify all subscribers to update their state
   console.log("[AuthContext-Global] Explicitly notifying all subscribers after manual auth update");
   notifyAuthSubscribers();
@@ -242,6 +263,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const checkPersistedUser = async () => {
       if (!currentUser) {
         console.log("[AuthContext-Provider] No user in state, checking for persisted user");
+        
+        // First check localStorage
+        if (typeof window !== 'undefined') {
+          try {
+            const storedUser = localStorage.getItem('whattoeat_user');
+            if (storedUser) {
+              const userData = JSON.parse(storedUser);
+              console.log(`[AuthContext-Provider] Found user in localStorage: ${userData.uid}`);
+              
+              // If we find a stored user but no current user, force a refresh of the auth state
+              const refreshedUser = await refreshUser();
+              if (refreshedUser) {
+                console.log(`[AuthContext-Provider] Successfully loaded user from refresh: ${refreshedUser.uid}`);
+                return;
+              } else {
+                console.log(`[AuthContext-Provider] Could not load user from refresh despite localStorage data`);
+                // Clear possibly stale localStorage data
+                localStorage.removeItem('whattoeat_user');
+              }
+            }
+          } catch (e) {
+            console.error('[AuthContext-Provider] Error checking localStorage:', e);
+          }
+        }
+        
+        // If no user in localStorage or failed to load, try normal refresh
         await refreshUser();
       }
     };

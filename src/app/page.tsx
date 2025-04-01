@@ -89,7 +89,7 @@ export default function Home() {
               
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button size="lg" asChild>
-                  <Link href="/generate">
+                  <Link href="/signin">
                     Get Started
                   </Link>
                 </Button>
@@ -192,7 +192,7 @@ export default function Home() {
             Join thousands of home cooks who are making delicious meals with what they already have.
           </p>
           <Button size="lg" variant="secondary" asChild>
-            <Link href="/generate" className="inline-flex items-center">
+            <Link href="/signin" className="inline-flex items-center">
               Start Cooking Now
               <ChevronRight className="ml-2 h-5 w-5" />
             </Link>

@@ -109,8 +109,29 @@ function AuthWrapperContent({
 
   // For generate and recipes pages - always show content
   if (isGeneratePage || isRecipesPage) {
-    // Just immediately show content for these pages
-    console.log(`[AuthWrapper] Immediately showing content for ${isGeneratePage ? 'generate' : 'recipes'} page`);
+    // Check if we need to redirect to sign in for the generate page when not authenticated
+    if (isGeneratePage && !currentUser && !loading && refreshAttempted) {
+      console.log('[AuthWrapper] User not authenticated for generate page, redirecting to sign in');
+      
+      // Redirect to sign in page with from=generate parameter for callback
+      const baseUrl = window.location.origin + '/whattoeat';
+      window.location.href = `${baseUrl}/signin?from=generate`;
+      
+      // Show loading while redirecting
+      return (
+        <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
+          <div className="flex flex-col items-center space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Redirecting to sign in...
+            </p>
+          </div>
+        </div>
+      );
+    }
+    
+    // For recipes pages, or if user is authenticated for generate page
+    console.log(`[AuthWrapper] Showing content for ${isGeneratePage ? 'generate' : 'recipes'} page`);
     return <>{children}</>;
   }
 

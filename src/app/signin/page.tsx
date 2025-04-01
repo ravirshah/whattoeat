@@ -92,12 +92,13 @@ function SignInContent() {
       const googleUser = await signInWithGoogle();
       console.log(`[SignIn] Google sign in successful: ${googleUser.uid}`);
       
-      // Navigate directly after Google sign-in
+      // MOST IMPORTANT: Force a complete page reload to the destination
+      // This ensures Firebase auth state is fully initialized on the new page
       const redirectPath = fromGenerate ? '/generate' : '/generate';
-      console.log(`[SignIn] Redirecting to ${redirectPath} after Google sign in`);
+      const fullUrl = window.location.origin + '/whattoeat' + redirectPath;
       
-      // Force a full page reload to ensure fresh state
-      window.location.href = window.location.origin + '/whattoeat' + redirectPath;
+      console.log(`[SignIn] Reloading page to ${fullUrl}`);
+      window.location.replace(fullUrl); // replace() is more reliable than href=
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google');
       console.error("[SignIn] Google sign in error:", error);
