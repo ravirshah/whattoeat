@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { Loader2 } from 'lucide-react';
 
@@ -16,21 +17,15 @@ export default function AuthWrapper({
   redirectTo = '/signin'
 }: AuthWrapperProps) {
   const { currentUser, loading } = useAuth();
+  const router = useRouter();
 
-  console.log(`[AuthWrapper] Render - loading: ${loading}, user: ${!!currentUser}`);
-
-  // Handle redirection with explicit URL instead of router
+  // Wait for auth state to stabilize before redirecting
   useEffect(() => {
     if (!loading && !currentUser && redirectIfNotAuthenticated) {
-      // CRITICAL: Use window.location with ABSOLUTE URL to avoid path resolution issues
-      const baseUrl = 'https://whattoeat.sortedbyshah.com/whattoeat';
-      const targetPage = redirectTo.startsWith('/') ? redirectTo.substring(1) : redirectTo;
-      const absoluteUrl = `${baseUrl}/${targetPage}`;
-      
-      console.log(`[AuthWrapper] Redirecting to absolute URL: ${absoluteUrl}`);
-      window.location.href = absoluteUrl;
+      // Use Next router for client-side navigation (relative URL)
+      router.push(redirectTo);
     }
-  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo]);
+  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo, router]);
 
   // If still loading, show loader
   if (loading) {
