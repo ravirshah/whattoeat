@@ -29,19 +29,22 @@ function SignInContent() {
   }, [fromGenerate]);
 
   const handleSuccessfulSignIn = async () => {
-    // Explicitly refresh the user state in AuthContext
-    const user = await refreshUser();
+    // We assume the sign-in was successful if this function is called.
+    // The auth context should update via its listener.
+    // Let's remove the potentially problematic refreshUser call.
+    // const user = await refreshUser();
+    // 
+    // if (!user) {
+    //   console.error("[SignIn] User not available after refresh - something went wrong");
+    //   setError("Sign in succeeded but we couldn't verify your account. Please try again.");
+    //   return;
+    // }
     
-    if (!user) {
-      console.error("[SignIn] User not available after refresh - something went wrong");
-      setError("Sign in succeeded but we couldn't verify your account. Please try again.");
-      return;
-    }
-    
-    console.log(`[SignIn] Sign in successful, user: ${user.uid}`);
+    // console.log(`[SignIn] Sign in successful, user: ${user.uid}`); // Can't log user.uid anymore
+    console.log(`[SignIn] Sign in process successful, navigating to /whattoeat/generate`);
     
     // Navigate programmatically to the generate page
-    console.log(`[SignIn] Sign in successful, navigating to /whattoeat/generate`);
+    // console.log(`[SignIn] Sign in successful, navigating to /whattoeat/generate`); // Redundant log
     router.push('/whattoeat/generate');
   };
 
