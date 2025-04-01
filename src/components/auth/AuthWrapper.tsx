@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, ReactNode, useState } from 'react';
+import { useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { Loader2 } from 'lucide-react';
@@ -18,39 +18,34 @@ export default function AuthWrapper({
 }: AuthWrapperProps) {
   const { currentUser, loading } = useAuth();
   const router = useRouter();
-  const [bypassMode, setBypassMode] = useState(false);
 
-  console.log(`[AuthWrapper] Render - loading: ${loading}, user: ${!!currentUser}, bypass: ${bypassMode}`);
+  console.log(`[AuthWrapper] Render - loading: ${loading}, user: ${!!currentUser}`);
 
-  // Emergency fallback - if auth is taking too long, just bypass it
+  // Handle redirection with proper path normalization
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (loading) {
-        console.log("[AuthWrapper] EMERGENCY BYPASS: Auth taking too long, bypassing completely");
-        setBypassMode(true);
+    if (!loading && !currentUser && redirectIfNotAuthenticated) {
+      // CRITICAL FIX: Ensure no double paths in redirect URL
+      let path = redirectTo;
+      
+      // Remove any leading '/whattoeat' from the redirectTo path to avoid duplicates
+      if (path.startsWith('/whattoeat')) {
+        path = path.replace(/^\/whattoeat/, '');
       }
-    }, 7000); // 7 seconds
-    
-    return () => clearTimeout(timeoutId);
-  }, [loading]);
-
-  // Handle redirection (but only if not in bypass mode)
-  useEffect(() => {
-    if (!loading && !currentUser && redirectIfNotAuthenticated && !bypassMode) {
-      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/whattoeat';
-      const redirectUrl = `${basePath}${redirectTo.startsWith('/') ? redirectTo : '/' + redirectTo}`;
+      
+      // Always start with a slash
+      if (!path.startsWith('/')) {
+        path = '/' + path;
+      }
+      
+      // Final redirect URL with single base path
+      const redirectUrl = `/whattoeat${path}`;
+      
       console.log(`[AuthWrapper] Redirecting to: ${redirectUrl}`);
       router.push(redirectUrl);
     }
-  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo, router, bypassMode]);
+  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo, router]);
 
-  // In bypass mode, just show the content
-  if (bypassMode) {
-    console.log("[AuthWrapper] Rendering children in bypass mode");
-    return <>{children}</>;
-  }
-
-  // Still loading, show loader
+  // Show loading state
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -62,13 +57,12 @@ export default function AuthWrapper({
     );
   }
 
-  // Auth complete and user exists or redirect not required
+  // If user is authenticated or we don't need authentication
   if (currentUser || !redirectIfNotAuthenticated) {
-    console.log("[AuthWrapper] Rendering children - auth complete");
     return <>{children}</>;
   }
 
-  // Auth complete, no user, waiting for redirect
+  // Show redirect state
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
       <div className="flex flex-col items-center space-y-4">
