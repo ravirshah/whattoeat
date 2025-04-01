@@ -77,33 +77,42 @@ const DIFFICULTIES = [
   'Easy', 'Medium', 'Hard'
 ];
 
-function GenerateRecipes() {
-  const { currentUser, loading: authLoading } = useAuth();
+// Define the type for preferences passed as props
+interface PreferencesData {
+  ingredients: string[];
+  equipment: string[];
+  staples: string[];
+  dietaryPrefs: string[];
+  cuisine?: string;
+  cookTime?: 'Under 30 mins' | 'Under 1 hour' | '1 hour+';
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
+}
+
+function GenerateRecipes({ initialPreferences }: { initialPreferences: PreferencesData }) {
+  const { currentUser } = useAuth();
   const router = useRouter();
   
   // Speech recognition ref
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   
-  // Input states
-  const [ingredients, setIngredients] = useState<string[]>([]);
+  // Initialize state from props
+  const [ingredients, setIngredients] = useState<string[]>(initialPreferences.ingredients || []);
   const [newIngredient, setNewIngredient] = useState('');
-  const [equipment, setEquipment] = useState<string[]>([]);
+  const [equipment, setEquipment] = useState<string[]>(initialPreferences.equipment || []);
   const [newEquipment, setNewEquipment] = useState('');
-  const [staples, setStaples] = useState<string[]>([]);
+  const [staples, setStaples] = useState<string[]>(initialPreferences.staples || []);
   const [newStaple, setNewStaple] = useState('');
-  const [dietaryPrefs, setDietaryPrefs] = useState<string[]>([]);
+  const [dietaryPrefs, setDietaryPrefs] = useState<string[]>(initialPreferences.dietaryPrefs || []);
   const [newDietaryPref, setNewDietaryPref] = useState('');
-  const [cuisine, setCuisine] = useState<string>('');
-  const [cookTime, setCookTime] = useState<'Under 30 mins' | 'Under 1 hour' | '1 hour+' | ''>('');
-  const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | ''>('');
+  const [cuisine, setCuisine] = useState<string>(initialPreferences.cuisine || '');
+  const [cookTime, setCookTime] = useState<'Under 30 mins' | 'Under 1 hour' | '1 hour+' | ''>(initialPreferences.cookTime || '');
+  const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | ''>(initialPreferences.difficulty || '');
   
   // UI states
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
-  const [loadingPreferences, setLoadingPreferences] = useState(true);
-  const [preferencesError, setPreferencesError] = useState(false);
-  const totalSteps = 5; // Define total steps consistently
+  const totalSteps = 5;
   
   // Voice recognition states
   const [listening, setListening] = useState(false);
@@ -134,66 +143,6 @@ function GenerateRecipes() {
       }
     };
   }, [listening]);
-  
-  // Load user preferences
-  useEffect(() => {
-    const loadUserPreferences = async () => {
-      // Guard against running if currentUser is null/undefined during auth loading
-      if (!currentUser?.uid) { 
-        setLoadingPreferences(false);
-        return;
-      }
-      
-      setLoadingPreferences(true);
-      try {
-        const prefs = await getUserPreferences(currentUser.uid); // Use guaranteed uid here
-        if (prefs) {
-          // Set state based on loaded prefs
-          setIngredients(prefs.ingredients || []);
-          setEquipment(prefs.equipment || []);
-          setStaples(prefs.staples || []);
-          setDietaryPrefs(prefs.dietaryPrefs || []);
-          setCuisine(prefs.cuisine || '');
-          setCookTime(prefs.cookTime || '');
-          setDifficulty(prefs.difficulty || '');
-        } else {
-           // If no preferences found (e.g., new user), set defaults or empty
-           setIngredients([]);
-           setEquipment([]);
-           setStaples([]);
-           setDietaryPrefs([]);
-           setCuisine('');
-           setCookTime('');
-           setDifficulty('');
-        }
-      } catch (error) {
-        console.error('Error loading preferences:', error);
-        setPreferencesError(true);
-        toast.error('Failed to load your preferences', {
-          description: 'Using default settings instead'
-        });
-      } finally {
-        setLoadingPreferences(false);
-      }
-    };
-    
-    // Only run when auth is finished AND we have a user ID
-    if (!authLoading && currentUser?.uid) {
-      loadUserPreferences();
-    } else if (!authLoading && !currentUser) {
-       // Handle the case where auth is done, but user is logged out
-       setLoadingPreferences(false); 
-       // Optionally reset fields to default if needed
-        setIngredients([]);
-        setEquipment([]);
-        setStaples([]);
-        setDietaryPrefs([]);
-        setCuisine('');
-        setCookTime('');
-        setDifficulty('');
-    }
-    // Depend only on authLoading and the user's ID for stability
-  }, [authLoading, currentUser?.uid]);
   
   // Add/remove functions for ingredients
   const addIngredient = () => {
@@ -260,39 +209,26 @@ function GenerateRecipes() {
     }
     
     try {
-      // Use \'(window as any)\' to access browser-specific API constructor
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      
       if (!SpeechRecognition) {
         toast.error('Voice recognition is not available');
         return;
       }
-      
-      // Assuming SpeechRecognition constructor type is handled by \'(window as any)\'
       const recognition = new SpeechRecognition(); 
       recognitionRef.current = recognition;
-      
       recognition.lang = 'en-US';
       recognition.continuous = true; 
       recognition.interimResults = false; 
       recognition.maxAlternatives = 1;
-      
       setListening(true);
       setTranscript('');
-      
       let category: 'ingredients' | 'equipment' | 'staples' = 'ingredients';
       if (step === 2) category = 'equipment';
       if (step === 3) category = 'staples';
-      const categoryDisplayName = 
-        category === 'ingredients' ? 'ingredient' : 
-        category === 'equipment' ? 'equipment item' : 'staple item';
+      const categoryDisplayName = category === 'ingredients' ? 'ingredient' : category === 'equipment' ? 'equipment item' : 'staple item';
 
-      // Define event types locally or ensure they come from a lib
-      // Assuming types like SpeechRecognitionEvent are available globally 
-      // or via tsconfig settings (e.g., \"dom\")
       recognition.onresult = (event: SpeechRecognitionEvent) => { 
         let finalTranscriptCombined = '';
-        // Check if results exist and have length
         if (event.results && event.results.length > event.resultIndex) {
           for (let i = event.resultIndex; i < event.results.length; ++i) {
             if (event.results[i].isFinal && event.results[i][0]) {
@@ -301,12 +237,10 @@ function GenerateRecipes() {
           }
         }
         finalTranscriptCombined = finalTranscriptCombined.trim();
-        
         if (finalTranscriptCombined) {
            setTranscript(prev => prev ? `${prev}, ${finalTranscriptCombined}` : finalTranscriptCombined);
            const itemsToAdd = parseItemsFromText(finalTranscriptCombined, category);
            if (itemsToAdd.length > 0) {
-             // Add unique items (case-insensitive check)
              let addedCount = 0;
              itemsToAdd.forEach(newItem => {
                 let alreadyExists = false;
@@ -330,131 +264,68 @@ function GenerateRecipes() {
         }
       };
 
-      // Assuming SpeechRecognitionErrorEvent is available
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         let errorMsg = `Speech recognition error: ${event.error}`;
-        if (event.error === 'no-speech') {
-          errorMsg = "No speech detected. Please try speaking again.";
-        } else if (event.error === 'audio-capture') {
-          errorMsg = "Audio capture failed. Check microphone permissions.";
-        } else if (event.error === 'not-allowed') {
-          errorMsg = "Microphone access denied. Please allow access in browser settings.";
-        }
+        if (event.error === 'no-speech') { errorMsg = "No speech detected. Please try speaking again."; }
+        else if (event.error === 'audio-capture') { errorMsg = "Audio capture failed. Check microphone permissions."; }
+        else if (event.error === 'not-allowed') { errorMsg = "Microphone access denied. Please allow access in browser settings."; }
         toast.error(errorMsg);
         stopVoiceRecognition();
       };
 
-      recognition.onend = () => {
-        if (recognitionRef.current) { 
-            setListening(false);
-        }
-      };
-      
+      recognition.onend = () => { if (recognitionRef.current) { setListening(false); } };
       recognition.start();
     } catch (e) {
       console.error("Failed to start voice recognition:", e);
       toast.error("Could not start voice recognition.");
       setListening(false);
-      if (recognitionRef.current) {
-        try { recognitionRef.current.abort(); } catch {} 
-        recognitionRef.current = null;
-      }
+      if (recognitionRef.current) { try { recognitionRef.current.abort(); } catch {} recognitionRef.current = null; }
     }
   };
   
-  // Stop recognition
   const stopVoiceRecognition = () => {
     if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (error) {
-        console.error('Error stopping recognition:', error);
-      }
-      
+      try { recognitionRef.current.stop(); } catch (error) { console.error('Error stopping recognition:', error); }
       setListening(false);
       recognitionRef.current = null;
-      
-      if (transcript) {
-        toast.info('Voice recognition stopped');
-      }
+      if (transcript) { toast.info('Voice recognition stopped'); }
     }
   };
   
   // Parse items from text
   const parseItemsFromText = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string[] => {
     try {
-      // Normalize text: convert to lowercase
       let normalizedText = text.toLowerCase();
-      
-      // Different parsing strategies based on category
       if (category === 'ingredients') {
-        // Replace common fraction words with symbols for ingredients
         normalizedText = normalizedText
-          .replace(/\bhalf\b/g, '1/2')
-          .replace(/\bhalf a\b/g, '1/2')
-          .replace(/\bquarter\b/g, '1/4')
-          .replace(/\bthird\b/g, '1/3')
-          .replace(/\bthree quarters\b/g, '3/4');
-        
-        // Convert number words to digits but keep them as standalone words
-        normalizedText = normalizedText
-          .replace(/\bone\b/g, '1')
-          .replace(/\btwo\b/g, '2')
-          .replace(/\bthree\b/g, '3')
-          .replace(/\bfour\b/g, '4')
-          .replace(/\bfive\b/g, '5')
-          .replace(/\bsix\b/g, '6')
-          .replace(/\bseven\b/g, '7')
-          .replace(/\beight\b/g, '8')
-          .replace(/\bnine\b/g, '9')
-          .replace(/\bten\b/g, '10');
+          .replace(/\bhalf\b/g, '1/2').replace(/\bhalf a\b/g, '1/2').replace(/\bquarter\b/g, '1/4').replace(/\bthird\b/g, '1/3').replace(/\bthree quarters\b/g, '3/4')
+          .replace(/\bone\b/g, '1').replace(/\btwo\b/g, '2').replace(/\bthree\b/g, '3').replace(/\bfour\b/g, '4').replace(/\bfive\b/g, '5').replace(/\bsix\b/g, '6').replace(/\bseven\b/g, '7').replace(/\beight\b/g, '8').replace(/\bnine\b/g, '9').replace(/\bten\b/g, '10');
       }
-      
-      // Split by common delimiters for all categories
       const explicitSplits = normalizedText.split(/(?:,|\band\b|\balso\b|\bplus\b|\bthen\b)\s*/i);
-      
-      // Array to hold the parsed items
       let items: string[] = [];
-      
-      // Process each chunk that might contain multiple items
       for (let chunk of explicitSplits) {
-        // Remove filler words
         chunk = chunk.replace(/\b(?:uhh?|umm?|err?|like|maybe|i think|i have|i've got|got|have)\b/gi, '');
-        
         if (category === 'ingredients') {
-          // More detailed parsing for ingredients
-          
-          // Identify if the chunk might contain multiple ingredients indicated by "some" keyword
           const someBasedChunks = chunk.split(/\bsome\b/i).map(part => part.trim()).filter(Boolean);
-          
           if (someBasedChunks.length > 1) {
-            // If "some" was used as a separator, process each part
-            for (let part of someBasedChunks) {
-              if (part) items.push(cleanItem(part, category));
-            }
+            for (let part of someBasedChunks) { if (part) items.push(cleanItem(part, category)); }
           } else {
-            // Check if this chunk might contain a quantity followed by an ingredient
             const quantityMatch = chunk.match(/^(\d+(?:\/\d+)?)\s+([a-z\s]+)$/);
-            
             if (quantityMatch) {
-              // We found a quantity followed by an ingredient
               const quantity = quantityMatch[1];
               const ingredientText = quantityMatch[2].trim();
               items.push(`${quantity} ${ingredientText}`);
             } else {
-              // No quantity pattern found, just clean it normally
               const cleaned = cleanItem(chunk, category);
               if (cleaned) items.push(cleaned);
             }
           }
         } else {
-          // Simpler parsing for equipment and staples
           const cleaned = cleanItem(chunk, category);
           if (cleaned) items.push(cleaned);
         }
       }
-      
       return items.filter(i => i.length > 0);
     } catch (error) {
       console.error('Error parsing speech:', error);
@@ -464,276 +335,98 @@ function GenerateRecipes() {
   
   // Helper function to clean up individual item text
   const cleanItem = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string => {
-    // Remove common articles from the beginning for all categories
     let cleaned = text.replace(/^\s*(?:a|an|the|some|few|little)\s+/i, '');
-    
     if (category === 'ingredients') {
-      // Handle "head of" pattern for ingredients (e.g., "head of broccoli" -> "broccoli")
       cleaned = cleaned.replace(/\b(head|bunch|clove|piece)s?\s+of\s+/i, '');
-      
-      // Handle common quantity expressions for ingredients
       cleaned = cleaned.replace(/\ba\s+(?:little|bit\s+of)\s+/i, '');
     } else if (category === 'equipment') {
-      // Clean up equipment-specific patterns
       cleaned = cleaned.replace(/\bmy\s+/i, '');
       cleaned = cleaned.replace(/\bi\s+(?:use|have|own)\s+(?:a|an|the)?\s*/i, '');
     } else if (category === 'staples') {
-      // Clean up staples-specific patterns
       cleaned = cleaned.replace(/\balways\s+(?:have|keep)\s+/i, '');
       cleaned = cleaned.replace(/\bin\s+(?:my|the)\s+pantry\b/i, '');
     }
-    
-    // Clean up any extra whitespace for all categories
     cleaned = cleaned.trim();
-    
     return cleaned;
   };
   
   // Add common preset items
   const addCommonItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary') => {
     switch (category) {
-      case 'ingredients':
-        if (!ingredients.includes(item)) setIngredients([...ingredients, item]);
-        break;
-      case 'equipment':
-        if (!equipment.includes(item)) setEquipment([...equipment, item]);
-        break;
-      case 'staples':
-        if (!staples.includes(item)) setStaples([...staples, item]);
-        break;
-      case 'dietary':
-        if (!dietaryPrefs.includes(item)) setDietaryPrefs([...dietaryPrefs, item]);
-        break;
+      case 'ingredients': if (!ingredients.includes(item)) setIngredients([...ingredients, item]); break;
+      case 'equipment': if (!equipment.includes(item)) setEquipment([...equipment, item]); break;
+      case 'staples': if (!staples.includes(item)) setStaples([...staples, item]); break;
+      case 'dietary': if (!dietaryPrefs.includes(item)) setDietaryPrefs([...dietaryPrefs, item]); break;
     }
   };
   
   // Navigation functions
   const nextStep = async () => {
-    if (step === 1 && ingredients.length === 0) {
-      setError('Please add at least one ingredient');
-      return;
-    }
-    
-    // Save preferences on moving from the respective steps
+    if (step === 1 && ingredients.length === 0) { setError('Please add at least one ingredient'); return; }
     if (currentUser) {
       try {
         if (step === 1) await updateUserPreferences(currentUser.uid, { ingredients });
         if (step === 2) await updateUserPreferences(currentUser.uid, { equipment });
         if (step === 3) await updateUserPreferences(currentUser.uid, { staples });
         if (step === 4) await updateUserPreferences(currentUser.uid, { dietaryPrefs });
-        if (step === 5) { 
-            await updateUserPreferences(currentUser.uid, { 
-                cuisine: cuisine || undefined, 
-                cookTime: cookTime || undefined, 
-                difficulty: difficulty || undefined 
-            });
-        }
-      } catch (e) {
-        console.error("Error saving preferences:", e);
-        toast.warning("Could not save preferences for next time.");
-      }
+        if (step === 5) { await updateUserPreferences(currentUser.uid, { cuisine: cuisine || undefined, cookTime: cookTime || undefined, difficulty: difficulty || undefined }); }
+      } catch (e) { console.error("Error saving preferences:", e); toast.warning("Could not save preferences for next time."); }
     }
-    
-    // Check against totalSteps
-    if (step < totalSteps) { 
-      setStep(step + 1);
-      setError('');
-    } else {
-      await generateRecipes();
-    }
+    if (step < totalSteps) { setStep(step + 1); setError(''); } 
+    else { await generateRecipes(); }
   };
   
-  const prevStep = () => {
-    if (step > 1) {
-      setStep(step - 1);
-      setError('');
-    }
-  };
+  const prevStep = () => { if (step > 1) { setStep(step - 1); setError(''); } };
   
   // Generate recipes
   const generateRecipes = async () => {
-    if (ingredients.length === 0) {
-      setError('Please add at least one ingredient');
-      setStep(1); // Go back to ingredient step
-      return;
-    }
-  
-    if (!currentUser) {
-      setError('You must be logged in to generate recipes');
-      router.push('/signin');
-      return;
-    }
-  
-    setGenerating(true);
-    setError('');
-    setRetryCount(0); // Reset retry count for new generation attempt
-  
+    if (ingredients.length === 0) { setError('Please add at least one ingredient'); setStep(1); return; }
+    if (!currentUser) { setError('You must be logged in to generate recipes'); router.push('/signin'); return; }
+    setGenerating(true); setError(''); setRetryCount(0);
     try {
-      // Try to update user stats in background (don't await)
-      try {
-        incrementRecipesGenerated(currentUser.uid).catch(err => {
-          console.error("Failed to increment recipe count:", err);
-          // Non-critical operation, continue regardless
-        });
-      } catch (statsError) {
-        console.error("Error updating stats:", statsError);
-        // Continue anyway - this isn't critical
-      }
-  
-      // Get the user's ID token for authentication
-      let token;
-      try {
-        token = await currentUser.getIdToken();
-        if (!token) {
-          throw new Error("Failed to get authentication token");
-        }
-      } catch (tokenError) {
-        console.error("Error getting auth token:", tokenError);
-        setError('Authentication error. Please try signing in again.');
-        setGenerating(false);
-        return;
-      }
-  
-      // Prepare request data
-      const requestData = {
-        ingredients, 
-        equipment, 
-        staples, 
-        dietaryPrefs,
-        cuisine,
-        cookTime,
-        difficulty,
-        userId: currentUser.uid // Pass userId for potential personalization later
-      };
-  
-      console.log("Sending API request with data:", {
-        ingredientsCount: ingredients.length,
-        equipmentCount: equipment.length,
-        staplesCount: staples.length,
-        dietaryPrefsCount: dietaryPrefs.length
-      });
-  
-      // First try the main API endpoint with a timeout
-      let recipeData;
-      try {
-        const response = await axios.post('/whattoeat/api/generate-recipes', 
-          requestData,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            timeout: 60000 // 60 second timeout
-          }
-        );
-      
+      try { incrementRecipesGenerated(currentUser.uid).catch(err => console.error("Failed to increment recipe count:", err)); } catch (statsError) { console.error("Error updating stats:", statsError); }
+      let token; try { token = await currentUser.getIdToken(); if (!token) throw new Error("Failed to get authentication token"); } catch (tokenError) { console.error("Error getting auth token:", tokenError); setError('Authentication error. Please try signing in again.'); setGenerating(false); return; }
+      const requestData = { ingredients, equipment, staples, dietaryPrefs, cuisine, cookTime, difficulty, userId: currentUser.uid };
+      console.log("Sending API request with data:", { ingredientsCount: ingredients.length, equipmentCount: equipment.length, staplesCount: staples.length, dietaryPrefsCount: dietaryPrefs.length });
+      let recipeData; try {
+        const response = await axios.post('/whattoeat/api/generate-recipes', requestData, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, timeout: 60000 });
         recipeData = response.data;
       } catch (mainApiError) {
         console.error("Error with main API, trying fallback:", mainApiError);
-        
-        // If the main API fails, try the simplified endpoint as a fallback
         try {
-          const fallbackResponse = await axios.post('/whattoeat/api/generate-recipes-simple', 
-            requestData,
-            {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              },
-              timeout: 30000 // 30 second timeout
-            }
-          );
-          
+          const fallbackResponse = await axios.post('/whattoeat/api/generate-recipes-simple', requestData, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, timeout: 30000 });
           recipeData = fallbackResponse.data;
-          // Show a toast notification about using fallback recipes
-          toast.info('Using sample recipes', {
-            description: 'Our full recipe generator is busy. Showing example recipes instead.'
-          });
-        } catch (fallbackError) {
-          console.error("Fallback API also failed:", fallbackError);
-          throw mainApiError; // Throw the original error for better error messaging
-        }
+          toast.info('Using sample recipes', { description: 'Our full recipe generator is busy. Showing example recipes instead.' });
+        } catch (fallbackError) { console.error("Fallback API also failed:", fallbackError); throw mainApiError; }
       }
-  
-      // Check if we got a valid response with recipes
       if (recipeData && recipeData.recipes && recipeData.recipes.length > 0) {
         console.log(`Received ${recipeData.recipes.length} recipes from API`);
-  
-        // Check if this is using fallback recipes
-        if (recipeData.apiInfo) {
-          console.log("Using API fallback recipes due to:", recipeData.apiInfo.error);
-          toast.info("Using sample recipes", {
-            description: "We're showing example recipes while our system is busy."
-          });
-        }
-  
-        // Store the recipes in session storage
+        if (recipeData.apiInfo) { console.log("Using API fallback recipes due to:", recipeData.apiInfo.error); toast.info("Using sample recipes", { description: "We're showing example recipes while our system is busy." }); }
         sessionStorage.setItem('generatedRecipes', JSON.stringify(recipeData.recipes));
-  
-        // Reset retry count on success
         setRetryCount(0);
-  
-        // Navigate to results page
         router.push('/recipes/results');
         return;
       }
-  
       throw new Error("No recipes returned from API");
-  
     } catch (error: any) {
       console.error("Error generating recipes:", error);
-  
-      // Increment retry count
-      const newRetryCount = retryCount + 1;
-      setRetryCount(newRetryCount);
-  
-      // Different handling based on error type
+      const newRetryCount = retryCount + 1; setRetryCount(newRetryCount);
       if (error.response) {
-        // Server returned an error response
         console.error("Server error:", error.response.status, error.response.data);
-  
-        if (error.response.status === 401) {
-          setError("Your session has expired. Please sign in again.");
-          
-          // Optionally redirect to sign-in page
-          setTimeout(() => {
-            router.push('/signin');
-          }, 2000);
-        } else if (error.response.data && error.response.data.error) {
-          setError(error.response.data.error);
-        } else {
-          setError("Error communicating with the recipe service. Please try again.");
-        }
-      } else if (error.request) {
-        // No response received (network issue)
-        console.error("Network error, no response received");
-        setError("Network issue. Please check your connection and try again.");
-      } else {
-        // Error setting up the request
-        console.error("Request setup error:", error.message);
-        setError("Failed to create recipe request. Please try again.");
-      }
-  
-      // Don't retry too many times
-      if (newRetryCount > maxRetries) {
-        toast.error("We're having trouble connecting to our service", {
-          description: "Please try again later"
-        });
-      }
-  
+        if (error.response.status === 401) { setError("Your session has expired. Please sign in again."); setTimeout(() => router.push('/signin'), 2000); } 
+        else if (error.response.data && error.response.data.error) { setError(error.response.data.error); } 
+        else { setError("Error communicating with the recipe service. Please try again."); }
+      } else if (error.request) { console.error("Network error, no response received"); setError("Network issue. Please check your connection and try again."); }
+      else { console.error("Request setup error:", error.message); setError("Failed to create recipe request. Please try again."); }
+      if (newRetryCount > maxRetries) { toast.error("We're having trouble connecting to our service", { description: "Please try again later" }); }
       setGenerating(false);
     }
   };
   
   // Also replace the retryGeneration function with this improved version
   const retryGeneration = () => {
-    if (retryCount >= maxRetries) {
-        toast.error("Maximum retries already reached.");
-        return;
-    }
-    setGenerating(true);
-    setError('');
-    setRetryCount(retryCount + 1);
+    if (retryCount >= maxRetries) { toast.error("Maximum retries already reached."); return; }
+    setGenerating(true); setError(''); setRetryCount(retryCount + 1);
     toast.info(`Manual retry initiated... (${retryCount + 1}/${maxRetries})`);
     generateRecipes();
   };
@@ -1064,34 +757,17 @@ function GenerateRecipes() {
   };
   
   // Render loading state ONLY for preferences, rely on AuthWrapper for auth loading
-  if (loadingPreferences) { 
-    // Show a smaller loader, perhaps centered within the container 
-    // where the card would normally be, instead of full screen.
+  if (generating) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl flex justify-center items-center min-h-[400px]"> 
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
-          <p className="text-sm text-gray-500 dark:text-gray-400">Loading Preferences...</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Generating Recipes...</p>
         </div>
       </div>
     );
   }
   
-  if (preferencesError) {
-      // Keep the error return as is
-     return (
-        <div className="container mx-auto px-4 py-8 max-w-4xl">
-          <Alert variant="destructive" className="mt-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              Error loading your saved preferences. Please refresh the page or try again later. You can still generate recipes with default settings.
-            </AlertDescription>
-          </Alert>
-        </div>
-    );
-  }
-
-  // If not loading preferences and no error, render the main content
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <Card className="shadow-lg border-gray-200 dark:border-gray-700">
@@ -1150,10 +826,82 @@ function GenerateRecipes() {
 }
 
 export default function GenerateRecipesPage() {
+  const { currentUser, loading: authLoading } = useAuth();
+  const [preferences, setPreferences] = useState<PreferencesData | null>(null);
+  const [loadingPreferences, setLoadingPreferences] = useState(true);
+  const [preferencesError, setPreferencesError] = useState(false);
+
+  // useEffect to load preferences after auth is complete
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      if (!currentUser?.uid) { 
+        // Should not happen if AuthWrapper is working, but safety check
+        setPreferencesError(true); 
+        setLoadingPreferences(false);
+        console.error("Attempted to load preferences without user ID");
+        return;
+      }
+      
+      setLoadingPreferences(true);
+      setPreferencesError(false);
+      try {
+        const prefs = await getUserPreferences(currentUser.uid);
+        // Set default empty object if prefs are null/undefined
+        setPreferences(prefs || { 
+            ingredients: [], equipment: [], staples: [], dietaryPrefs: [], 
+            cuisine: undefined, cookTime: undefined, difficulty: undefined // Use undefined for optional fields
+        }); 
+      } catch (error) {
+        console.error('Error loading preferences in Page:', error);
+        setPreferencesError(true);
+        toast.error('Failed to load your preferences', {
+          description: 'Please refresh the page or try again later.'
+        });
+      } finally {
+        setLoadingPreferences(false);
+      }
+    };
+
+    // Only run when auth is done loading AND we have a user
+    if (!authLoading && currentUser) {
+      loadUserPreferences();
+    } else if (!authLoading && !currentUser) {
+      // If auth finished but no user, stop loading (AuthWrapper should redirect anyway)
+      setLoadingPreferences(false);
+    }
+    // Depend on auth state
+  }, [authLoading, currentUser]); // Depend on currentUser object here is okay, as it triggers re-fetch if user logs in/out
+
+  // AuthWrapper handles the main auth loading/redirect
   return (
     <AuthWrapper>
       <MainLayout>
-        <GenerateRecipes />
+        {/* Show loader while preferences are loading */}
+        {loadingPreferences && (
+           <div className="container mx-auto px-4 py-8 max-w-4xl flex justify-center items-center min-h-[400px]"> 
+              <div className="flex flex-col items-center space-y-4">
+                <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">Loading User Data...</p>
+             </div>
+           </div>
+        )}
+
+        {/* Show error if preferences failed to load */}
+        {!loadingPreferences && preferencesError && (
+          <div className="container mx-auto px-4 py-8 max-w-4xl">
+            <Alert variant="destructive" className="mt-4">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Error loading your saved preferences. Please refresh the page or try again later.
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
+        {/* Render GenerateRecipes only when preferences are loaded successfully */}
+        {!loadingPreferences && !preferencesError && preferences && (
+          <GenerateRecipes initialPreferences={preferences} />
+        )}
       </MainLayout>
     </AuthWrapper>
   );
