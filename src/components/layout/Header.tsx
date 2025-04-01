@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { signOut } from '@/lib/auth';
+import { User } from 'firebase/auth';
 import { 
   Sheet, 
   SheetContent, 
@@ -18,22 +19,43 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui';
-import { Menu, User, ChefHat, LogOut, Home, BookOpen, Loader2 } from 'lucide-react';
+import { Menu, User as LucideUser, ChefHat, LogOut, Home, BookOpen, Loader2 } from 'lucide-react';
 
 // Component that uses usePathname
 function HeaderContent() {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, refreshUser } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
   const [forceShowButtons, setForceShowButtons] = useState(false);
   const [headerMounted, setHeaderMounted] = useState(false);
+  const [localUser, setLocalUser] = useState<User | null>(null);
 
   // Log auth state when header loads
   useEffect(() => {
     console.log("[Header] Component mounted - Auth state:", 
       loading ? "loading" : currentUser ? `User ${currentUser.uid}` : "no user");
     setHeaderMounted(true);
+    
+    // If we have a user, set the local user immediately
+    if (currentUser) {
+      setLocalUser(currentUser);
+    }
+    
+    // Immediately try to refresh auth to ensure we have the latest state
+    const initialRefresh = async () => {
+      try {
+        const refreshedUser = await refreshUser();
+        if (refreshedUser) {
+          console.log("[Header] Initial refresh found user:", refreshedUser.uid);
+          setLocalUser(refreshedUser);
+        }
+      } catch (e) {
+        console.error("[Header] Error during initial auth refresh:", e);
+      }
+    };
+    
+    initialRefresh();
   }, []);
 
   // Log changes to auth state
@@ -42,8 +64,37 @@ function HeaderContent() {
       console.log("[Header] Auth state changed:", 
         loading ? "loading" : currentUser ? `User ${currentUser.uid}` : "no user",
         "forceShowButtons:", forceShowButtons);
+      
+      // If user becomes available, update local state
+      if (currentUser) {
+        setLocalUser(currentUser);
+      }
     }
   }, [loading, currentUser, forceShowButtons, headerMounted]);
+  
+  // Periodically check auth state to handle edge cases
+  useEffect(() => {
+    const authCheckInterval = setInterval(async () => {
+      if (!currentUser && !loading) {
+        // Only debug log this to avoid console spam
+        console.log("[Header] Periodic auth check");
+        try {
+          const refreshedUser = await refreshUser();
+          if (refreshedUser) {
+            console.log("[Header] Periodic refresh found user:", refreshedUser.uid);
+            setLocalUser(refreshedUser);
+          }
+        } catch (e) {
+          // Silently catch errors to avoid console pollution
+        }
+      }
+    }, 10000); // Check every 10 seconds
+    
+    return () => clearInterval(authCheckInterval);
+  }, [currentUser, loading, refreshUser]);
+
+  // Use local user for rendering if available, fall back to context user
+  const displayUser = localUser || currentUser;
 
   // Handle scroll effect for header
   useEffect(() => {
@@ -105,7 +156,7 @@ function HeaderContent() {
           }`}>
             Generate Recipes
           </Link>
-          {currentUser && (
+          {displayUser && (
             <Link href="/recipes" className={`text-sm font-medium transition-colors hover:text-emerald-600 ${
               isActive('/recipes') ? 'text-emerald-600' : 'text-gray-700 dark:text-gray-200'
             }`}>
@@ -118,28 +169,28 @@ function HeaderContent() {
         <div className="hidden md:flex items-center space-x-4">
           {loading && !forceShowButtons ? (
             <div className="h-9 w-24 bg-gray-200 animate-pulse rounded-md dark:bg-gray-700"></div>
-          ) : currentUser ? (
+          ) : displayUser ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full" size="icon">
                   <Avatar className="h-9 w-9">
                     <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
-                      {currentUser.email?.charAt(0).toUpperCase() || 'U'}
+                      {displayUser.email?.charAt(0).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <div className="flex flex-col space-y-1 p-2">
-                  <p className="text-sm font-medium leading-none">{currentUser.displayName || 'User'}</p>
+                  <p className="text-sm font-medium leading-none">{displayUser.displayName || 'User'}</p>
                   <p className="text-xs leading-none text-gray-500 dark:text-gray-400">
-                    {currentUser.email}
+                    {displayUser.email}
                   </p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/profile" className="cursor-pointer">
-                    <User className="mr-2 h-4 w-4" />
+                    <LucideUser className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </Link>
                 </DropdownMenuItem>
@@ -200,7 +251,7 @@ function HeaderContent() {
                     <ChefHat className="h-5 w-5 mr-2" />
                     Generate Recipes
                   </Link>
-                  {currentUser && (
+                  {displayUser && (
                     <Link 
                       href="/recipes" 
                       className="flex items-center px-2 py-1 text-base font-medium text-gray-700 hover:text-emerald-600 hover:bg-gray-100 rounded-md transition dark:text-gray-100 dark:hover:bg-gray-800"
@@ -214,22 +265,22 @@ function HeaderContent() {
               
               <div className="py-6 border-t border-gray-200 dark:border-gray-700">
                 {(!loading || forceShowButtons) && (
-                  currentUser ? (
+                  displayUser ? (
                     <div className="space-y-4">
                       <div className="flex items-center">
                         <Avatar className="h-10 w-10 mr-3">
                           <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
-                            {currentUser.email?.charAt(0).toUpperCase() || 'U'}
+                            {displayUser.email?.charAt(0).toUpperCase() || 'U'}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="text-sm font-medium">{currentUser.displayName || 'User'}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{currentUser.email}</p>
+                          <p className="text-sm font-medium">{displayUser.displayName || 'User'}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{displayUser.email}</p>
                         </div>
                       </div>
                       <Button variant="outline" className="w-full justify-start" asChild>
                         <Link href="/profile">
-                          <User className="h-4 w-4 mr-2" />
+                          <LucideUser className="h-4 w-4 mr-2" />
                           Profile
                         </Link>
                       </Button>

@@ -28,13 +28,22 @@ function SignInContent() {
 
   const handleSuccessfulSignIn = async () => {
     // Explicitly refresh the user state in AuthContext
-    await refreshUser();
+    const user = await refreshUser();
+    
+    if (!user) {
+      console.error("[SignIn] User not available after refresh - something went wrong");
+      setError("Sign in succeeded but we couldn't verify your account. Please try again.");
+      return;
+    }
+    
+    console.log(`[SignIn] Sign in successful, user: ${user.uid}`);
     
     // Navigate to the appropriate page
     const redirectPath = fromGenerate ? '/generate' : '/generate';
     console.log(`[SignIn] Sign in successful, redirecting to ${redirectPath}`);
     
     // Use direct navigation for most reliable page transition
+    // Forcing a complete page reload to ensure auth state is fully updated
     window.location.href = window.location.origin + '/whattoeat' + redirectPath;
   };
 
@@ -79,14 +88,35 @@ function SignInContent() {
     console.log(`[SignIn] Attempting Google sign in, fromGenerate: ${fromGenerate}`);
 
     try {
-      await signInWithGoogle();
+      const googleUser = await signInWithGoogle();
+      console.log(`[SignIn] Google sign in returned user: ${googleUser.uid}`);
+      
+      // Double-check with auth context
+      const contextUser = await refreshUser();
+      
+      if (!contextUser) {
+        console.error("[SignIn] Context user not available after Google sign in");
+        // Try one more refresh with slight delay
+        setTimeout(async () => {
+          const retryUser = await refreshUser();
+          if (retryUser) {
+            console.log("[SignIn] User found on retry, continuing with sign in");
+            // Use the common success handler
+            await handleSuccessfulSignIn();
+          } else {
+            console.error("[SignIn] User still not available after retry");
+            setError("Sign in succeeded but we couldn't verify your account. Please refresh the page.");
+            setLoading(false);
+          }
+        }, 1000);
+        return;
+      }
       
       // Use the common success handler
       await handleSuccessfulSignIn();
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google');
       console.error("[SignIn] Google sign in error:", error);
-    } finally {
       setLoading(false);
     }
   };

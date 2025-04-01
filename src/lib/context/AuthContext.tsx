@@ -134,25 +134,52 @@ async function refreshCurrentUser(): Promise<User | null> {
     console.log("[AuthContext] Refreshing current user");
     // Force auth to refresh
     const auth = getAuth();
+    
+    // Wait for auth state to be ready
+    console.log("[AuthContext] Waiting for auth state to be ready");
     await auth.authStateReady();
     const freshUser = auth.currentUser;
     
+    // Check if the user exists but might not match global state
+    const needsGlobalUpdate = (freshUser && !globalUser) || 
+                              (!freshUser && globalUser) || 
+                              (freshUser && globalUser && freshUser.uid !== globalUser.uid);
+    
     if (freshUser) {
+      // Log user details for debugging
+      console.log(`[AuthContext] Current user found: ${freshUser.uid}, email: ${freshUser.email}, display name: ${freshUser.displayName || 'not set'}`);
+      console.log(`[AuthContext] User verified: ${freshUser.emailVerified}, provider: ${freshUser.providerId || 'unknown'}`);
+      
       try {
         // Also refresh the token to ensure it's up-to-date
         console.log("[AuthContext] Refreshing token for user:", freshUser.uid);
-        await freshUser.getIdToken(true);
+        const token = await freshUser.getIdToken(true);
+        console.log("[AuthContext] Token refreshed successfully, length:", token.length);
       } catch (tokenError) {
         console.error("[AuthContext] Error refreshing token:", tokenError);
         // Continue anyway
       }
+      
+      try {
+        // Also reload the user to ensure we have latest profile info
+        await freshUser.reload();
+        console.log("[AuthContext] User profile reloaded");
+      } catch (reloadError) {
+        console.error("[AuthContext] Error reloading user profile:", reloadError);
+        // Continue anyway
+      }
+    } else {
+      console.log("[AuthContext] No current user found");
     }
     
     // Update global state if needed
-    if ((freshUser && !globalUser) || (!freshUser && globalUser) || 
-        (freshUser && globalUser && freshUser.uid !== globalUser.uid)) {
+    if (needsGlobalUpdate) {
       console.log("[AuthContext] Detected auth state mismatch, updating global state");
       setGlobalAuthUser(freshUser);
+    } else if (freshUser) {
+      // Even if no mismatch, notify subscribers to ensure UI updates
+      console.log("[AuthContext] No state mismatch, but notifying subscribers anyway to refresh UI");
+      notifyAuthSubscribers();
     }
     
     return freshUser;

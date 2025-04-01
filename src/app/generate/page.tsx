@@ -437,19 +437,52 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
     setError('');
     setRetryCount(0);
     
-    // Get user if available (but don't require it)
+    // Get user if available - make multiple attempts to get a fresh token
     let refreshedUser = null;
     let token: string | undefined = undefined;
     
     try {
       console.log("[GenerateRecipes] Checking auth state before generating recipes");
-      refreshedUser = await refreshUser();
       
-      if (refreshedUser) {
-        console.log("[GenerateRecipes] Auth refresh successful, user ID:", refreshedUser.uid);
+      // Multiple attempts to get a valid user
+      for (let attempt = 0; attempt < 2; attempt++) {
+        console.log(`[GenerateRecipes] Auth refresh attempt ${attempt + 1}`);
+        refreshedUser = await refreshUser();
         
-        // Only update preferences if we have a valid user
+        if (refreshedUser) {
+          console.log(`[GenerateRecipes] Auth refresh attempt ${attempt + 1} successful, user ID:`, refreshedUser.uid);
+          
+          // Try to get a fresh token
+          try {
+            console.log("[GenerateRecipes] Getting fresh ID token");
+            token = await refreshedUser.getIdToken(true);
+            console.log("[GenerateRecipes] Successfully obtained token, length:", token.length);
+            // If we get here with a valid token, break the retry loop
+            break;
+          } catch (tokenError) {
+            console.error("[GenerateRecipes] Error getting token on attempt " + (attempt + 1) + ":", tokenError);
+            
+            if (attempt === 0) {
+              // On first attempt failure, try reloading the user object
+              try {
+                console.log("[GenerateRecipes] Attempting to reload user before retry");
+                await refreshedUser.reload();
+              } catch (reloadError) {
+                console.error("[GenerateRecipes] Error reloading user:", reloadError);
+              }
+            }
+          }
+        } else {
+          console.log(`[GenerateRecipes] Auth refresh attempt ${attempt + 1} failed, no user returned`);
+          // No point retrying if there's no user at all
+          break;
+        }
+      }
+      
+      // Only update preferences if we have a valid user
+      if (refreshedUser) {
         try {
+          console.log("[GenerateRecipes] Updating preferences for user:", refreshedUser.uid);
           await updateUserPreferences(refreshedUser.uid, { 
             ingredients, equipment, staples, dietaryPrefs,
             cuisine: cuisine || undefined, 
@@ -460,10 +493,6 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
           // Update usage stats
           incrementRecipesGenerated(refreshedUser.uid)
             .catch(err => console.error("[GenerateRecipes] Failed to increment recipe count:", err));
-            
-          // Get a fresh token directly from the refreshed user
-          console.log("[GenerateRecipes] Getting fresh ID token");
-          token = await refreshedUser.getIdToken(true);
         } catch (err) {
           console.error("[GenerateRecipes] Error with user operations:", err);
           // Continue without user data
@@ -504,10 +533,19 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     };
     
+    // Log API call details for debugging
+    console.log("[GenerateRecipes] API request details:", { 
+      hasToken: !!token,
+      tokenLength: token?.length || 0,
+      hasUserId: !!refreshedUser?.uid,
+      numIngredients: ingredients.length,
+      requestUrl: '/whattoeat/api/generate-recipes'
+    });
+    
     // Make API call with refreshed token
     let recipeData;
     try {
-      console.log("[GenerateRecipes] Making API call with auth token length:", token?.length || 0);
+      console.log("[GenerateRecipes] Starting API call");
       
       // Use a more direct approach for axios call
       const response = await axios({
@@ -532,6 +570,47 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
       const mainApiError = error;
       console.error("[GenerateRecipes] Error with main API, details:", mainApiError.message);
       
+      // Check specifically for auth issues
+      let isAuthError = mainApiError.response && 
+                          (mainApiError.response.status === 401 || 
+                           mainApiError.response.status === 403);
+      
+      if (isAuthError) {
+        console.log("[GenerateRecipes] Auth error detected in API response");
+        
+        // Try once more to refresh the token if we have a user
+        if (refreshedUser) {
+          try {
+            console.log("[GenerateRecipes] Making one final attempt to refresh token");
+            await refreshedUser.reload();
+            token = await refreshedUser.getIdToken(true);
+            console.log("[GenerateRecipes] Got refreshed token on final attempt");
+            
+            // Update headers with the new token
+            headers.Authorization = `Bearer ${token}`;
+            
+            // Try the API call again with the fresh token
+            console.log("[GenerateRecipes] Retrying API call with new token");
+            const retryResponse = await axios({
+              method: 'post',
+              url: '/whattoeat/api/generate-recipes',
+              headers: headers,
+              data: requestData,
+              timeout: 60000
+            });
+            
+            recipeData = retryResponse.data;
+            console.log("[GenerateRecipes] Retry API call successful");
+            
+            // If we get here, skip the fallback attempt
+            isAuthError = false;
+          } catch (retryError) {
+            console.error("[GenerateRecipes] Final token refresh attempt failed:", retryError);
+            // Continue to fallback
+          }
+        }
+      }
+      
       if (mainApiError.response) {
         console.error("[GenerateRecipes] Server responded with:", 
           mainApiError.response.status, 
@@ -540,49 +619,61 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
         );
       }
       
-      try {
-        // Try fallback with the same direct approach
-        console.log("[GenerateRecipes] Attempting fallback API...");
-        const fallbackResponse = await axios({
-          method: 'post',
-          url: '/whattoeat/api/generate-recipes-simple',
-          headers: headers,
-          data: requestData,
-          timeout: 30000
-        });
-        
-        console.log("[GenerateRecipes] Fallback API response:", 
-          fallbackResponse.status, 
-          fallbackResponse.statusText
-        );
-        
-        recipeData = fallbackResponse.data;
-        toast.info('Using sample recipes', { 
-          description: 'Our full recipe generator is busy. Showing example recipes instead.' 
-        });
-        console.log("[GenerateRecipes] Fallback API call successful");
-      } catch (error2: any) {
-        // Explicitly type the second error as any
-        const fallbackError = error2;
-        console.error("[GenerateRecipes] Fallback API also failed:", 
-          fallbackError.message,
-          fallbackError.response ? `Status: ${fallbackError.response.status}` : 'No response'
-        );
-        
-        // Handle error properly - show meaningful error and don't block user with auth errors
-        const newRetryCount = retryCount + 1;
-        setRetryCount(newRetryCount);
-        
-        if (mainApiError.response && mainApiError.response.status === 401) {
-          // For auth errors, provide guidance but don't block
-          console.log("[GenerateRecipes] Auth issue detected, but continuing");
-          toast.warning("You may need to sign in for best results", {
-            description: "Some features may be limited"
+      if (!recipeData) {
+        try {
+          // Try fallback with the same direct approach
+          console.log("[GenerateRecipes] Attempting fallback API (no auth required)...");
+          const fallbackResponse = await axios({
+            method: 'post',
+            url: '/whattoeat/api/generate-recipes-simple',
+            headers: { 'Content-Type': 'application/json' }, // No auth for fallback
+            data: requestData,
+            timeout: 30000
           });
-          // Don't set error here, let's try to continue if possible
-        } else {
-          // For other errors, show appropriate message
-          setError("Failed to generate recipes. Please try again.");
+          
+          console.log("[GenerateRecipes] Fallback API response:", 
+            fallbackResponse.status, 
+            fallbackResponse.statusText
+          );
+          
+          recipeData = fallbackResponse.data;
+          
+          if (isAuthError) {
+            toast.warning("Using limited recipe generation", { 
+              description: 'Sign in to access personalized recipes.'
+            });
+          } else {
+            toast.info('Using sample recipes', { 
+              description: 'Our full recipe generator is busy. Showing example recipes instead.' 
+            });
+          }
+          
+          console.log("[GenerateRecipes] Fallback API call successful");
+        } catch (error2: any) {
+          // Explicitly type the second error as any
+          const fallbackError = error2;
+          console.error("[GenerateRecipes] Fallback API also failed:", 
+            fallbackError.message,
+            fallbackError.response ? `Status: ${fallbackError.response.status}` : 'No response'
+          );
+          
+          // Handle error properly - show meaningful error and don't block user with auth errors
+          const newRetryCount = retryCount + 1;
+          setRetryCount(newRetryCount);
+          
+          if (isAuthError) {
+            // For auth errors, provide guidance but don't block
+            console.log("[GenerateRecipes] Auth issue detected, but continuing");
+            toast.warning("Please sign in for full features", {
+              description: "Sign in to generate personalized recipes"
+            });
+            
+            setError("Please sign in to access all features.");
+          } else {
+            // For other errors, show appropriate message
+            setError("Failed to generate recipes. Please try again.");
+          }
+          
           setGenerating(false);
           throw mainApiError;
         }

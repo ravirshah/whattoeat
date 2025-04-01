@@ -55,25 +55,65 @@ import {
     
     try {
       const provider = new GoogleAuthProvider();
+      // Add scopes if needed
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      // Force re-authentication to ensure fresh credentials
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      
       const userCredential = await signInWithPopup(auth, provider);
       console.log("Google signin successful:", userCredential.user.uid);
+      
+      // Get a fresh ID token immediately - this helps ensure the token is available right away
+      try {
+        const token = await userCredential.user.getIdToken(true);
+        console.log("Fresh token obtained after Google sign-in, length:", token.length);
+      } catch (tokenError) {
+        console.error("Error getting fresh token after Google sign-in:", tokenError);
+        // Continue anyway as we've already authenticated
+      }
       
       // IMPORTANT: Force update the global auth state
       setGlobalAuthUser(userCredential.user);
       
       // Check if user document exists, create if it doesn't
-      const userDocRef = doc(db, "users", userCredential.user.uid);
-      const userDoc = await getDoc(userDocRef);
-      
-      if (!userDoc.exists()) {
-        console.log("Creating new user document for Google user");
-        await createUserDocument(userCredential.user);
+      try {
+        const userDocRef = doc(db, "users", userCredential.user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (!userDoc.exists()) {
+          console.log("Creating new user document for Google user");
+          await createUserDocument(userCredential.user);
+        }
+      } catch (dbError) {
+        console.error("Error checking/creating user document:", dbError);
+        // Continue anyway as we've already authenticated
       }
       
+      // Reload the user object to ensure we have the latest user data
+      try {
+        await userCredential.user.reload();
+        console.log("User data reloaded after Google sign-in");
+      } catch (reloadError) {
+        console.error("Error reloading user after Google sign-in:", reloadError);
+        // Continue anyway as we've already authenticated
+      }
+      
+      // Return the user after all operations
       return userCredential.user;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error signing in with Google:", error);
-      throw error;
+      // Check for specific error codes
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('Sign-in canceled: The popup was closed before completing authentication.');
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('Popup blocked: Please allow popups for this site to sign in with Google.');
+      } else {
+        throw error;
+      }
     }
   };
   
