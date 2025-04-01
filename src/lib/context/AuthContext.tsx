@@ -20,63 +20,59 @@ console.log("[AuthContext] Module loaded.");
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialAuthCheckComplete, setInitialAuthCheckComplete] = useState(false);
 
   useEffect(() => {
     console.log("[AuthContext] useEffect triggered.");
     
-    // Force auth to complete after 5 seconds no matter what
-    const timeoutId = setTimeout(() => {
-      console.log("[AuthContext] Safety timeout triggered - forcing auth complete");
-      setLoading(false);
-    }, 5000);
-    
-    // Check if we already have a user (useful after login/refresh)
+    // Important: first check if Firebase thinks we're already logged in
     if (auth && auth.currentUser) {
-      console.log("[AuthContext] Found existing user:", auth.currentUser.uid);
+      console.log("[AuthContext] Existing user found:", auth.currentUser.uid);
       setCurrentUser(auth.currentUser);
-      setLoading(false);
-      clearTimeout(timeoutId);
-      return () => {};
+      setInitialAuthCheckComplete(true);
+      return; // Exit early, no need for listener
     }
     
-    // Watch for auth state changes (needed for sign-in/sign-out)
-    let unsubscribe = () => {};
+    // Track component mount state
+    let isMounted = true;
     
     try {
-      unsubscribe = onAuthStateChanged(auth, 
+      console.log("[AuthContext] Setting up auth state listener");
+      const unsubscribe = onAuthStateChanged(auth, 
         (user) => {
           console.log("[AuthContext] Auth state changed:", user?.uid || "No user");
-          setCurrentUser(user);
-          setLoading(false);
-          clearTimeout(timeoutId);
+          if (isMounted) {
+            setCurrentUser(user);
+            setInitialAuthCheckComplete(true);
+          }
         }, 
         (error) => {
           console.error("[AuthContext] Auth error:", error);
-          setLoading(false);
-          clearTimeout(timeoutId);
+          if (isMounted) {
+            setInitialAuthCheckComplete(true);
+          }
         }
       );
+      
+      // Critical cleanup
+      return () => {
+        console.log("[AuthContext] Cleanup function called");
+        isMounted = false;
+        unsubscribe();
+      };
     } catch (error) {
-      console.error("[AuthContext] Setup error:", error);
-      setLoading(false);
-      clearTimeout(timeoutId);
+      console.error("[AuthContext] Error setting up auth listener:", error);
+      // Still mark as complete on error
+      setInitialAuthCheckComplete(true);
+      return () => {};
     }
-    
-    return () => {
-      clearTimeout(timeoutId);
-      unsubscribe();
-    };
-  }, []);
+  }, []); // Empty dependency array = run once only
 
-  // For debugging
-  useEffect(() => {
-    console.log(`[AuthContext] State updated - Loading: ${loading}, User: ${currentUser?.uid || "null"}`);
-  }, [loading, currentUser]);
+  // Derive loading state from initialAuthCheckComplete
+  const loading = !initialAuthCheckComplete;
 
-  return (
-    <AuthContext.Provider value={{ currentUser, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  // Log state changes to track the issue
+  console.log(`[AuthContext] Current state - loading: ${loading}, user: ${currentUser?.uid || "null"}, initialCheck: ${initialAuthCheckComplete}`);
+
+  return <AuthContext.Provider value={{ currentUser, loading }}>{children}</AuthContext.Provider>;
 };
