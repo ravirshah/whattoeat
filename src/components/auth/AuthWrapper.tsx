@@ -18,35 +18,40 @@ export default function AuthWrapper({
 }: AuthWrapperProps) {
   const { currentUser, loading } = useAuth();
   const router = useRouter();
-  const [waitExpired, setWaitExpired] = useState(false);
+  const [bypassMode, setBypassMode] = useState(false);
 
-  console.log(`[AuthWrapper] Render Check - loading: ${loading}, user: ${!!currentUser}, redirectRequired: ${redirectIfNotAuthenticated}`);
+  console.log(`[AuthWrapper] Render - loading: ${loading}, user: ${!!currentUser}, bypass: ${bypassMode}`);
 
-  // Add safety timeout for AuthWrapper
+  // Emergency fallback - if auth is taking too long, just bypass it
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (loading) {
-        console.log("[AuthWrapper] Maximum wait time exceeded, proceeding anyway");
-        setWaitExpired(true);
+        console.log("[AuthWrapper] EMERGENCY BYPASS: Auth taking too long, bypassing completely");
+        setBypassMode(true);
       }
-    }, 6000); // 6 seconds
+    }, 7000); // 7 seconds
     
     return () => clearTimeout(timeoutId);
   }, [loading]);
 
-  // Handle redirection
+  // Handle redirection (but only if not in bypass mode)
   useEffect(() => {
-    if ((!loading || waitExpired) && !currentUser && redirectIfNotAuthenticated) {
+    if (!loading && !currentUser && redirectIfNotAuthenticated && !bypassMode) {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/whattoeat';
       const redirectUrl = `${basePath}${redirectTo.startsWith('/') ? redirectTo : '/' + redirectTo}`;
-      console.log(`[AuthWrapper] Auth complete, no user. Redirecting to: ${redirectUrl}`);
+      console.log(`[AuthWrapper] Redirecting to: ${redirectUrl}`);
       router.push(redirectUrl);
     }
-  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo, router, waitExpired]);
+  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo, router, bypassMode]);
 
-  // Show loading indicator only if still loading and timeout not triggered
-  if (loading && !waitExpired) {
-    console.log("[AuthWrapper] Rendering loader because AuthContext loading = true");
+  // In bypass mode, just show the content
+  if (bypassMode) {
+    console.log("[AuthWrapper] Rendering children in bypass mode");
+    return <>{children}</>;
+  }
+
+  // Still loading, show loader
+  if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
         <div className="flex flex-col items-center space-y-4">
@@ -57,14 +62,13 @@ export default function AuthWrapper({
     );
   }
 
-  // If auth complete or timeout triggered, and can show content
-  if (((!loading || waitExpired) && currentUser) || (!redirectIfNotAuthenticated)) {
-    console.log("[AuthWrapper] Rendering children");
+  // Auth complete and user exists or redirect not required
+  if (currentUser || !redirectIfNotAuthenticated) {
+    console.log("[AuthWrapper] Rendering children - auth complete");
     return <>{children}</>;
   }
 
-  // Otherwise show simpler loading indicator while redirect happens
-  console.log("[AuthWrapper] Rendering redirect loader");
+  // Auth complete, no user, waiting for redirect
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
       <div className="flex flex-col items-center space-y-4">

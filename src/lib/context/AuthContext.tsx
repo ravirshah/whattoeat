@@ -25,24 +25,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     console.log("[AuthContext] useEffect triggered.");
     
-    // Safety timeout - 5 seconds maximum for auth to resolve
+    // Force auth to complete after 5 seconds no matter what
     const timeoutId = setTimeout(() => {
       console.log("[AuthContext] Safety timeout triggered - forcing auth complete");
       setLoading(false);
     }, 5000);
     
+    // Check if we already have a user (useful after login/refresh)
+    if (auth && auth.currentUser) {
+      console.log("[AuthContext] Found existing user:", auth.currentUser.uid);
+      setCurrentUser(auth.currentUser);
+      setLoading(false);
+      clearTimeout(timeoutId);
+      return () => {};
+    }
+    
+    // Watch for auth state changes (needed for sign-in/sign-out)
+    let unsubscribe = () => {};
+    
     try {
-      // Check if we already have a user
-      if (auth.currentUser) {
-        console.log("[AuthContext] Found existing user:", auth.currentUser.uid);
-        setCurrentUser(auth.currentUser);
-        setLoading(false);
-        clearTimeout(timeoutId);
-        return () => {};
-      }
-      
-      // Auth state listener for changes
-      const unsubscribe = onAuthStateChanged(auth, 
+      unsubscribe = onAuthStateChanged(auth, 
         (user) => {
           console.log("[AuthContext] Auth state changed:", user?.uid || "No user");
           setCurrentUser(user);
@@ -55,21 +57,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearTimeout(timeoutId);
         }
       );
-      
-      return () => {
-        clearTimeout(timeoutId);
-        unsubscribe();
-      };
     } catch (error) {
       console.error("[AuthContext] Setup error:", error);
       setLoading(false);
       clearTimeout(timeoutId);
-      return () => {};
     }
+    
+    return () => {
+      clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
-  // Debug current state
-  console.log(`[AuthContext] State - Loading: ${loading}, User: ${currentUser?.uid || "null"}`);
+  // For debugging
+  useEffect(() => {
+    console.log(`[AuthContext] State updated - Loading: ${loading}, User: ${currentUser?.uid || "null"}`);
+  }, [loading, currentUser]);
 
   return (
     <AuthContext.Provider value={{ currentUser, loading }}>
