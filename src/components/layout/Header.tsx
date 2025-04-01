@@ -143,10 +143,21 @@ function HeaderContent() {
   const handleSignOut = async () => {
     try {
       console.log("[Header] Sign out requested");
-      await signOut();
+      const success = await signOut();
+      if (success) {
+        console.log("[Header] Sign out successful, navigating to home page");
+        // Navigate to home page using router
+        router.push('/whattoeat');
+      } else {
+        console.warn("[Header] Sign out function reported failure.");
+        // Optionally handle failure, maybe show an error message?
+        // For now, just navigate home anyway as a fallback
+        router.push('/whattoeat'); 
+      }
     } catch (error) {
       console.error('[Header] Error signing out:', error);
-      router.push('/');
+      // Navigate home even if there was an error
+      router.push('/whattoeat');
     }
   };
 

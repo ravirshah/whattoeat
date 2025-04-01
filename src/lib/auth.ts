@@ -29,11 +29,6 @@ export const registerWithEmail = async (email: string, password: string) => {
     await userCredential.user.getIdToken(true);
     console.log("[Auth] Successfully refreshed user token for new registration");
     
-    // Force direct navigation to generate page
-    console.log("[Auth] Registration successful, redirecting to generate page");
-    const baseUrl = window.location.origin;
-    window.location.href = `${baseUrl}/whattoeat/generate`;
-    
     return userCredential.user;
   } catch (error) {
     console.error("[Auth] Error registering user:", error);
@@ -52,11 +47,6 @@ export const signInWithEmail = async (email: string, password: string) => {
     // Force token refresh immediately after sign-in
     await userCredential.user.getIdToken(true);
     console.log("[Auth] Successfully refreshed user token for email sign-in");
-    
-    // Force direct navigation to generate page
-    console.log("[Auth] Email sign-in successful, redirecting to generate page");
-    const baseUrl = window.location.origin;
-    window.location.href = `${baseUrl}/whattoeat/generate`;
     
     return userCredential.user;
   } catch (error) {
@@ -100,10 +90,6 @@ export async function signInWithGoogle() {
     // Wait a bit to ensure auth state propagates
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Force reload the page to ensure the app is in a fresh state
-    console.log("[Auth] Sign-in complete, reloading page");
-    window.location.href = window.location.origin + '/whattoeat/generate';
-    
     return true;
   } catch (error: unknown) {
     if (error instanceof FirebaseError) {
@@ -139,10 +125,6 @@ export const signOut = async () => {
       console.error("[Auth] Error clearing localStorage:", e);
     }
 
-    // Force a page reload to clear any in-memory state
-    console.log("[Auth] Forcing page reload after sign out");
-    window.location.href = window.location.origin + '/whattoeat';
-    
     return true;
   } catch (error) {
     console.error("[Auth] Error signing out:", error);

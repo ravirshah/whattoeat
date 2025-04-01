@@ -40,12 +40,9 @@ function SignInContent() {
     
     console.log(`[SignIn] Sign in successful, user: ${user.uid}`);
     
-    // Always navigate to generate page
-    console.log(`[SignIn] Sign in successful, redirecting to /whattoeat/generate`);
-    
-    // Use direct navigation for most reliable page transition
-    // Forcing a complete page reload to ensure auth state is fully updated
-    window.location.href = window.location.origin + '/whattoeat/generate';
+    // Navigate programmatically to the generate page
+    console.log(`[SignIn] Sign in successful, navigating to /whattoeat/generate`);
+    router.push('/whattoeat/generate');
   };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
@@ -55,9 +52,11 @@ function SignInContent() {
     console.log(`[SignIn] Attempting to sign in with email: ${email}`);
   
     try {
-      // The signInWithEmail function now handles redirection
+      // Call the auth function, but don't expect it to redirect
       await signInWithEmail(email, password);
-      // We should never reach here as the page will redirect
+      // If successful, call the success handler
+      console.log("[SignIn] Email sign-in successful, calling success handler");
+      await handleSuccessfulSignIn();
     } catch (error: any) {
       console.error("[SignIn] Sign in error:", error);
   
@@ -86,9 +85,17 @@ function SignInContent() {
     
     try {
       console.log("Starting Google sign-in process");
-      await signInWithGoogle();
-      // No need to handle the redirect here anymore - 
-      // it's handled directly in the signInWithGoogle function
+      const success = await signInWithGoogle();
+      // If successful, call the success handler
+      if (success) {
+        console.log("[SignIn] Google sign-in successful, calling success handler");
+        await handleSuccessfulSignIn();
+      } else {
+        // If signInWithGoogle returns false, it usually means the popup was closed
+        // or blocked. The function itself handles alerts for these cases.
+        console.log("[SignIn] Google sign-in did not complete successfully (likely closed popup).");
+        setLoading(false); // Ensure loading state is reset
+      }
     } catch (error) {
       console.error("Error during Google sign-in:", error);
       setLoading(false);
