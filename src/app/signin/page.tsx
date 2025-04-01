@@ -41,11 +41,11 @@ function SignInContent() {
     console.log(`[SignIn] Sign in successful, user: ${user.uid}`);
     
     // Always navigate to generate page
-    console.log(`[SignIn] Sign in successful, redirecting to /generate`);
+    console.log(`[SignIn] Sign in successful, redirecting to /whattoeat/generate`);
     
     // Use direct navigation for most reliable page transition
     // Forcing a complete page reload to ensure auth state is fully updated
-    window.location.href = window.location.origin + '/generate';
+    window.location.href = window.location.origin + '/whattoeat/generate';
   };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
@@ -106,24 +106,64 @@ function SignInContent() {
   const handleEmergencyDirectAuth = async () => {
     try {
       setLoading(true);
-      console.log("[SignIn] EMERGENCY: Attempting direct Google auth with page reload");
+      console.log("[SignIn] EMERGENCY: Direct Firebase auth with page reload");
       
-      // Create Google auth provider
+      // Disable any error state
+      setError('');
+      
+      // Create Google auth provider with explicit parameters
       const provider = new GoogleAuthProvider();
       provider.addScope('https://www.googleapis.com/auth/userinfo.email');
       provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
-      provider.setCustomParameters({ prompt: 'select_account' });
       
-      // Sign in directly
+      // CRITICAL: Force re-authentication with prompt
+      provider.setCustomParameters({ 
+        prompt: 'select_account',
+        auth_type: 'reauthenticate' 
+      });
+      
+      // Direct Firebase auth
       const result = await signInWithPopup(auth, provider);
-      console.log("[SignIn] EMERGENCY: Google sign-in successful, reloading to generate page");
+      console.log("[SignIn] EMERGENCY: Auth successful with user:", result.user.uid);
       
-      // Force direct reload to generate page - simplest possible approach
-      window.location.href = "/generate";
+      // Force token refresh after successful sign in
+      const token = await result.user.getIdToken(true);
+      console.log("[SignIn] EMERGENCY: Got fresh token, length:", token.length);
+      
+      // Create user document
+      try {
+        // Import function for doc creation
+        const { doc, setDoc } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        
+        const userDoc = doc(db, "users", result.user.uid);
+        await setDoc(userDoc, {
+          email: result.user.email,
+          preferences: {
+            ingredients: [],
+            equipment: [],
+            staples: [],
+            dietaryPrefs: []
+          },
+          usageStats: {
+            month: new Date().getMonth(),
+            recipesGenerated: 0
+          },
+          savedRecipes: []
+        }, { merge: true });
+        console.log("[SignIn] EMERGENCY: Updated user document");
+      } catch (docError) {
+        console.error("[SignIn] EMERGENCY: Error with user document:", docError);
+        // Continue anyway
+      }
+      
+      // Most reliable approach: complete hard reload to generate page
+      console.log("[SignIn] EMERGENCY: Forcing full hard navigation");
+      window.location.href = window.location.origin + "/whattoeat/generate";
     } catch (error) {
       console.error("[SignIn] EMERGENCY auth failed:", error);
       setLoading(false);
-      setError("Emergency sign-in failed. Please try the normal sign-in options.");
+      setError("Emergency sign-in failed. Please try again.");
     }
   };
 

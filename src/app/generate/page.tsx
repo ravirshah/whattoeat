@@ -710,7 +710,7 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
         
         // Direct fallback navigation if router fails
         console.log("[GenerateRecipes] Attempting direct navigation");
-        window.location.href = window.location.origin + '/recipes/results';
+        window.location.href = window.location.origin + '/whattoeat/recipes/results';
       }
       return;
     } else {

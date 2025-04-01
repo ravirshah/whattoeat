@@ -32,10 +32,10 @@ function RegisterContent() {
     await refreshUser();
     
     // Navigate to the generate page
-    console.log(`[Register] Registration successful, redirecting to /generate`);
+    console.log(`[Register] Registration successful, redirecting to /whattoeat/generate`);
     
     // Use direct navigation for reliable page transition
-    window.location.href = window.location.origin + '/generate';
+    window.location.href = window.location.origin + '/whattoeat/generate';
   };
 
   const handleRegister = async (e: React.FormEvent) => {

@@ -47,9 +47,16 @@ try {
           if (user) {
             console.log('[Firebase] Auth state changed: User logged in:', user.uid);
             
-            // Force a token refresh when auth state changes to logged in
+            // IMPORTANT: Always refresh token when auth state changes to ensure valid session
             user.getIdToken(true)
-              .then(() => console.log('[Firebase] Token refreshed after auth state change'))
+              .then(token => {
+                console.log('[Firebase] Token refreshed after auth state change, length:', token.length);
+                
+                // Force reload user to ensure we have latest data
+                user.reload()
+                  .then(() => console.log('[Firebase] User data reloaded successfully'))
+                  .catch(err => console.error('[Firebase] Error reloading user data:', err));
+              })
               .catch(err => console.error('[Firebase] Error refreshing token after auth state change:', err));
           } else {
             console.log('[Firebase] Auth state changed: No user logged in');

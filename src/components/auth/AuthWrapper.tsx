@@ -38,8 +38,21 @@ function AuthWrapperContent({
         console.log('[AuthWrapper] Attempting to refresh auth state');
         setRefreshAttempted(true);
         try {
+          // Wait longer for the user refresh to complete
+          console.log('[AuthWrapper] Waiting for fresh auth state...');
           const user = await refreshUser();
-          console.log('[AuthWrapper] Auth refresh result:', user ? 'User found' : 'No user found');
+          console.log('[AuthWrapper] Auth refresh result:', user ? `User found: ${user.uid}` : 'No user found');
+          
+          // If we successfully got a user, verify it's valid
+          if (user) {
+            try {
+              // Force a token refresh to ensure we have a valid session
+              await user.getIdToken(true);
+              console.log('[AuthWrapper] Successfully refreshed auth token');
+            } catch (tokenError) {
+              console.error('[AuthWrapper] Error refreshing token:', tokenError);
+            }
+          }
         } catch (e) {
           console.error('[AuthWrapper] Error refreshing auth:', e);
         }
@@ -91,7 +104,7 @@ function AuthWrapperContent({
       // CRITICAL: Use window.location with ABSOLUTE URL to avoid path resolution issues
       const baseUrl = window.location.origin;
       const targetPage = redirectTo.startsWith('/') ? redirectTo.substring(1) : redirectTo;
-      const absoluteUrl = `${baseUrl}/${targetPage}`;
+      const absoluteUrl = `${baseUrl}/whattoeat/${targetPage}`;
       
       console.log(`[AuthWrapper] Redirecting to absolute URL: ${absoluteUrl}`);
       setRedirecting(true);
@@ -137,7 +150,7 @@ function AuthWrapperContent({
       
       // Use direct window.location redirection for reliability
       const baseUrl = window.location.origin;
-      window.location.href = `${baseUrl}/signin?from=generate`;
+      window.location.href = `${baseUrl}/whattoeat/signin?from=generate`;
       
       // Show loading while redirecting
       return (

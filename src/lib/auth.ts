@@ -32,7 +32,7 @@ export const registerWithEmail = async (email: string, password: string) => {
     // Force direct navigation to generate page
     console.log("[Auth] Registration successful, redirecting to generate page");
     const baseUrl = window.location.origin;
-    window.location.href = `${baseUrl}/generate`;
+    window.location.href = `${baseUrl}/whattoeat/generate`;
     
     return userCredential.user;
   } catch (error) {
@@ -56,7 +56,7 @@ export const signInWithEmail = async (email: string, password: string) => {
     // Force direct navigation to generate page
     console.log("[Auth] Email sign-in successful, redirecting to generate page");
     const baseUrl = window.location.origin;
-    window.location.href = `${baseUrl}/generate`;
+    window.location.href = `${baseUrl}/whattoeat/generate`;
     
     return userCredential.user;
   } catch (error) {
@@ -78,11 +78,11 @@ export async function signInWithGoogle() {
     // Force select account prompt every time
     provider.setCustomParameters({ prompt: 'select_account' });
     
-    // Sign in
+    // SIMPLE APPROACH: Just do the popup sign-in and let Firebase handle auth state
     const result = await signInWithPopup(auth, provider);
     console.log("[Auth] Google sign-in successful, userId:", result.user.uid);
     
-    // Force token refresh immediately after sign-in
+    // Force token refresh immediately after sign-in to ensure token is fresh
     await result.user.getIdToken(true);
     console.log("[Auth] Successfully refreshed user token");
     
@@ -94,16 +94,15 @@ export async function signInWithGoogle() {
       // Continue anyway - don't block authentication for DB errors
     }
     
-    // Force reload the page to ensure fresh state with authenticated user
-    const urlParams = new URLSearchParams(window.location.search);
-    const fromGenerate = urlParams.get('from') === 'generate';
+    // Update global auth state
+    setGlobalAuthUser(result.user);
     
-    console.log("[Auth] Reloading page with destination: generate page");
+    // Wait a bit to ensure auth state propagates
+    await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Use direct navigation to ensure clean state
-    const baseUrl = window.location.origin;
-    // Always redirect to generate page after sign-in, regardless of where we came from
-    window.location.href = `${baseUrl}/generate`;
+    // Force reload the page to ensure the app is in a fresh state
+    console.log("[Auth] Sign-in complete, reloading page");
+    window.location.href = window.location.origin + '/whattoeat/generate';
     
     return true;
   } catch (error: unknown) {
@@ -142,7 +141,7 @@ export const signOut = async () => {
 
     // Force a page reload to clear any in-memory state
     console.log("[Auth] Forcing page reload after sign out");
-    window.location.href = window.location.origin;
+    window.location.href = window.location.origin + '/whattoeat';
     
     return true;
   } catch (error) {
