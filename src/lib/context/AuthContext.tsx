@@ -2,7 +2,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, User, getAuth } from 'firebase/auth';
 import { auth } from '../firebase'; // Assuming 'auth' is correctly initialized
 
 // --- Global State Management --- 
@@ -24,7 +24,21 @@ function notifyAuthSubscribers() {
 export function setGlobalAuthUser(user: User | null) {
   console.log("[AuthContext-Global] setGlobalAuthUser called:", user ? `User ID: ${user.uid}` : "No user");
   globalUser = user;
+  globalInitialAuthCheckComplete = true; // Also mark auth check as complete when manually setting user
   notifyAuthSubscribers();
+}
+
+// Immediately try to get the current user synchronously
+// This helps avoid flashes of unauthenticated content
+try {
+  const currentUser = auth.currentUser;
+  if (currentUser) {
+    console.log("[AuthContext-Global] Detected synchronous currentUser:", currentUser.uid);
+    globalUser = currentUser;
+    // We don't set globalInitialAuthCheckComplete yet because we still need the async check
+  }
+} catch (e) {
+  console.error("[AuthContext-Global] Error accessing auth.currentUser:", e);
 }
 
 // Use a flag to track if we're on the initial render or not
@@ -72,35 +86,68 @@ onAuthStateChanged(auth,
 );
 console.log("[AuthContext-Global] Global listener attached.");
 
-// Pre-populate global state if user is already known synchronously (e.g., SSR hydration)
-// Note: This might run before the async listener fires the first time
-if (auth.currentUser && !globalInitialAuthCheckComplete) {
-  console.log("[AuthContext-Global] Pre-populating global state with synchronous currentUser:", auth.currentUser.uid);
-  globalUser = auth.currentUser;
-  // We cannot be *sure* this is the final initial state, so don't set globalInitialAuthCheckComplete here.
-  // Let the async listener confirm the initial state definitively.
-}
+// Set a timeout to force complete the auth check if it takes too long
+setTimeout(() => {
+  if (!globalInitialAuthCheckComplete) {
+    console.log("[AuthContext-Global] Forcing initial auth check completion after timeout");
+    globalInitialAuthCheckComplete = true;
+    notifyAuthSubscribers();
+  }
+}, 3000); // 3 second timeout
 
 // --- React Context --- 
 
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean; // True until globalInitialAuthCheckComplete is true
+  refreshUser: () => Promise<User | null>; // Function to manually refresh user state
 }
 
 const AuthContext = createContext<AuthContextType>({
   currentUser: globalUser, // Initial value from global
   loading: !globalInitialAuthCheckComplete, // Initial value from global
+  refreshUser: async () => null,
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 console.log("[AuthContext] React Module loaded.");
 
+/**
+ * Force refreshes the current user from Firebase auth
+ * Useful when there might be a discrepancy between global state and Firebase
+ */
+async function refreshCurrentUser(): Promise<User | null> {
+  try {
+    // Force auth to refresh
+    const auth = getAuth();
+    await auth.authStateReady();
+    const freshUser = auth.currentUser;
+    
+    // Update global state if needed
+    if ((freshUser && !globalUser) || (!freshUser && globalUser) || 
+        (freshUser && globalUser && freshUser.uid !== globalUser.uid)) {
+      console.log("[AuthContext] Detected auth state mismatch, updating global state");
+      setGlobalAuthUser(freshUser);
+    }
+    
+    return freshUser;
+  } catch (e) {
+    console.error("[AuthContext] Error refreshing user:", e);
+    return null;
+  }
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // React state, initialized from global state
   const [currentUser, setCurrentUser] = useState<User | null>(globalUser);
   const [loading, setLoading] = useState<boolean>(!globalInitialAuthCheckComplete);
+
+  // Function to manually refresh user state
+  const refreshUser = async () => {
+    const user = await refreshCurrentUser();
+    return user;
+  };
 
   useEffect(() => {
     // This function will run whenever the global state changes (via notification)
@@ -127,7 +174,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []); // Run subscription effect only once on mount
 
-  const value = { currentUser, loading };
+  // Check for persisted user on page load/refresh
+  useEffect(() => {
+    const checkPersistedUser = async () => {
+      if (!currentUser) {
+        console.log("[AuthContext-Provider] No user in state, checking for persisted user");
+        await refreshUser();
+      }
+    };
+    
+    checkPersistedUser();
+  }, []); // Only run once on mount
+
+  const value = { currentUser, loading, refreshUser };
 
   console.log(`[AuthContext-Provider] Rendering - Loading: ${loading}, User: ${!!currentUser}`);
 

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { registerWithEmail, signInWithGoogle } from '@/lib/auth';
+import { useAuth } from '@/lib/context/AuthContext';
 import MainLayout from '@/components/layout/MainLayout';
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Alert, AlertDescription } from '@/components/ui';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -15,6 +16,18 @@ export default function Register() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { refreshUser } = useAuth();
+
+  const handleSuccessfulRegistration = async () => {
+    // Explicitly refresh the user state in AuthContext
+    await refreshUser();
+    
+    // Navigate to the generate page
+    console.log("Registration successful, redirecting to /generate");
+    
+    // Use router.push for same-origin navigation
+    router.push('/generate');
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,9 +49,7 @@ export default function Register() {
 
     try {
       await registerWithEmail(email, password);
-      // DIRECT NAVIGATION: Use window.location.href for reliable navigation
-      const baseUrl = 'https://whattoeat.sortedbyshah.com/whattoeat';
-      window.location.href = `${baseUrl}/generate`;
+      await handleSuccessfulRegistration();
     } catch (error: any) {
       // Try to provide a more user-friendly error message
       const errorCode = error.code;
@@ -64,9 +75,7 @@ export default function Register() {
 
     try {
       await signInWithGoogle();
-      // DIRECT NAVIGATION: Use window.location.href for reliable navigation
-      const baseUrl = 'https://whattoeat.sortedbyshah.com/whattoeat';
-      window.location.href = `${baseUrl}/generate`;
+      await handleSuccessfulRegistration();
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google');
     } finally {

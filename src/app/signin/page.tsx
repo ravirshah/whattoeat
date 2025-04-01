@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { signInWithEmail, signInWithGoogle } from '@/lib/auth';
+import { useAuth } from '@/lib/context/AuthContext';
 import MainLayout from '@/components/layout/MainLayout';
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Alert, AlertDescription } from '@/components/ui';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -14,6 +15,19 @@ export default function SignIn() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { refreshUser } = useAuth();
+
+  const handleSuccessfulSignIn = async () => {
+    // Explicitly refresh the user state in AuthContext
+    await refreshUser();
+    
+    // Navigate to the generate page
+    console.log("Sign in successful, redirecting to /generate");
+    
+    // Instead of using baseUrl, use router.push which is more reliable
+    // for same-origin navigation
+    router.push('/generate');
+  };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,9 +39,8 @@ export default function SignIn() {
       const user = await signInWithEmail(email, password);
       console.log("Sign in successful:", user);
       
-      // DIRECT NAVIGATION: Use window.location.href for reliable navigation
-      const baseUrl = 'https://whattoeat.sortedbyshah.com/whattoeat';
-      window.location.href = `${baseUrl}/generate`;
+      // Use the common success handler
+      await handleSuccessfulSignIn();
     } catch (error: any) {
       console.error("Sign in error:", error);
   
@@ -58,9 +71,8 @@ export default function SignIn() {
     try {
       await signInWithGoogle();
       
-      // DIRECT NAVIGATION: Use window.location.href for reliable navigation
-      const baseUrl = 'https://whattoeat.sortedbyshah.com/whattoeat';
-      window.location.href = `${baseUrl}/generate`;
+      // Use the common success handler
+      await handleSuccessfulSignIn();
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google');
     } finally {

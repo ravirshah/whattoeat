@@ -120,7 +120,7 @@ interface PreferencesData {
 }
 
 function GenerateRecipes({ initialPreferences }: { initialPreferences: PreferencesData }) {
-  const { currentUser } = useAuth();
+  const { currentUser, refreshUser } = useAuth();
   const router = useRouter();
   
   // Speech recognition ref
@@ -153,6 +153,22 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
   // Retry mechanism
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 2;
+  
+  // Make sure we have a valid user
+  useEffect(() => {
+    const verifyUser = async () => {
+      // If there's no current user, try to refresh
+      if (!currentUser) {
+        console.log("[GenerateRecipes] No current user, trying to refresh auth state");
+        const refreshedUser = await refreshUser();
+        if (!refreshedUser) {
+          console.log("[GenerateRecipes] Still no user after refresh, may need to sign in");
+        }
+      }
+    };
+    
+    verifyUser();
+  }, [currentUser, refreshUser]);
   
   // Check if speech recognition is supported
   useEffect(() => {
@@ -413,10 +429,23 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
   const generateRecipes = async () => {
     if (ingredients.length === 0) { setError('Please add at least one ingredient'); setStep(1); return; }
     
-    // Skip this check since user is already authenticated at this point
-    // if (!currentUser) { setError('You must be logged in to generate recipes'); router.push('/signin'); return; }
-    
     setGenerating(true); setError(''); setRetryCount(0);
+    
+    // Try to refresh auth state first - this ensures we have fresh tokens
+    try {
+      const refreshedUser = await refreshUser();
+      if (!refreshedUser) {
+        console.log("[GenerateRecipes] No user after refresh, redirecting to sign in");
+        setError("Session expired. Please sign in again.");
+        setGenerating(false);
+        router.push('/signin');
+        return;
+      }
+    } catch (authRefreshError) {
+      console.error("[GenerateRecipes] Error refreshing auth:", authRefreshError);
+      // Continue with current user anyway, the token might still be valid
+    }
+    
     try {
       try { 
         if (currentUser?.uid) {
@@ -426,19 +455,22 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
       
       let token;
       try { 
-        if (!currentUser) {
-          // Just reset loading if no user
-          setError("User authentication required. Please try refreshing the page.");
+        // Make sure we're using the refreshed user or current user
+        const userToUse = currentUser;
+        if (!userToUse) {
+          setError("Authentication error. Please sign in again.");
           setGenerating(false);
+          router.push('/signin');
           return;
         }
         
-        token = await currentUser.getIdToken(); 
+        token = await userToUse.getIdToken(true); // Force token refresh
         if (!token) throw new Error("Failed to get authentication token"); 
       } catch (tokenError) { 
         console.error("Error getting auth token:", tokenError); 
-        setError('Authentication error. Please try refreshing the page.'); 
-        setGenerating(false); 
+        setError('Authentication error. Please sign in again.'); 
+        setGenerating(false);
+        router.push('/signin');
         return; 
       }
       
@@ -885,11 +917,25 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
 }
 
 export default function GenerateRecipesPage() {
-  const { currentUser, loading: authLoading } = useAuth();
+  const { currentUser, loading: authLoading, refreshUser } = useAuth();
   const [preferences, setPreferences] = useState<PreferencesData | null>(null);
   const [loadingPreferences, setLoadingPreferences] = useState(true);
   const [preferencesError, setPreferencesError] = useState(false);
   const [forceContinue, setForceContinue] = useState(false);
+  const [userChecked, setUserChecked] = useState(false);
+
+  // Force check auth state at startup
+  useEffect(() => {
+    const checkUserAuth = async () => {
+      if (!userChecked) {
+        console.log("[GeneratePage] Doing initial auth check");
+        await refreshUser();
+        setUserChecked(true);
+      }
+    };
+    
+    checkUserAuth();
+  }, [refreshUser, userChecked]);
 
   // Force continue after 5 seconds if still loading (safety measure)
   useEffect(() => {
@@ -903,6 +949,15 @@ export default function GenerateRecipesPage() {
 
     return () => clearTimeout(forceTimeout);
   }, [loadingPreferences]);
+
+  // Reset loading state when user changes
+  useEffect(() => {
+    if (userChecked && !authLoading && currentUser) {
+      console.log("[GeneratePage] User state changed, reloading preferences");
+      setLoadingPreferences(true);
+      setPreferencesError(false);
+    }
+  }, [currentUser, authLoading, userChecked]);
 
   // useEffect to load preferences after auth is complete
   useEffect(() => {
@@ -967,16 +1022,16 @@ export default function GenerateRecipesPage() {
       }
     };
 
-    console.log(`[GeneratePage] Effect check - authLoading: ${authLoading}, currentUser: ${!!currentUser}`);
+    console.log(`[GeneratePage] Effect check - authLoading: ${authLoading}, currentUser: ${!!currentUser}, userChecked: ${userChecked}`);
     
-    // If auth isn't loading anymore, or we need to force continue
-    if ((!authLoading && currentUser) || forceContinue) {
+    // Only load preferences when auth is complete and we have a user
+    if (userChecked && !authLoading && currentUser) {
       loadUserPreferences();
-    } else if (!authLoading && !currentUser) {
+    } else if (userChecked && !authLoading && !currentUser) {
       console.log("[GeneratePage] Auth loaded, no user. Setting loadingPreferences false.");
       setLoadingPreferences(false);
     }
-  }, [authLoading, currentUser, forceContinue]); 
+  }, [authLoading, currentUser, userChecked]);
 
   // If we need to force continue without preferences, create empty ones
   useEffect(() => {
