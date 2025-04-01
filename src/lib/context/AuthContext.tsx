@@ -25,61 +25,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     console.log("[AuthContext] useEffect triggered.");
     
-    // Direct auth state check first (current state)
-    console.log("[AuthContext] Direct currentUser check:", auth.currentUser?.uid || "No user");
-    
-    // This is critical: If Firebase thinks user is already logged in, update state immediately
-    if (auth.currentUser) {
-      console.log("[AuthContext] Setting initial user from direct check:", auth.currentUser.uid);
-      setCurrentUser(auth.currentUser);
-      setLoading(false);
-    }
-    
-    // Safety timeout - don't block app forever if auth is broken
-    const safetyTimeout = setTimeout(() => {
+    // Safety timeout - 5 seconds maximum for auth to resolve
+    const timeoutId = setTimeout(() => {
       console.log("[AuthContext] Safety timeout triggered - forcing auth complete");
       setLoading(false);
     }, 5000);
     
-    let unsubscribed = false;
-    
     try {
+      // Check if we already have a user
+      if (auth.currentUser) {
+        console.log("[AuthContext] Found existing user:", auth.currentUser.uid);
+        setCurrentUser(auth.currentUser);
+        setLoading(false);
+        clearTimeout(timeoutId);
+        return () => {};
+      }
+      
       // Auth state listener for changes
       const unsubscribe = onAuthStateChanged(auth, 
         (user) => {
-          if (unsubscribed) return;
-          
           console.log("[AuthContext] Auth state changed:", user?.uid || "No user");
           setCurrentUser(user);
           setLoading(false);
-          clearTimeout(safetyTimeout);
+          clearTimeout(timeoutId);
         }, 
         (error) => {
-          if (unsubscribed) return;
-          
           console.error("[AuthContext] Auth error:", error);
           setLoading(false);
-          clearTimeout(safetyTimeout);
+          clearTimeout(timeoutId);
         }
       );
       
       return () => {
-        unsubscribed = true;
-        clearTimeout(safetyTimeout);
+        clearTimeout(timeoutId);
         unsubscribe();
       };
     } catch (error) {
       console.error("[AuthContext] Setup error:", error);
       setLoading(false);
-      clearTimeout(safetyTimeout);
-      return () => {}; // empty cleanup if setup failed
+      clearTimeout(timeoutId);
+      return () => {};
     }
   }, []);
 
-  // Debug logging
-  useEffect(() => {
-    console.log(`[AuthContext] State updated - Loading: ${loading}, User: ${currentUser?.uid || "null"}`);
-  }, [loading, currentUser]);
+  // Debug current state
+  console.log(`[AuthContext] State - Loading: ${loading}, User: ${currentUser?.uid || "null"}`);
 
   return (
     <AuthContext.Provider value={{ currentUser, loading }}>

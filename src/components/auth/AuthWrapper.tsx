@@ -18,61 +18,59 @@ export default function AuthWrapper({
 }: AuthWrapperProps) {
   const { currentUser, loading } = useAuth();
   const router = useRouter();
-  const [redirecting, setRedirecting] = useState(false);
-  const [hasCompletedCheck, setHasCompletedCheck] = useState(false);
+  const [waitExpired, setWaitExpired] = useState(false);
 
   console.log(`[AuthWrapper] Render Check - loading: ${loading}, user: ${!!currentUser}, redirectRequired: ${redirectIfNotAuthenticated}`);
 
+  // Add safety timeout for AuthWrapper
   useEffect(() => {
-    // Safety timeout - ensure we don't get stuck loading
-    const timeout = setTimeout(() => {
-      if (!hasCompletedCheck) {
-        console.log("[AuthWrapper] Safety timeout - forcing completion of auth check");
-        setHasCompletedCheck(true);
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.log("[AuthWrapper] Maximum wait time exceeded, proceeding anyway");
+        setWaitExpired(true);
       }
     }, 6000); // 6 seconds
     
-    // Exit early if still loading and timeout hasn't triggered
-    if (loading && !hasCompletedCheck) {
-      return () => clearTimeout(timeout);
-    }
-    
-    // If we've completed auth check or loading is done
-    clearTimeout(timeout);
-    setHasCompletedCheck(true);
-    
-    if (!currentUser && redirectIfNotAuthenticated && !redirecting) {
-      setRedirecting(true);
+    return () => clearTimeout(timeoutId);
+  }, [loading]);
+
+  // Handle redirection
+  useEffect(() => {
+    if ((!loading || waitExpired) && !currentUser && redirectIfNotAuthenticated) {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/whattoeat';
       const redirectUrl = `${basePath}${redirectTo.startsWith('/') ? redirectTo : '/' + redirectTo}`;
       console.log(`[AuthWrapper] Auth complete, no user. Redirecting to: ${redirectUrl}`);
       router.push(redirectUrl);
-    } else {
-      console.log(`[AuthWrapper] Auth complete. User ${currentUser ? 'exists' : 'does not exist'}. Redirect ${redirectIfNotAuthenticated ? 'was required' : 'not required'}.`);
     }
-    
-    return () => clearTimeout(timeout);
-  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo, router, redirecting, hasCompletedCheck]);
+  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo, router, waitExpired]);
 
-  // If still loading and under timeout, show loading indicator
-  if ((loading && !hasCompletedCheck) || (redirecting && redirectIfNotAuthenticated && !currentUser)) {
-    console.log("[AuthWrapper] Rendering loader - auth still in progress");
+  // Show loading indicator only if still loading and timeout not triggered
+  if (loading && !waitExpired) {
+    console.log("[AuthWrapper] Rendering loader because AuthContext loading = true");
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {redirecting ? "Redirecting..." : "Verifying Access..."}
-          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Verifying Access...</p>
         </div>
       </div>
     );
   }
 
-  // At this point, either:
-  // 1. Auth is complete and user exists
-  // 2. Auth is complete, user doesn't exist, but redirect isn't required
-  // 3. Safety timeout triggered
-  console.log("[AuthWrapper] Rendering children - auth completed or timeout triggered");
-  return <>{children}</>;
+  // If auth complete or timeout triggered, and can show content
+  if (((!loading || waitExpired) && currentUser) || (!redirectIfNotAuthenticated)) {
+    console.log("[AuthWrapper] Rendering children");
+    return <>{children}</>;
+  }
+
+  // Otherwise show simpler loading indicator while redirect happens
+  console.log("[AuthWrapper] Rendering redirect loader");
+  return (
+    <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="flex flex-col items-center space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">Redirecting...</p>
+      </div>
+    </div>
+  );
 }
