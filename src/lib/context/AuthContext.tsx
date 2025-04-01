@@ -23,9 +23,21 @@ function notifyAuthSubscribers() {
 // This is used by auth.ts for Google sign-in
 export function setGlobalAuthUser(user: User | null) {
   console.log("[AuthContext-Global] setGlobalAuthUser called:", user ? `User ID: ${user.uid}` : "No user");
+  
+  // Update the global variables
   globalUser = user;
   globalInitialAuthCheckComplete = true; // Also mark auth check as complete when manually setting user
+  
+  // Make sure we notify all subscribers to update their state
+  console.log("[AuthContext-Global] Explicitly notifying all subscribers after manual auth update");
   notifyAuthSubscribers();
+  
+  // If we're in the browser, also force a token refresh to ensure tokens are fresh
+  if (typeof window !== 'undefined' && user) {
+    user.getIdToken(true)
+      .then(token => console.log("[AuthContext-Global] Successfully refreshed token after manual auth update, length:", token.length))
+      .catch(err => console.error("[AuthContext-Global] Error refreshing token after manual auth update:", err));
+  }
 }
 
 // Immediately try to get the current user synchronously

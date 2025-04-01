@@ -79,6 +79,9 @@ import {
       // IMPORTANT: Force update the global auth state
       setGlobalAuthUser(userCredential.user);
       
+      // Add a small delay to let auth state propagate through the system
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Check if user document exists, create if it doesn't
       try {
         const userDocRef = doc(db, "users", userCredential.user.uid);

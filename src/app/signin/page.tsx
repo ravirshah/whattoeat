@@ -88,32 +88,16 @@ function SignInContent() {
     console.log(`[SignIn] Attempting Google sign in, fromGenerate: ${fromGenerate}`);
 
     try {
+      // Sign in with Google
       const googleUser = await signInWithGoogle();
-      console.log(`[SignIn] Google sign in returned user: ${googleUser.uid}`);
+      console.log(`[SignIn] Google sign in successful: ${googleUser.uid}`);
       
-      // Double-check with auth context
-      const contextUser = await refreshUser();
+      // Navigate directly after Google sign-in
+      const redirectPath = fromGenerate ? '/generate' : '/generate';
+      console.log(`[SignIn] Redirecting to ${redirectPath} after Google sign in`);
       
-      if (!contextUser) {
-        console.error("[SignIn] Context user not available after Google sign in");
-        // Try one more refresh with slight delay
-        setTimeout(async () => {
-          const retryUser = await refreshUser();
-          if (retryUser) {
-            console.log("[SignIn] User found on retry, continuing with sign in");
-            // Use the common success handler
-            await handleSuccessfulSignIn();
-          } else {
-            console.error("[SignIn] User still not available after retry");
-            setError("Sign in succeeded but we couldn't verify your account. Please refresh the page.");
-            setLoading(false);
-          }
-        }, 1000);
-        return;
-      }
-      
-      // Use the common success handler
-      await handleSuccessfulSignIn();
+      // Force a full page reload to ensure fresh state
+      window.location.href = window.location.origin + '/whattoeat' + redirectPath;
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google');
       console.error("[SignIn] Google sign in error:", error);

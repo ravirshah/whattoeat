@@ -31,6 +31,27 @@ function HeaderContent() {
   const [headerMounted, setHeaderMounted] = useState(false);
   const [localUser, setLocalUser] = useState<User | null>(null);
 
+  // Check for URL parameters that indicate a fresh login
+  useEffect(() => {
+    // Check if this is a page refresh/load
+    const isPageRefresh = window.performance.navigation.type === 1 || 
+                         window.performance.getEntriesByType('navigation')
+                         .some((nav: any) => nav.type === 'reload');
+                         
+    if (isPageRefresh) {
+      console.log("[Header] Page reload detected, refreshing auth state");
+      // Try to refresh auth immediately on page load
+      refreshUser().then(user => {
+        if (user) {
+          console.log("[Header] Found user after page reload:", user.uid);
+          setLocalUser(user);
+        }
+      }).catch(err => {
+        console.error("[Header] Error refreshing user after page reload:", err);
+      });
+    }
+  }, []);
+
   // Log auth state when header loads
   useEffect(() => {
     console.log("[Header] Component mounted - Auth state:", 
