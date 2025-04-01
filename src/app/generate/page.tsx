@@ -834,43 +834,65 @@ export default function GenerateRecipesPage() {
   // useEffect to load preferences after auth is complete
   useEffect(() => {
     const loadUserPreferences = async () => {
-      if (!currentUser?.uid) { 
-        // Should not happen if AuthWrapper is working, but safety check
+      const userUid = currentUser?.uid; // Capture uid for logging stability
+      if (!userUid) { 
         setPreferencesError(true); 
         setLoadingPreferences(false);
-        console.error("Attempted to load preferences without user ID");
+        console.error("[GeneratePage] Attempted to load preferences without user ID");
         return;
       }
       
+      console.log(`[GeneratePage] Starting preference load for user: ${userUid}`);
       setLoadingPreferences(true);
       setPreferencesError(false);
+      
+      const loadTimeoutMs = 10000; // 10 second timeout
+      let timeoutId: NodeJS.Timeout | null = null;
+
       try {
-        const prefs = await getUserPreferences(currentUser.uid);
-        // Set default empty object if prefs are null/undefined
+        const prefsPromise = getUserPreferences(userUid);
+
+        const timeoutPromise = new Promise<never>((_, reject) => { // Promise that rejects on timeout
+           timeoutId = setTimeout(() => {
+            console.error(`[GeneratePage] Preference load timed out after ${loadTimeoutMs}ms for user: ${userUid}`);
+            reject(new Error("Loading user data timed out."));
+          }, loadTimeoutMs);
+        });
+
+        // Race the actual fetch against the timeout
+        const prefs = await Promise.race([prefsPromise, timeoutPromise]);
+        
+        if (timeoutId) clearTimeout(timeoutId); // Clear timeout if prefsPromise won
+
+        console.log(`[GeneratePage] Preference load successful for user: ${userUid}. Found prefs: ${!!prefs}`);
         setPreferences(prefs || { 
             ingredients: [], equipment: [], staples: [], dietaryPrefs: [], 
-            cuisine: undefined, cookTime: undefined, difficulty: undefined // Use undefined for optional fields
+            cuisine: undefined, cookTime: undefined, difficulty: undefined
         }); 
-      } catch (error) {
-        console.error('Error loading preferences in Page:', error);
+      } catch (error: any) {
+        if (timeoutId) clearTimeout(timeoutId); // Clear timeout if it's still pending on error
+        
+        console.error(`[GeneratePage] Preference load failed for user: ${userUid}`, error);
         setPreferencesError(true);
-        toast.error('Failed to load your preferences', {
+        // Use the timeout error message specifically if that was the cause
+        toast.error(error.message === "Loading user data timed out." ? error.message : 'Failed to load your preferences', {
           description: 'Please refresh the page or try again later.'
         });
+        setPreferences(null); // Set preferences to null on error to avoid rendering form with bad data
       } finally {
+        console.log(`[GeneratePage] Setting loadingPreferences to false for user: ${userUid}`);
         setLoadingPreferences(false);
       }
     };
 
-    // Only run when auth is done loading AND we have a user
+    console.log(`[GeneratePage] Effect check - authLoading: ${authLoading}, currentUser: ${!!currentUser}`);
     if (!authLoading && currentUser) {
       loadUserPreferences();
     } else if (!authLoading && !currentUser) {
-      // If auth finished but no user, stop loading (AuthWrapper should redirect anyway)
+      console.log("[GeneratePage] Auth loaded, no user. Setting loadingPreferences false.");
       setLoadingPreferences(false);
     }
-    // Depend on auth state
-  }, [authLoading, currentUser]); // Depend on currentUser object here is okay, as it triggers re-fetch if user logs in/out
+  }, [authLoading, currentUser]); 
 
   // AuthWrapper handles the main auth loading/redirect
   return (
