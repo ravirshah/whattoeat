@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { Loader2 } from 'lucide-react';
 
@@ -17,35 +16,23 @@ export default function AuthWrapper({
   redirectTo = '/signin'
 }: AuthWrapperProps) {
   const { currentUser, loading } = useAuth();
-  const router = useRouter();
 
   console.log(`[AuthWrapper] Render - loading: ${loading}, user: ${!!currentUser}`);
 
-  // Handle redirection with proper path normalization
+  // Handle redirection with explicit URL instead of router
   useEffect(() => {
     if (!loading && !currentUser && redirectIfNotAuthenticated) {
-      // CRITICAL FIX: Ensure no double paths in redirect URL
-      let path = redirectTo;
+      // CRITICAL: Use window.location with ABSOLUTE URL to avoid path resolution issues
+      const baseUrl = 'https://whattoeat.sortedbyshah.com/whattoeat';
+      const targetPage = redirectTo.startsWith('/') ? redirectTo.substring(1) : redirectTo;
+      const absoluteUrl = `${baseUrl}/${targetPage}`;
       
-      // Remove any leading '/whattoeat' from the redirectTo path to avoid duplicates
-      if (path.startsWith('/whattoeat')) {
-        path = path.replace(/^\/whattoeat/, '');
-      }
-      
-      // Always start with a slash
-      if (!path.startsWith('/')) {
-        path = '/' + path;
-      }
-      
-      // Final redirect URL with single base path
-      const redirectUrl = `/whattoeat${path}`;
-      
-      console.log(`[AuthWrapper] Redirecting to: ${redirectUrl}`);
-      router.push(redirectUrl);
+      console.log(`[AuthWrapper] Redirecting to absolute URL: ${absoluteUrl}`);
+      window.location.href = absoluteUrl;
     }
-  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo, router]);
+  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo]);
 
-  // Show loading state
+  // If still loading, show loader
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -57,12 +44,12 @@ export default function AuthWrapper({
     );
   }
 
-  // If user is authenticated or we don't need authentication
+  // If authenticated or auth not required, show content
   if (currentUser || !redirectIfNotAuthenticated) {
     return <>{children}</>;
   }
 
-  // Show redirect state
+  // Show redirect loading state
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
       <div className="flex flex-col items-center space-y-4">
