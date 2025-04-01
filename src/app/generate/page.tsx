@@ -137,15 +137,17 @@ function GenerateRecipes() {
   // Load user preferences
   useEffect(() => {
     const loadUserPreferences = async () => {
-      if (!currentUser) {
+      // Guard against running if currentUser is null/undefined during auth loading
+      if (!currentUser?.uid) { 
         setLoadingPreferences(false);
         return;
       }
       
       setLoadingPreferences(true);
       try {
-        const prefs = await getUserPreferences(currentUser.uid);
+        const prefs = await getUserPreferences(currentUser.uid); // Use guaranteed uid here
         if (prefs) {
+          // Set state based on loaded prefs
           setIngredients(prefs.ingredients || []);
           setEquipment(prefs.equipment || []);
           setStaples(prefs.staples || []);
@@ -153,6 +155,15 @@ function GenerateRecipes() {
           setCuisine(prefs.cuisine || '');
           setCookTime(prefs.cookTime || '');
           setDifficulty(prefs.difficulty || '');
+        } else {
+           // If no preferences found (e.g., new user), set defaults or empty
+           setIngredients([]);
+           setEquipment([]);
+           setStaples([]);
+           setDietaryPrefs([]);
+           setCuisine('');
+           setCookTime('');
+           setDifficulty('');
         }
       } catch (error) {
         console.error('Error loading preferences:', error);
@@ -165,10 +176,23 @@ function GenerateRecipes() {
       }
     };
     
-    if (!authLoading) {
+    // Only run when auth is finished AND we have a user ID
+    if (!authLoading && currentUser?.uid) {
       loadUserPreferences();
+    } else if (!authLoading && !currentUser) {
+       // Handle the case where auth is done, but user is logged out
+       setLoadingPreferences(false); 
+       // Optionally reset fields to default if needed
+        setIngredients([]);
+        setEquipment([]);
+        setStaples([]);
+        setDietaryPrefs([]);
+        setCuisine('');
+        setCookTime('');
+        setDifficulty('');
     }
-  }, [currentUser, authLoading]);
+    // Depend only on authLoading and the user's ID for stability
+  }, [authLoading, currentUser?.uid]);
   
   // Add/remove functions for ingredients
   const addIngredient = () => {

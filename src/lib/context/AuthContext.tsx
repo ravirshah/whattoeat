@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       clearTimeout(safetyTimeout);
       if (unsubscribe) unsubscribe();
     };
-  }, []);
+  }, [auth]);
 
   const value = {
     currentUser,
