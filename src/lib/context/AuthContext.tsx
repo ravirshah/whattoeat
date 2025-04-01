@@ -19,6 +19,14 @@ function notifyAuthSubscribers() {
   authSubscribers.forEach(callback => callback());
 }
 
+// Export function to manually set the global user
+// This is used by auth.ts for Google sign-in
+export function setGlobalAuthUser(user: User | null) {
+  console.log("[AuthContext-Global] setGlobalAuthUser called:", user ? `User ID: ${user.uid}` : "No user");
+  globalUser = user;
+  notifyAuthSubscribers();
+}
+
 // Attach the listener *once* globally
 console.log("[AuthContext-Global] Setting up global onAuthStateChanged listener...");
 onAuthStateChanged(auth, 

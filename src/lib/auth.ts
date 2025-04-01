@@ -21,6 +21,9 @@ import {
       // Create user document in Firestore
       await createUserDocument(userCredential.user);
       
+      // IMPORTANT: Force update the global auth state
+      setGlobalAuthUser(userCredential.user);
+      
       return userCredential.user;
     } catch (error) {
       console.error("Error registering user:", error);
@@ -35,6 +38,10 @@ import {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       console.log("User signed in successfully:", userCredential.user.uid);
+      
+      // IMPORTANT: Force update the global auth state
+      setGlobalAuthUser(userCredential.user);
+      
       return userCredential.user;
     } catch (error) {
       console.error("Error signing in:", error);
@@ -77,6 +84,10 @@ import {
     try {
       await firebaseSignOut(auth);
       console.log("User signed out successfully");
+      
+      // IMPORTANT: Force update the global auth state to null
+      setGlobalAuthUser(null);
+      
     } catch (error) {
       console.error("Error signing out:", error);
       throw error;

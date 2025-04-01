@@ -24,7 +24,10 @@ export default function SignIn() {
     try {
       const user = await signInWithEmail(email, password);
       console.log("Sign in successful:", user);
-      router.push('/generate');
+      
+      // DIRECT NAVIGATION: Use window.location.href for reliable navigation
+      const baseUrl = 'https://whattoeat.sortedbyshah.com/whattoeat';
+      window.location.href = `${baseUrl}/generate`;
     } catch (error: any) {
       console.error("Sign in error:", error);
   
@@ -54,7 +57,10 @@ export default function SignIn() {
 
     try {
       await signInWithGoogle();
-      router.push('/generate');
+      
+      // DIRECT NAVIGATION: Use window.location.href for reliable navigation
+      const baseUrl = 'https://whattoeat.sortedbyshah.com/whattoeat';
+      window.location.href = `${baseUrl}/generate`;
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google');
     } finally {

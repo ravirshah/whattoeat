@@ -36,7 +36,9 @@ export default function Register() {
 
     try {
       await registerWithEmail(email, password);
-      router.push('/generate');
+      // DIRECT NAVIGATION: Use window.location.href for reliable navigation
+      const baseUrl = 'https://whattoeat.sortedbyshah.com/whattoeat';
+      window.location.href = `${baseUrl}/generate`;
     } catch (error: any) {
       // Try to provide a more user-friendly error message
       const errorCode = error.code;
@@ -62,7 +64,9 @@ export default function Register() {
 
     try {
       await signInWithGoogle();
-      router.push('/generate');
+      // DIRECT NAVIGATION: Use window.location.href for reliable navigation
+      const baseUrl = 'https://whattoeat.sortedbyshah.com/whattoeat';
+      window.location.href = `${baseUrl}/generate`;
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google');
     } finally {
