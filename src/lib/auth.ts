@@ -82,12 +82,31 @@ import {
     console.log("Signing out user");
     
     try {
+      // Clear any session data first
+      try {
+        sessionStorage.clear();
+        localStorage.removeItem('firebase:authUser');
+      } catch (e) {
+        console.error("Error clearing session data:", e);
+        // Continue with signout anyway
+      }
+      
+      // Firebase sign out
       await firebaseSignOut(auth);
       console.log("User signed out successfully");
       
       // IMPORTANT: Force update the global auth state to null
       setGlobalAuthUser(null);
       
+      // Return to home page after a slight delay
+      return new Promise<void>((resolve) => {
+        setTimeout(() => {
+          // Use window.location for a clean reload
+          console.log("Redirecting to home page after signout");
+          window.location.href = window.location.origin + '/whattoeat';
+          resolve();
+        }, 100);
+      });
     } catch (error) {
       console.error("Error signing out:", error);
       throw error;

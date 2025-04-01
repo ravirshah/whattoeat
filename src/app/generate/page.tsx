@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { getUserPreferences, updateUserPreferences, incrementRecipesGenerated } from '@/lib/db';
@@ -425,94 +425,206 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
   
   const prevStep = () => { if (step > 1) { setStep(step - 1); setError(''); } };
   
-  // Generate recipes
-  const generateRecipes = async () => {
-    if (ingredients.length === 0) { setError('Please add at least one ingredient'); setStep(1); return; }
+  // Generate recipes - using useCallback to avoid stale state
+  const generateRecipes = useCallback(async () => {
+    if (ingredients.length === 0) { 
+      setError('Please add at least one ingredient'); 
+      setStep(1); 
+      return; 
+    }
     
-    setGenerating(true); setError(''); setRetryCount(0);
+    setGenerating(true);
+    setError('');
+    setRetryCount(0);
     
     // Try to refresh auth state first - this ensures we have fresh tokens
     try {
+      console.log("[GenerateRecipes] Refreshing auth state before generating recipes");
       const refreshedUser = await refreshUser();
       if (!refreshedUser) {
-        console.log("[GenerateRecipes] No user after refresh, redirecting to sign in");
-        setError("Session expired. Please sign in again.");
+        console.log("[GenerateRecipes] No user after refresh, showing error");
+        setError("Authentication error. Please refresh the page and try again.");
         setGenerating(false);
-        router.push('/signin');
-        return;
+        return; // Don't redirect, just show error
       }
-    } catch (authRefreshError) {
-      console.error("[GenerateRecipes] Error refreshing auth:", authRefreshError);
-      // Continue with current user anyway, the token might still be valid
-    }
-    
-    try {
-      try { 
-        if (currentUser?.uid) {
-          incrementRecipesGenerated(currentUser.uid).catch(err => console.error("Failed to increment recipe count:", err)); 
-        }
-      } catch (statsError) { console.error("Error updating stats:", statsError); }
       
-      let token;
+      console.log("[GenerateRecipes] Auth refresh successful, user ID:", refreshedUser.uid);
+      
+      // Force update preferences if user changed
+      if (currentUser?.uid !== refreshedUser.uid) {
+        console.log("[GenerateRecipes] User changed, updating preferences");
+        try {
+          await updateUserPreferences(refreshedUser.uid, { 
+            ingredients, equipment, staples, dietaryPrefs,
+            cuisine: cuisine || undefined, 
+            cookTime: cookTime || undefined, 
+            difficulty: difficulty || undefined 
+          });
+        } catch (prefError) {
+          console.error("[GenerateRecipes] Error updating preferences:", prefError);
+          // Continue anyway
+        }
+      }
+      
       try { 
-        // Make sure we're using the refreshed user or current user
-        const userToUse = currentUser;
-        if (!userToUse) {
-          setError("Authentication error. Please sign in again.");
-          setGenerating(false);
-          router.push('/signin');
-          return;
+        // Update usage stats
+        console.log("[GenerateRecipes] Incrementing usage stats");
+        incrementRecipesGenerated(refreshedUser.uid)
+          .catch(err => console.error("[GenerateRecipes] Failed to increment recipe count:", err)); 
+      } catch (statsError) {
+        console.error("[GenerateRecipes] Error updating stats:", statsError);
+        // Continue anyway
+      }
+      
+      // Get a fresh token directly from the refreshed user
+      console.log("[GenerateRecipes] Getting fresh ID token");
+      const token = await refreshedUser.getIdToken(true);
+      if (!token) {
+        throw new Error("[GenerateRecipes] Failed to get authentication token");
+      }
+      
+      const requestData = { 
+        ingredients, 
+        equipment, 
+        staples, 
+        dietaryPrefs, 
+        cuisine, 
+        cookTime, 
+        difficulty, 
+        userId: refreshedUser.uid 
+      };
+      
+      console.log("[GenerateRecipes] Sending API request with data:", {
+        userId: refreshedUser.uid,  
+        ingredientsCount: ingredients.length, 
+        equipmentCount: equipment.length, 
+        staplesCount: staples.length, 
+        dietaryPrefsCount: dietaryPrefs.length
+      });
+      
+      // Make API call with refreshed token
+      let recipeData;
+      try {
+        const response = await axios.post('/whattoeat/api/generate-recipes', requestData, { 
+          headers: { 
+            'Authorization': `Bearer ${token}`, 
+            'Content-Type': 'application/json' 
+          }, 
+          timeout: 60000 
+        });
+        recipeData = response.data;
+        console.log("[GenerateRecipes] API call successful");
+      } catch (mainApiError) {
+        console.error("[GenerateRecipes] Error with main API, trying fallback:", mainApiError);
+        try {
+          // Try fallback
+          const fallbackResponse = await axios.post('/whattoeat/api/generate-recipes-simple', requestData, { 
+            headers: { 
+              'Authorization': `Bearer ${token}`, 
+              'Content-Type': 'application/json' 
+            }, 
+            timeout: 30000 
+          });
+          recipeData = fallbackResponse.data;
+          toast.info('Using sample recipes', { 
+            description: 'Our full recipe generator is busy. Showing example recipes instead.' 
+          });
+          console.log("[GenerateRecipes] Fallback API call successful");
+        } catch (fallbackError) {
+          console.error("[GenerateRecipes] Fallback API also failed:", fallbackError);
+          throw mainApiError;
+        }
+      }
+      
+      if (recipeData && recipeData.recipes && recipeData.recipes.length > 0) {
+        console.log(`[GenerateRecipes] Received ${recipeData.recipes.length} recipes from API`);
+        
+        if (recipeData.apiInfo) {
+          console.log("[GenerateRecipes] Using API fallback recipes due to:", recipeData.apiInfo.error);
+          toast.info("Using sample recipes", { 
+            description: "We're showing example recipes while our system is busy." 
+          });
         }
         
-        token = await userToUse.getIdToken(true); // Force token refresh
-        if (!token) throw new Error("Failed to get authentication token"); 
-      } catch (tokenError) { 
-        console.error("Error getting auth token:", tokenError); 
-        setError('Authentication error. Please sign in again.'); 
-        setGenerating(false);
-        router.push('/signin');
-        return; 
-      }
-      
-      const requestData = { ingredients, equipment, staples, dietaryPrefs, cuisine, cookTime, difficulty, userId: currentUser.uid };
-      console.log("Sending API request with data:", { ingredientsCount: ingredients.length, equipmentCount: equipment.length, staplesCount: staples.length, dietaryPrefsCount: dietaryPrefs.length });
-      let recipeData; try {
-        const response = await axios.post('/whattoeat/api/generate-recipes', requestData, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, timeout: 60000 });
-        recipeData = response.data;
-      } catch (mainApiError) {
-        console.error("Error with main API, trying fallback:", mainApiError);
-        try {
-          const fallbackResponse = await axios.post('/whattoeat/api/generate-recipes-simple', requestData, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, timeout: 30000 });
-          recipeData = fallbackResponse.data;
-          toast.info('Using sample recipes', { description: 'Our full recipe generator is busy. Showing example recipes instead.' });
-        } catch (fallbackError) { console.error("Fallback API also failed:", fallbackError); throw mainApiError; }
-      }
-      if (recipeData && recipeData.recipes && recipeData.recipes.length > 0) {
-        console.log(`Received ${recipeData.recipes.length} recipes from API`);
-        if (recipeData.apiInfo) { console.log("Using API fallback recipes due to:", recipeData.apiInfo.error); toast.info("Using sample recipes", { description: "We're showing example recipes while our system is busy." }); }
+        // Store recipes in session storage
         sessionStorage.setItem('generatedRecipes', JSON.stringify(recipeData.recipes));
         setRetryCount(0);
+        
+        // Navigate to results page
+        console.log("[GenerateRecipes] Navigating to results page");
         router.push('/recipes/results');
         return;
       }
-      throw new Error("No recipes returned from API");
+      
+      throw new Error("[GenerateRecipes] No recipes returned from API");
+      
     } catch (error: any) {
-      console.error("Error generating recipes:", error);
-      const newRetryCount = retryCount + 1; setRetryCount(newRetryCount);
+      console.error("[GenerateRecipes] Error generating recipes:", error);
+      
+      const newRetryCount = retryCount + 1;
+      setRetryCount(newRetryCount);
+      
+      // Handle different error types
       if (error.response) {
-        console.error("Server error:", error.response.status, error.response.data);
-        if (error.response.status === 401) { 
-          // Don't redirect to signin, just show an error
-          setError("Authentication error. Please refresh the page and try again."); 
+        console.error("[GenerateRecipes] Server error:", error.response.status, error.response.data);
+        
+        if (error.response.status === 401) {
+          // Auth error - try to refresh again but don't redirect
+          try {
+            console.log("[GenerateRecipes] Trying one more auth refresh on 401");
+            const oneMoreTry = await refreshUser();
+            if (oneMoreTry) {
+              console.log("[GenerateRecipes] Second auth refresh successful");
+              setError("Please try again. Your session has been refreshed.");
+            } else {
+              setError("Authentication error. Please refresh the page and try again.");
+            }
+          } catch (refreshError) {
+            console.error("[GenerateRecipes] Second auth refresh failed:", refreshError);
+            setError("Authentication error. Please refresh the page and try again.");
+          }
         } 
-        else if (error.response.data && error.response.data.error) { setError(error.response.data.error); } 
-        else { setError("Error communicating with the recipe service. Please try again."); }
-      } else if (error.request) { console.error("Network error, no response received"); setError("Network issue. Please check your connection and try again."); }
-      else { console.error("Request setup error:", error.message); setError("Failed to create recipe request. Please try again."); }
-      if (newRetryCount > maxRetries) { toast.error("We're having trouble connecting to our service", { description: "Please try again later" }); }
+        else if (error.response.data && error.response.data.error) {
+          setError(error.response.data.error);
+        } 
+        else {
+          setError("Error communicating with the recipe service. Please try again.");
+        }
+      } 
+      else if (error.request) {
+        console.error("[GenerateRecipes] Network error, no response received");
+        setError("Network issue. Please check your connection and try again.");
+      }
+      else {
+        console.error("[GenerateRecipes] Request setup error:", error.message);
+        setError("Failed to create recipe request. Please try again.");
+      }
+      
+      if (newRetryCount > maxRetries) {
+        toast.error("We're having trouble connecting to our service", {
+          description: "Please try again later"
+        });
+      }
+    } finally {
       setGenerating(false);
     }
-  };
+  }, [
+    ingredients, 
+    refreshUser, 
+    setError, 
+    setStep, 
+    setGenerating, 
+    retryCount, 
+    setRetryCount,
+    equipment,
+    staples,
+    dietaryPrefs,
+    cuisine,
+    cookTime,
+    difficulty,
+    router,
+    maxRetries
+  ]);
   
   // Also replace the retryGeneration function with this improved version
   const retryGeneration = () => {
