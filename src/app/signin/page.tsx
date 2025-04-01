@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signInWithEmail, signInWithGoogle } from '@/lib/auth';
 import { useAuth } from '@/lib/context/AuthContext';
@@ -16,33 +16,41 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { refreshUser } = useAuth();
+  const searchParams = useSearchParams();
+  
+  // Check if we're coming from the generate page
+  const fromGenerate = searchParams?.get('from') === 'generate';
+  
+  useEffect(() => {
+    console.log(`[SignIn] Page loaded, fromGenerate: ${fromGenerate}`);
+  }, [fromGenerate]);
 
   const handleSuccessfulSignIn = async () => {
     // Explicitly refresh the user state in AuthContext
     await refreshUser();
     
-    // Navigate to the generate page
-    console.log("Sign in successful, redirecting to /generate");
+    // Navigate to the appropriate page
+    const redirectPath = fromGenerate ? '/generate' : '/generate';
+    console.log(`[SignIn] Sign in successful, redirecting to ${redirectPath}`);
     
-    // Instead of using baseUrl, use router.push which is more reliable
-    // for same-origin navigation
-    router.push('/generate');
+    // Use direct navigation for most reliable page transition
+    window.location.href = window.location.origin + '/whattoeat' + redirectPath;
   };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    console.log("Attempting to sign in with:", email);
+    console.log(`[SignIn] Attempting to sign in with email: ${email}, fromGenerate: ${fromGenerate}`);
   
     try {
       const user = await signInWithEmail(email, password);
-      console.log("Sign in successful:", user);
+      console.log("[SignIn] Sign in successful:", user.uid);
       
       // Use the common success handler
       await handleSuccessfulSignIn();
     } catch (error: any) {
-      console.error("Sign in error:", error);
+      console.error("[SignIn] Sign in error:", error);
   
       // Try to provide a more user-friendly error message
       const errorCode = error.code;
@@ -67,6 +75,7 @@ export default function SignIn() {
   const handleGoogleSignIn = async () => {
     setError('');
     setLoading(true);
+    console.log(`[SignIn] Attempting Google sign in, fromGenerate: ${fromGenerate}`);
 
     try {
       await signInWithGoogle();
@@ -75,6 +84,7 @@ export default function SignIn() {
       await handleSuccessfulSignIn();
     } catch (error: any) {
       setError(error.message || 'Failed to sign in with Google');
+      console.error("[SignIn] Google sign in error:", error);
     } finally {
       setLoading(false);
     }

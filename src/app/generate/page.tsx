@@ -478,11 +478,17 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
       
       // Get a fresh token directly from the refreshed user
       console.log("[GenerateRecipes] Getting fresh ID token");
-      const token = await refreshedUser.getIdToken(true);
-      if (!token) {
-        throw new Error("[GenerateRecipes] Failed to get authentication token");
+      let token: string | undefined = undefined;
+      try {
+        token = await refreshedUser.getIdToken(true);
+        if (!token) {
+          console.log("[GenerateRecipes] No token available, continuing without auth");
+        }
+      } catch (tokenError) {
+        console.error("[GenerateRecipes] Error getting token, continuing without auth:", tokenError);
       }
       
+      // Prepare request data - include userId if we have a user
       const requestData = { 
         ingredients, 
         equipment, 
@@ -490,48 +496,90 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
         dietaryPrefs, 
         cuisine, 
         cookTime, 
-        difficulty, 
-        userId: refreshedUser.uid 
+        difficulty,
+        // Only include userId if we have a refreshed user
+        ...(refreshedUser?.uid ? { userId: refreshedUser.uid } : {})
       };
       
+      // Log what we're sending (without token)
       console.log("[GenerateRecipes] Sending API request with data:", {
-        userId: refreshedUser.uid,  
+        hasUserId: !!refreshedUser?.uid,
         ingredientsCount: ingredients.length, 
         equipmentCount: equipment.length, 
         staplesCount: staples.length, 
         dietaryPrefsCount: dietaryPrefs.length
       });
       
+      // Prepare headers - include auth token if available
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      };
+      
       // Make API call with refreshed token
       let recipeData;
       try {
-        const response = await axios.post('/whattoeat/api/generate-recipes', requestData, { 
-          headers: { 
-            'Authorization': `Bearer ${token}`, 
-            'Content-Type': 'application/json' 
-          }, 
-          timeout: 60000 
+        console.log("[GenerateRecipes] Making API call with auth token length:", token?.length || 0);
+        
+        // Use a more direct approach for axios call
+        const response = await axios({
+          method: 'post',
+          url: '/whattoeat/api/generate-recipes',
+          headers: headers,
+          data: requestData,
+          timeout: 60000
         });
+        
+        // Log the response for debugging
+        console.log("[GenerateRecipes] Raw API response:", 
+          response.status, 
+          response.statusText,
+          typeof response.data === 'object' ? 'Data object received' : 'Non-object data'
+        );
+        
         recipeData = response.data;
         console.log("[GenerateRecipes] API call successful");
-      } catch (mainApiError) {
-        console.error("[GenerateRecipes] Error with main API, trying fallback:", mainApiError);
+      } catch (error: any) {
+        // Explicitly type the error as any to access axios error properties
+        const mainApiError = error;
+        console.error("[GenerateRecipes] Error with main API, details:", mainApiError.message);
+        
+        if (mainApiError.response) {
+          console.error("[GenerateRecipes] Server responded with:", 
+            mainApiError.response.status, 
+            mainApiError.response.statusText,
+            mainApiError.response.data
+          );
+        }
+        
         try {
-          // Try fallback
-          const fallbackResponse = await axios.post('/whattoeat/api/generate-recipes-simple', requestData, { 
-            headers: { 
-              'Authorization': `Bearer ${token}`, 
-              'Content-Type': 'application/json' 
-            }, 
-            timeout: 30000 
+          // Try fallback with the same direct approach
+          console.log("[GenerateRecipes] Attempting fallback API...");
+          const fallbackResponse = await axios({
+            method: 'post',
+            url: '/whattoeat/api/generate-recipes-simple',
+            headers: headers,
+            data: requestData,
+            timeout: 30000
           });
+          
+          console.log("[GenerateRecipes] Fallback API response:", 
+            fallbackResponse.status, 
+            fallbackResponse.statusText
+          );
+          
           recipeData = fallbackResponse.data;
           toast.info('Using sample recipes', { 
             description: 'Our full recipe generator is busy. Showing example recipes instead.' 
           });
           console.log("[GenerateRecipes] Fallback API call successful");
-        } catch (fallbackError) {
-          console.error("[GenerateRecipes] Fallback API also failed:", fallbackError);
+        } catch (error2: any) {
+          // Explicitly type the second error as any
+          const fallbackError = error2;
+          console.error("[GenerateRecipes] Fallback API also failed:", 
+            fallbackError.message,
+            fallbackError.response ? `Status: ${fallbackError.response.status}` : 'No response'
+          );
           throw mainApiError;
         }
       }
@@ -547,16 +595,40 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
         }
         
         // Store recipes in session storage
-        sessionStorage.setItem('generatedRecipes', JSON.stringify(recipeData.recipes));
+        try {
+          console.log("[GenerateRecipes] Storing recipes in session storage");
+          sessionStorage.setItem('generatedRecipes', JSON.stringify(recipeData.recipes));
+        } catch (storageError) {
+          console.error("[GenerateRecipes] Failed to store recipes in session storage:", storageError);
+          // Continue anyway - we'll use the recipeData directly
+        }
+        
         setRetryCount(0);
         
         // Navigate to results page
         console.log("[GenerateRecipes] Navigating to results page");
-        router.push('/recipes/results');
+        try {
+          router.push('/recipes/results');
+        } catch (navigationError) {
+          console.error("[GenerateRecipes] Navigation error:", navigationError);
+          
+          // Direct fallback navigation if router fails
+          console.log("[GenerateRecipes] Attempting direct navigation");
+          window.location.href = window.location.origin + '/whattoeat/recipes/results';
+        }
         return;
+      } else {
+        // Log what we received if data structure is unexpected
+        console.error("[GenerateRecipes] Unexpected data structure:", 
+          recipeData ? 
+            (recipeData.recipes ? 
+              `Empty recipes array (length: ${recipeData.recipes.length})` :
+              "No recipes field in response"
+            ) : 
+            "No data received"
+        );
+        throw new Error("[GenerateRecipes] No valid recipes returned from API");
       }
-      
-      throw new Error("[GenerateRecipes] No recipes returned from API");
       
     } catch (error: any) {
       console.error("[GenerateRecipes] Error generating recipes:", error);

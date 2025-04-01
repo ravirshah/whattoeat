@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { registerWithEmail, signInWithGoogle } from '@/lib/auth';
 import { useAuth } from '@/lib/context/AuthContext';
@@ -17,16 +17,24 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { refreshUser } = useAuth();
+  const searchParams = useSearchParams();
+  
+  // Check if we're coming from the generate page
+  const fromGenerate = searchParams?.get('from') === 'generate';
+  
+  useEffect(() => {
+    console.log(`[Register] Page loaded, fromGenerate: ${fromGenerate}`);
+  }, [fromGenerate]);
 
   const handleSuccessfulRegistration = async () => {
     // Explicitly refresh the user state in AuthContext
     await refreshUser();
     
     // Navigate to the generate page
-    console.log("Registration successful, redirecting to /generate");
+    console.log(`[Register] Registration successful, redirecting to /generate`);
     
-    // Use router.push for same-origin navigation
-    router.push('/generate');
+    // Use direct navigation for reliable page transition
+    window.location.href = window.location.origin + '/whattoeat/generate';
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -46,9 +54,11 @@ export default function Register() {
     }
     
     setLoading(true);
+    console.log(`[Register] Attempting to register with email: ${email}`);
 
     try {
       await registerWithEmail(email, password);
+      console.log(`[Register] Registration successful`);
       await handleSuccessfulRegistration();
     } catch (error: any) {
       // Try to provide a more user-friendly error message
@@ -63,6 +73,7 @@ export default function Register() {
         errorMessage = 'The password is too weak.';
       }
       
+      console.error(`[Register] Registration error: ${errorCode} - ${errorMessage}`);
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -72,11 +83,14 @@ export default function Register() {
   const handleGoogleSignIn = async () => {
     setError('');
     setLoading(true);
+    console.log(`[Register] Attempting Google sign in`);
 
     try {
       await signInWithGoogle();
+      console.log(`[Register] Google sign in successful`);
       await handleSuccessfulRegistration();
     } catch (error: any) {
+      console.error(`[Register] Google sign in error:`, error);
       setError(error.message || 'Failed to sign in with Google');
     } finally {
       setLoading(false);
