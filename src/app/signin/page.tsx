@@ -4,12 +4,9 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signInWithEmail, signInWithGoogle } from '@/lib/auth';
-import { useAuth } from '@/lib/context/AuthContext';
 import MainLayout from '@/components/layout/MainLayout';
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Alert, AlertDescription } from '@/components/ui';
 import { Loader2, AlertCircle } from 'lucide-react';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 
 // Component that uses useSearchParams
 function SignInContent() {
@@ -18,34 +15,24 @@ function SignInContent() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { refreshUser } = useAuth();
   const searchParams = useSearchParams();
-  
-  // Check if we're coming from the generate page
+
+  // Check if we're coming from a specific page (optional, keep if needed)
   const fromGenerate = searchParams?.get('from') === 'generate';
-  
+
   useEffect(() => {
-    console.log(`[SignIn] Page loaded, fromGenerate: ${fromGenerate}`);
+    // Log if redirected from generate page
+    if (fromGenerate) {
+      console.log(`[SignIn] Page loaded, redirect source: generate`);
+    }
   }, [fromGenerate]);
 
-  const handleSuccessfulSignIn = async () => {
-    // We assume the sign-in was successful if this function is called.
-    // The auth context should update via its listener.
-    // Let's remove the potentially problematic refreshUser call.
-    // const user = await refreshUser();
-    // 
-    // if (!user) {
-    //   console.error("[SignIn] User not available after refresh - something went wrong");
-    //   setError("Sign in succeeded but we couldn't verify your account. Please try again.");
-    //   return;
-    // }
-    
-    // console.log(`[SignIn] Sign in successful, user: ${user.uid}`); // Can't log user.uid anymore
-    console.log(`[SignIn] Sign in process successful, navigating to /generate`);
-    
+  // Navigate after successful sign-in
+  const handleSuccessfulSignIn = () => {
+    console.log(`[SignIn] Sign-in process successful, navigating to /generate`);
     // Navigate programmatically to the generate page
-    // console.log(`[SignIn] Sign in successful, navigating to /whattoeat/generate`); // Redundant log
-    router.push('/generate');
+    // Use replace to avoid adding the sign-in page to history after successful login
+    router.replace('/generate');
   };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
@@ -53,127 +40,60 @@ function SignInContent() {
     setError('');
     setLoading(true);
     console.log(`[SignIn] Attempting to sign in with email: ${email}`);
-  
+
     try {
-      // Call the auth function, but don't expect it to redirect
+      // Call the auth function
       await signInWithEmail(email, password);
-      // If successful, call the success handler
-      console.log("[SignIn] Email sign-in successful, calling success handler");
-      await handleSuccessfulSignIn();
+      // If successful, Firebase listener in AuthContext will update the state.
+      // Navigate after the promise resolves.
+      console.log("[SignIn] Email sign-in function succeeded.");
+      handleSuccessfulSignIn();
     } catch (error: any) {
       console.error("[SignIn] Sign in error:", error);
-  
-      // Try to provide a more user-friendly error message
+      setLoading(false); // Stop loading on error
+
+      // Provide user-friendly error messages
       const errorCode = error.code;
-      let errorMessage = error.message || 'Failed to sign in';
-      
+      let errorMessage = 'Failed to sign in. Please check your credentials.'; // Default message
+
       if (errorCode === 'auth/invalid-email') {
         errorMessage = 'Invalid email address format.';
       } else if (errorCode === 'auth/user-disabled') {
         errorMessage = 'This account has been disabled.';
-      } else if (errorCode === 'auth/user-not-found') {
-        errorMessage = 'No account found with this email.';
-      } else if (errorCode === 'auth/wrong-password') {
+      } else if (errorCode === 'auth/user-not-found' || errorCode === 'auth/invalid-credential') {
+        // Treat user-not-found and invalid-credential (includes wrong password) similarly
+        errorMessage = 'Incorrect email or password.';
+      } else if (errorCode === 'auth/wrong-password') { // Keep specific for potential future use
         errorMessage = 'Incorrect password.';
       }
-      
+
       setError(errorMessage);
-      setLoading(false);
     }
+    // Removed finally block, setLoading(false) handled in success/error paths
   };
 
   const handleGoogleSignIn = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
+    setError(''); // Clear previous errors
     setLoading(true);
-    
+    console.log("[SignIn] Attempting Google sign-in");
+
     try {
-      console.log("Starting Google sign-in process");
       const success = await signInWithGoogle();
-      // If successful, call the success handler
+      // If successful, Firebase listener handles state update.
       if (success) {
-        console.log("[SignIn] Google sign-in successful, calling success handler");
-        await handleSuccessfulSignIn();
+        console.log("[SignIn] Google sign-in function succeeded.");
+        handleSuccessfulSignIn();
       } else {
-        // If signInWithGoogle returns false, it usually means the popup was closed
-        // or blocked. The function itself handles alerts for these cases.
-        console.log("[SignIn] Google sign-in did not complete successfully (likely closed popup).");
-        setLoading(false); // Ensure loading state is reset
+        // signInWithGoogle internally handles errors like popup closed
+        console.log("[SignIn] Google sign-in did not complete successfully (e.g., popup closed).");
+        setLoading(false); // Reset loading state if popup was closed
       }
     } catch (error) {
-      console.error("Error during Google sign-in:", error);
+      // Catch unexpected errors from signInWithGoogle (though it aims to handle them internally)
+      console.error("Error during Google sign-in attempt:", error);
       setLoading(false);
       setError("Failed to sign in with Google. Please try again.");
-    }
-  };
-  
-  // For demo/prototype - create a test account
-  const handleCreateTestAccount = async () => {
-    setEmail('test@example.com');
-    setPassword('password123');
-  };
-  
-  // Emergency direct authentication bypassing redirects
-  const handleEmergencyDirectAuth = async () => {
-    try {
-      setLoading(true);
-      console.log("[SignIn] EMERGENCY: Direct Firebase auth with page reload");
-      
-      // Disable any error state
-      setError('');
-      
-      // Create Google auth provider with explicit parameters
-      const provider = new GoogleAuthProvider();
-      provider.addScope('https://www.googleapis.com/auth/userinfo.email');
-      provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
-      
-      // CRITICAL: Force re-authentication with prompt
-      provider.setCustomParameters({ 
-        prompt: 'select_account',
-        auth_type: 'reauthenticate' 
-      });
-      
-      // Direct Firebase auth
-      const result = await signInWithPopup(auth, provider);
-      console.log("[SignIn] EMERGENCY: Auth successful with user:", result.user.uid);
-      
-      // Force token refresh after successful sign in
-      const token = await result.user.getIdToken(true);
-      console.log("[SignIn] EMERGENCY: Got fresh token, length:", token.length);
-      
-      // Create user document
-      try {
-        // Import function for doc creation
-        const { doc, setDoc } = await import('firebase/firestore');
-        const { db } = await import('@/lib/firebase');
-        
-        const userDoc = doc(db, "users", result.user.uid);
-        await setDoc(userDoc, {
-          email: result.user.email,
-          preferences: {
-            ingredients: [],
-            equipment: [],
-            staples: [],
-            dietaryPrefs: []
-          },
-          usageStats: {
-            month: new Date().getMonth(),
-            recipesGenerated: 0
-          },
-          savedRecipes: []
-        }, { merge: true });
-        console.log("[SignIn] EMERGENCY: Updated user document");
-      } catch (docError) {
-        console.error("[SignIn] EMERGENCY: Error with user document:", docError);
-        // Continue anyway
-      }
-      
-      // Most reliable approach: complete hard reload to generate page
-      console.log("[SignIn] EMERGENCY: Forcing full hard navigation");
-      window.location.href = window.location.origin + "/whattoeat/generate";
-    } catch (error) {
-      console.error("[SignIn] EMERGENCY auth failed:", error);
-      setLoading(false);
-      setError("Emergency sign-in failed. Please try again.");
     }
   };
 
@@ -183,10 +103,10 @@ function SignInContent() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Sign in</CardTitle>
           <CardDescription className="text-center">
-            Enter your credentials to access your account
+            Enter your credentials to access your recipes
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent>
           {error && (
             <Alert variant="destructive" className="mb-6">
@@ -194,39 +114,42 @@ function SignInContent() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          
+
           <form onSubmit={handleEmailSignIn} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input 
+              <Input
                 id="email"
                 type="email"
                 placeholder="hello@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <Link 
-                  href="/forgot-password" 
+                {/* Link to password reset - ensure this page exists */}
+                {/* <Link
+                  href="/forgot-password"
                   className="text-sm font-medium text-emerald-600 hover:text-emerald-500 dark:text-emerald-500 dark:hover:text-emerald-400"
                 >
                   Forgot password?
-                </Link>
+                </Link> */}
               </div>
-              <Input 
+              <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full"
               disabled={loading}
             >
@@ -238,7 +161,7 @@ function SignInContent() {
               ) : 'Sign in'}
             </Button>
           </form>
-          
+
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t border-gray-300 dark:border-gray-600" />
@@ -249,9 +172,9 @@ function SignInContent() {
               </span>
             </div>
           </div>
-          
-          <Button 
-            variant="outline" 
+
+          <Button
+            variant="outline"
             className="w-full"
             disabled={loading}
             onClick={handleGoogleSignIn}
@@ -268,36 +191,13 @@ function SignInContent() {
             )}
             Google
           </Button>
-
-          {/* For testing purposes */}
-          <Button
-            variant="ghost"
-            className="w-full mt-4 text-sm"
-            onClick={handleCreateTestAccount}
-          >
-            Use test account credentials
-          </Button>
-          
-          {/* Emergency direct auth button */}
-          <Button
-            variant="destructive"
-            className="w-full mt-4"
-            onClick={handleEmergencyDirectAuth}
-            disabled={loading}
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              "EMERGENCY: Direct Google Sign-In"
-            )}
-          </Button>
         </CardContent>
-        
+
         <CardFooter className="flex justify-center">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Don't have an account?{' '}
-            <Link 
-              href="/register" 
+            <Link
+              href="/register"
               className="font-medium text-emerald-600 hover:text-emerald-500 dark:text-emerald-500 dark:hover:text-emerald-400"
             >
               Register
