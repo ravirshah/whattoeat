@@ -7,7 +7,8 @@ import {
   useState,
   useEffect,
   ReactNode,
-  useCallback
+  useCallback,
+  useRef // Import useRef
 } from 'react';
 import { onAuthStateChanged, User, getAuth } from 'firebase/auth';
 import { auth } from '../firebase'; // Assuming 'auth' is correctly initialized
@@ -35,9 +36,15 @@ console.log("[AuthContext] React Module loaded.");
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true); // Start as loading
+  const listenerAttached = useRef(false); // Prevent duplicate listeners
 
   // Function to manually refresh the ID token
   const refreshUserToken = useCallback(async (): Promise<string | null> => {
+    // Add extra check for auth object readiness
+    if (!auth) {
+        console.warn("[AuthContext] refreshUserToken called before auth initialized.");
+        return null;
+    }
     const user = auth.currentUser;
     if (user) {
       try {
@@ -45,12 +52,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const token = await user.getIdToken(true); // Force refresh
         console.log("[AuthContext] Token refreshed successfully.");
         return token;
-      } catch (error) {
+      } catch (error: any) {
         console.error("[AuthContext] Error refreshing token:", error);
         // Sign out the user if token refresh fails significantly (e.g., user deleted, disabled)
-        // Consider more specific error handling based on Firebase error codes if needed
-        await auth.signOut();
-        setCurrentUser(null); // Update state immediately
+        if (error.code === 'auth/user-token-expired' || error.code === 'auth/user-disabled' || error.code === 'auth/user-not-found') {
+             console.warn("[AuthContext] Signing out due to token refresh error:", error.code);
+             await auth.signOut();
+             setCurrentUser(null); // Update state immediately
+        }
         return null;
       }
     }
@@ -59,39 +68,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
+    // Ensure listener is attached only once
+    if (listenerAttached.current || !auth) return;
+    listenerAttached.current = true;
+
     console.log("[AuthContext] Setting up onAuthStateChanged listener...");
 
     // Subscribe to Firebase auth state changes
     const unsubscribe = onAuthStateChanged(
       auth,
-      async (user) => {
+      (user) => {
         // Auth state changed
-        console.log("[AuthContext] onAuthStateChanged triggered. User:", user ? user.uid : "null");
+        console.log("[AuthContext] >>> onAuthStateChanged CALLBACK START <<<");
+        console.log("[AuthContext] Listener triggered. Received user:", user ? user.uid : "null");
+
         setCurrentUser(user); // Update the user state
+        console.log("[AuthContext] currentUser state updated in context.");
 
-        if (user) {
-          // Optional: Refresh token on initial load or significant state change
-          // await refreshUserToken();
-        }
-
-        // Initial auth check is complete once the listener fires for the first time
-        setLoading(false);
-        console.log("[AuthContext] Initial auth check complete. Loading set to false.");
+        setLoading(false); // Set loading to false *after* setting user
+        console.log("[AuthContext] loading state set to FALSE in context.");
+        console.log("[AuthContext] >>> onAuthStateChanged CALLBACK END <<<");
       },
       (error) => {
         // Handle errors during listener setup or operation
-        console.error("[AuthContext] Error in onAuthStateChanged listener:", error);
+        console.error("[AuthContext] XXX Error in onAuthStateChanged listener XXX:", error);
         setCurrentUser(null);
         setLoading(false); // Ensure loading is false even on error
+        console.log("[AuthContext] Set loading to FALSE due to listener error.");
       }
     );
+
+    console.log("[AuthContext] onAuthStateChanged listener setup complete.");
 
     // Cleanup: Unsubscribe from the listener when the component unmounts
     return () => {
       console.log("[AuthContext] Unsubscribing from onAuthStateChanged listener.");
       unsubscribe();
+      listenerAttached.current = false;
     };
-  }, [refreshUserToken]); // Rerun effect if refreshUserToken changes (it shouldn't due to useCallback)
+    // Intentionally keeping dependencies minimal for the listener setup itself.
+    // refreshUserToken is stable due to useCallback.
+  }, []); // Run only once on mount
 
   // Value provided by the context
   const value = {
@@ -100,10 +117,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     refreshUserToken,
   };
 
-  console.log(`[AuthContext-Provider] Rendering - Loading: ${loading}, User: ${!!currentUser}`);
+  // Logging provider state on re-render
+  // console.log(`[AuthContext-Provider] Rendering - Loading: ${loading}, User: ${currentUser?.uid ?? 'null'}`);
 
-  // Provide the context value to child components
-  // Don't render children until the initial auth check is complete to avoid flashes
   return (
     <AuthContext.Provider value={value}>
       {children}
@@ -113,18 +129,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 // Export function to get the current user directly (useful outside components, e.g., API routes)
 export const getCurrentUser = (): User | null => {
-  return auth.currentUser;
+  return auth?.currentUser ?? null; // Add check for auth existence
 };
 
-// Export function needed by the old sign-in logic (can be removed if sign-in is updated)
+// Deprecated function - keep for reference or remove if sure it's unused
 export function setGlobalAuthUser(user: User | null) {
     console.warn("[AuthContext] setGlobalAuthUser is deprecated. Rely on AuthProvider state.");
-    // This function no longer directly manipulates the provider's state.
-    // The onAuthStateChanged listener is the source of truth.
-    if (user && auth.currentUser?.uid !== user.uid) {
-        console.warn("[AuthContext] setGlobalAuthUser called with a different user than auth.currentUser.");
-        // Potentially trigger a token refresh or other check if needed, but avoid direct state setting.
-    } else if (!user && auth.currentUser) {
-         console.warn("[AuthContext] setGlobalAuthUser called with null but auth.currentUser exists.");
-    }
 }
