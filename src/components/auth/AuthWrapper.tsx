@@ -2,207 +2,90 @@
 
 import { useEffect, useState, ReactNode, Suspense } from 'react';
 import { useAuth } from '@/lib/context/AuthContext';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
 import { Loader2 } from 'lucide-react';
 
 interface AuthWrapperProps {
   children: ReactNode;
-  redirectIfNotAuthenticated?: boolean;
-  redirectTo?: string;
+  // Define explicit types for pages
+  pageType: 'public' | 'protected' | 'auth'; // e.g., landing | generate | signin
 }
 
 // Component to handle pathname with suspense
 function AuthWrapperContent({
   children,
-  redirectIfNotAuthenticated = true,
-  redirectTo = '/signin'
+  pageType
 }: AuthWrapperProps) {
-  const { currentUser, loading, refreshUser } = useAuth();
-  const pathname = usePathname();
-  // Safety timeout state to prevent infinite loading
-  const [forceShow, setForceShow] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
-  const [refreshAttempted, setRefreshAttempted] = useState(false);
+  const { currentUser, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname(); // Get current path
+  const [isRedirecting, setIsRedirecting] = useState(false); // Track redirection state
 
-  // Check if current route is generate - we'll be more permissive for this route
-  const isGeneratePage = pathname?.includes('/generate') || false;
-  const isRecipesPage = pathname?.includes('/recipes') || false;
-
-  // Log every render with its state
-  console.log(`[AuthWrapper] Render - loading: ${loading}, user: ${!!currentUser}, path: ${pathname}, forceShow: ${forceShow}, redirecting: ${redirecting}, refreshAttempted: ${refreshAttempted}`);
-
-  // Try to refresh auth state once on initial load if no user is detected
   useEffect(() => {
-    const tryRefreshAuth = async () => {
-      if (!refreshAttempted) {
-        console.log('[AuthWrapper] Attempting to refresh auth state');
-        setRefreshAttempted(true);
-        try {
-          // Wait longer for the user refresh to complete
-          console.log('[AuthWrapper] Waiting for fresh auth state...');
-          const user = await refreshUser();
-          console.log('[AuthWrapper] Auth refresh result:', user ? `User found: ${user.uid}` : 'No user found');
-          
-          // If we successfully got a user, verify it's valid
-          if (user) {
-            try {
-              // Force a token refresh to ensure we have a valid session
-              await user.getIdToken(true);
-              console.log('[AuthWrapper] Successfully refreshed auth token');
-            } catch (tokenError) {
-              console.error('[AuthWrapper] Error refreshing token:', tokenError);
-            }
-          }
-        } catch (e) {
-          console.error('[AuthWrapper] Error refreshing auth:', e);
-        }
-      }
-    };
-    
-    tryRefreshAuth();
-  }, [refreshUser, refreshAttempted]);
-
-  // Safety timeout effect - if loading for too long, force show content
-  // Use shorter timeout for generate page
-  useEffect(() => {
-    if (loading && !forceShow) {
-      const timeoutDuration = isGeneratePage ? 1500 : 3000; // 1.5s for generate, 3s for others
-      console.log(`[AuthWrapper] Starting safety timeout (${timeoutDuration}ms)`);
-      
-      const timer = setTimeout(() => {
-        console.log('[AuthWrapper] Safety timeout triggered - forcing content display');
-        setForceShow(true);
-      }, timeoutDuration);
-      
-      return () => clearTimeout(timer);
+    // Don't do anything while auth is loading, unless it takes too long
+    if (authLoading) {
+      console.log(`[AuthWrapper] Auth state loading for path: ${pathname}`);
+      // Optional: Implement a timeout here if loading takes too long
+      // const timer = setTimeout(() => { /* handle timeout */ }, 5000);
+      // return () => clearTimeout(timer);
+      return; 
     }
-  }, [loading, forceShow, isGeneratePage]);
 
-  // Handle redirection with explicit URL instead of router
-  useEffect(() => {
-    // For generate and recipes pages, we'll be very permissive
-    if (isGeneratePage || isRecipesPage) {
-      // Skip redirect completely if on these pages
-      console.log(`[AuthWrapper] Skipping auth check for ${isGeneratePage ? 'generate' : 'recipes'} page`);
-      return;
-    }
-    
-    // Normal case for other pages
-    // Only attempt redirect if:
-    // 1. Not loading (or forceShow is true)
-    // 2. No current user
-    // 3. redirectIfNotAuthenticated is true
-    // 4. We haven't already started redirecting
-    // 5. We've already attempted a refresh
-    const shouldRedirect = (!loading || forceShow) && 
-                          !currentUser && 
-                          redirectIfNotAuthenticated && 
-                          !redirecting &&
-                          refreshAttempted;
-                          
-    if (shouldRedirect) {
-      // CRITICAL: Use window.location with ABSOLUTE URL to avoid path resolution issues
-      const baseUrl = window.location.origin;
-      const targetPage = redirectTo.startsWith('/') ? redirectTo.substring(1) : redirectTo;
-      const absoluteUrl = `${baseUrl}/whattoeat/${targetPage}`;
-      
-      console.log(`[AuthWrapper] Redirecting to absolute URL: ${absoluteUrl}`);
-      setRedirecting(true);
-      
-      // Use a small delay to prevent rapid redirects if there's any state flicker
-      setTimeout(() => {
-        if (!currentUser) { // Double check we still need to redirect
-          window.location.href = absoluteUrl;
-        } else {
-          setRedirecting(false);
-        }
-      }, 500);
-    }
-  }, [loading, currentUser, redirectIfNotAuthenticated, redirectTo, forceShow, redirecting, refreshAttempted, isGeneratePage, isRecipesPage]);
+    // Auth state is resolved (loading is false)
+    console.log(`[AuthWrapper] Auth state resolved for path: ${pathname}. User: ${!!currentUser}, PageType: ${pageType}`);
 
-  // For generate and recipes pages
-  if (isGeneratePage || isRecipesPage) {
-    // For generate page, ALWAYS require authentication
-    if (isGeneratePage) {
-      // Check if we're still loading
-      if (loading && !forceShow) {
-        console.log('[AuthWrapper] Still loading auth state for generate page');
-        return (
-          <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
-            <div className="flex flex-col items-center space-y-4">
-              <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Verifying Access...
-              </p>
-            </div>
-          </div>
-        );
-      }
-      
-      // If user is available, show content
-      if (currentUser) {
-        console.log('[AuthWrapper] User authenticated for generate page, showing content');
-        return <>{children}</>;
-      }
-      
-      // If no user after loading is complete or force show is true, redirect
-      console.log('[AuthWrapper] User not authenticated for generate page, redirecting to sign in');
-      
-      // Use direct window.location redirection for reliability
-      const baseUrl = window.location.origin;
-      window.location.href = `${baseUrl}/whattoeat/signin?from=generate`;
-      
-      // Show loading while redirecting
-      return (
-        <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
-          <div className="flex flex-col items-center space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Redirecting to sign in...
-            </p>
-          </div>
-        </div>
-      );
-    }
-    
-    // For recipes pages, we're more permissive
-    console.log('[AuthWrapper] Showing content for recipes page');
-    return <>{children}</>;
-  }
+    // --- Redirection Logic --- 
+    let shouldRedirect = false;
+    let redirectTarget: string | null = null;
 
-  // If still loading and we haven't hit the safety timeout, show loader
-  if ((loading && !forceShow) || (redirecting && !forceShow)) {
+    // 1. Trying to access a PROTECTED page (e.g., /generate) WITHOUT a user
+    if (pageType === 'protected' && !currentUser) {
+      console.log("[AuthWrapper] Accessing protected route without user. Redirecting to signin.");
+      shouldRedirect = true;
+      // Add current path as query param for redirecting back after login
+      redirectTarget = `/signin?from=${encodeURIComponent(pathname || '')}`;
+    }
+
+    // 2. Trying to access an AUTH page (e.g., /signin, /register) WITH a user
+    if (pageType === 'auth' && currentUser) {
+      console.log("[AuthWrapper] Accessing auth route with user. Redirecting to home (or /generate).");
+      shouldRedirect = true;
+      // Redirect to a default logged-in page, e.g., /generate or /
+      redirectTarget = '/generate'; // Or maybe just '/' depending on desired flow
+    }
+
+    // Execute redirect if needed and not already redirecting
+    if (shouldRedirect && redirectTarget && !isRedirecting) {
+        console.log(`[AuthWrapper] Triggering redirect to: ${redirectTarget}`);
+        setIsRedirecting(true);
+        // Use router.replace for client-side navigation
+        router.replace(redirectTarget);
+    }
+
+  }, [authLoading, currentUser, pageType, router, pathname, isRedirecting]);
+
+  // --- Render Logic --- 
+
+  // Show loader if auth is loading OR if we are actively redirecting
+  if (authLoading || isRedirecting) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {redirecting ? 'Redirecting...' : 'Verifying Access...'}
+            {isRedirecting ? 'Redirecting...' : 'Loading...'}
           </p>
         </div>
       </div>
     );
   }
 
-  // If authenticated, hit safety timeout, or auth not required, show content
-  if (currentUser || forceShow || !redirectIfNotAuthenticated) {
-    console.log('[AuthWrapper] Showing content because:', 
-      currentUser ? 'user is authenticated' : 
-      forceShow ? 'safety timeout hit' : 
-      'auth not required');
-    // Return children even if redirecting is true, to avoid flash
-    return <>{children}</>;
-  }
-
-  // Show redirect loading state
-  return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
-      <div className="flex flex-col items-center space-y-4">
-        <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
-        <p className="text-sm text-gray-500 dark:text-gray-400">Redirecting...</p>
-      </div>
-    </div>
-  );
+  // If we reach here, auth is resolved and no redirection is needed *for this state*
+  // Render the children
+  // Example: If on protected page, currentUser MUST exist by now.
+  // Example: If on auth page, currentUser MUST NOT exist by now.
+  // Example: If on public page, render regardless of user state.
+  return <>{children}</>;
 }
 
 // Fallback for Suspense
@@ -211,23 +94,20 @@ function AuthWrapperFallback() {
     <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-950">
       <div className="flex flex-col items-center space-y-4">
         <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
-        <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading Page...</p>
       </div>
     </div>
   );
 }
 
+// Export the main wrapper component
 export default function AuthWrapper({
   children,
-  redirectIfNotAuthenticated = true,
-  redirectTo = '/signin'
+  pageType
 }: AuthWrapperProps) {
   return (
     <Suspense fallback={<AuthWrapperFallback />}>
-      <AuthWrapperContent
-        redirectIfNotAuthenticated={redirectIfNotAuthenticated}
-        redirectTo={redirectTo}
-      >
+      <AuthWrapperContent pageType={pageType}>
         {children}
       </AuthWrapperContent>
     </Suspense>
