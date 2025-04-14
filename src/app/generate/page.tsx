@@ -342,7 +342,11 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
             } else if (status === 429) { // Rate limit
                  errorMessage = "Rate limit exceeded. Please try again later.";
             } else if (errorData?.error) {
-                errorMessage = `Failed to generate recipes: ${errorData.error}`; 
+                errorMessage = `Failed to generate recipes: ${
+                  typeof errorData.error === 'string'
+                    ? errorData.error
+                    : JSON.stringify(errorData.error)
+                }`;
             }
         } else if (axiosError.request) {
             console.error("API No Response:", axiosError.request);
