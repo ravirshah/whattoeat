@@ -119,7 +119,7 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
   useEffect(() => {
     return () => {
       if (recognitionRef.current && listening) {
-        try { recognitionRef.current.stop(); } catch (e) { /* ignore */ }
+        try { (recognitionRef.current as any).stop(); } catch (e) { /* ignore */ }
       }
     };
   }, [listening]);
@@ -133,11 +133,14 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
   const removeStaple = (index: number) => { /* ... */ };
   const addDietaryPref = () => { /* ... */ };
   const removeDietaryPref = (index: number) => { /* ... */ };
-  const capitalizeFirstLetter = (string: string): string => { /* ... */ };
-  const startVoiceRecognition = () => { /* ... */ };
-  const stopVoiceRecognition = () => { /* ... */ };
-  const parseItemsFromText = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string[] => { /* ... */ };
-  const cleanItem = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string => { /* ... */ };
+  const capitalizeFirstLetter = (string: string): string => {
+    if (!string) return '';
+    return string.charAt(0).toUpperCase() + string.slice(1);
+  };
+  const startVoiceRecognition = (): void => {};
+  const stopVoiceRecognition = (): void => {};
+  const parseItemsFromText = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string[] => { return []; };
+  const cleanItem = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string => { return text; };
   const addCommonItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary') => { /* ... */ };
 
   // Navigation functions
@@ -440,7 +443,18 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
                              className="mb-3"
                              disabled={generating}
                            />
-                           {/* ... rest of case 5 content, add disabled={generating} to buttons ... */}
+                           <select
+                             id="difficulty"
+                             value={difficulty}
+                             onChange={(e) => setDifficulty(e.target.value as 'Easy' | 'Medium' | 'Hard' | '')}
+                             disabled={generating}
+                             className="mb-3"
+                           >
+                             <option value="">Select difficulty</option>
+                             <option value="Easy">Easy</option>
+                             <option value="Medium">Medium</option>
+                             <option value="Hard">Hard</option>
+                           </select>
                          </div>
                          {/* ... other sections for cook time, difficulty ... */} 
                      </CardContent>
@@ -565,7 +579,7 @@ export default function GenerateRecipesPage() {
   // Render logic
   return (
     // AuthWrapper handles redirecting if user is required but not logged in
-    <AuthWrapper loading={authLoading}> 
+    <AuthWrapper pageType="protected"> 
       <MainLayout>
         {/* Show loader ONLY while preferences are loading (after auth is ready) */} 
         {authLoading || (loadingPrefs && currentUser) ? (
@@ -578,7 +592,7 @@ export default function GenerateRecipesPage() {
         ) : errorPrefs ? (
           // Show non-blocking error if preferences failed, but still render the form with defaults
           <div className="container mx-auto px-4 py-8 max-w-4xl">
-            <Alert variant="warning" className="mb-4">
+            <Alert variant="destructive" className="mb-4">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>{errorPrefs}</AlertDescription>
             </Alert>
