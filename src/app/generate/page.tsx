@@ -51,12 +51,22 @@ interface SpeechRecognition extends EventTarget { /* ... */ }
 interface SpeechRecognitionEvent extends Event { /* ... */ }
 interface SpeechRecognitionErrorEvent extends Event { /* ... */ }
 
-// Common preset options (assuming these are defined correctly)
-const COMMON_INGREDIENTS = ['Chicken', 'Rice', 'Pasta', /* ... */ ];
-const COMMON_EQUIPMENT = ['Oven', 'Stovetop', 'Microwave', /* ... */ ];
-const COMMON_STAPLES = ['Salt', 'Pepper', 'Olive Oil', /* ... */ ];
-const COMMON_DIETARY_PREFS = ['Vegetarian', 'Vegan', 'Gluten-Free', /* ... */ ];
-const POPULAR_CUISINES = ['Italian', 'Chinese', 'Mexican', /* ... */ ];
+// Common preset options (fully expanded)
+const COMMON_INGREDIENTS = [
+  'Chicken', 'Rice', 'Pasta', 'Potatoes', 'Onions', 'Garlic', 'Tomatoes', 'Eggs', 'Beef', 'Pork', 'Carrots', 'Bell Peppers', 'Broccoli', 'Spinach', 'Mushrooms', 'Beans', 'Cheese', 'Milk', 'Yogurt', 'Apples', 'Bananas', 'Lemon', 'Bread', 'Fish', 'Shrimp', 'Corn', 'Peas', 'Cabbage', 'Zucchini', 'Cucumber', 'Avocado', 'Lettuce', 'Sausage', 'Turkey', 'Tofu', 'Lentils', 'Chickpeas', 'Sweet Potato', 'Cauliflower', 'Celery', 'Green Beans', 'Pumpkin', 'Eggplant', 'Bacon', 'Ham', 'Salmon', 'Tuna', 'Basil', 'Parsley', 'Cilantro', 'Chili Peppers', 'Ginger', 'Lime', 'Orange', 'Pear', 'Grapes', 'Strawberries', 'Blueberries', 'Raspberries', 'Pineapple', 'Mango', 'Coconut', 'Walnuts', 'Almonds', 'Peanuts', 'Cashews', 'Sunflower Seeds', 'Pumpkin Seeds', 'Oats', 'Quinoa', 'Barley', 'Couscous', 'Polenta', 'Sour Cream', 'Cream Cheese', 'Feta', 'Mozzarella', 'Parmesan', 'Goat Cheese', 'Ricotta', 'Sardines', 'Anchovies', 'Clams', 'Mussels', 'Crab', 'Lobster', 'Duck', 'Venison', 'Lamb', 'Artichoke', 'Asparagus', 'Brussels Sprouts', 'Radish', 'Turnip', 'Leek', 'Shallot', 'Scallion', 'Kale', 'Arugula', 'Swiss Chard', 'Endive', 'Watercress', 'Okra', 'Bok Choy', 'Napa Cabbage', 'Daikon', 'Jicama', 'Fennel', 'Beet', 'Parsnip', 'Rutabaga', 'Horseradish', 'Wasabi', 'Seaweed', 'Nori', 'Kimchi', 'Sauerkraut', 'Pickles', 'Capers', 'Olives', 'Sun-dried Tomatoes', 'Roasted Red Peppers', 'Pesto', 'Tapenade', 'Hummus', 'Tahini', 'Miso', 'Tempeh', 'Seitan', 'Edamame', 'Soybeans', 'Black Beans', 'Kidney Beans', 'Pinto Beans', 'White Beans', 'Navy Beans', 'Great Northern Beans', 'Cannellini Beans', 'Lima Beans', 'Butter Beans', 'Split Peas', 'Green Peas', 'Snow Peas', 'Sugar Snap Peas', 'Chard', 'Collard Greens', 'Mustard Greens', 'Turnip Greens', 'Dandelion Greens', 'Purslane', 'Sorrel', 'Chicory', 'Radicchio', 'Escarole', 'Frisée', 'Mâche', 'Mesclun', 'Sprouts', 'Microgreens', 'Herbs', 'Spices', 'Other'
+];
+const COMMON_EQUIPMENT = [
+  'Oven', 'Stovetop', 'Microwave', 'Blender', 'Food Processor', 'Slow Cooker', 'Air Fryer', 'Pressure Cooker', 'Grill', 'Toaster', 'Hand Mixer', 'Stand Mixer', 'Dutch Oven', 'Cast Iron Pan', 'Non-Stick Pan', 'Baking Sheet', 'Saucepan', 'Stockpot', 'Wok', 'Rice Cooker', 'Bread Maker', 'Coffee Maker', 'Espresso Machine', 'Kettle', 'Deep Fryer', 'Sous Vide', 'Immersion Blender', 'Juicer', 'Ice Cream Maker', 'Pizza Stone', 'Mandoline', 'Spiralizer', 'Salad Spinner', 'Colander', 'Sieve', 'Grater', 'Peeler', 'Can Opener', 'Bottle Opener', 'Corkscrew', 'Rolling Pin', 'Measuring Cups', 'Measuring Spoons', 'Thermometer', 'Timer', 'Scale', 'Tongs', 'Whisk', 'Ladle', 'Slotted Spoon', 'Spatula', 'Wooden Spoon', 'Cutting Board', 'Knife Set', 'Paring Knife', 'Chef Knife', 'Bread Knife', 'Carving Knife', 'Cleaver', 'Boning Knife', 'Fillet Knife', 'Utility Knife', 'Peeling Knife', 'Scissors', 'Kitchen Shears', 'Mortar and Pestle', 'Garlic Press', 'Zester', 'Melon Baller', 'Apple Corer', 'Egg Slicer', 'Ice Cream Scoop', 'Pizza Cutter', 'Pastry Brush', 'Baster', 'Turkey Lifter', 'Trussing Needle', 'Skewers', 'Grill Pan', 'Griddle', 'Waffle Iron', 'Crepe Pan', 'Tart Pan', 'Springform Pan', 'Bundt Pan', 'Loaf Pan', 'Muffin Tin', 'Pie Dish', 'Casserole Dish', 'Ramekin', 'Souffle Dish', 'Baking Dish', 'Roasting Pan', 'Broiler Pan', 'Sheet Pan', 'Cooling Rack', 'Wire Rack', 'Other'
+];
+const COMMON_STAPLES = [
+  'Salt', 'Pepper', 'Olive Oil', 'Vegetable Oil', 'Flour', 'Sugar', 'Brown Sugar', 'Butter', 'Soy Sauce', 'Vinegar', 'Rice Vinegar', 'Honey', 'Maple Syrup', 'Pasta Sauce', 'Canned Tomatoes', 'Canned Beans', 'Broth', 'Spices', 'Hot Sauce', 'Mustard', 'Ketchup', 'Mayonnaise', 'Cornstarch', 'Baking Powder', 'Baking Soda', 'Yeast', 'Cocoa Powder', 'Chocolate Chips', 'Peanut Butter', 'Jam', 'Jelly', 'Pickles', 'Relish', 'Worcestershire Sauce', 'Fish Sauce', 'Sesame Oil', 'Coconut Oil', 'Shortening', 'Lard', 'Molasses', 'Syrup', 'Lemon Juice', 'Lime Juice', 'Bouillon Cubes', 'Stock', 'Evaporated Milk', 'Condensed Milk', 'Powdered Milk', 'Non-Dairy Milk', 'Oats', 'Rice', 'Quinoa', 'Barley', 'Couscous', 'Polenta', 'Breadcrumbs', 'Crackers', 'Cereal', 'Granola', 'Nuts', 'Seeds', 'Dried Fruit', 'Raisins', 'Cranberries', 'Apricots', 'Dates', 'Prunes', 'Other'
+];
+const COMMON_DIETARY_PREFS = [
+  'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Low-Carb', 'Keto', 'Paleo', 'Nut-Free', 'Low-Sugar', 'Low-Sodium', 'Pescatarian', 'High-Protein', 'Halal', 'Kosher', 'No Pork', 'No Shellfish', 'No Red Meat', 'Other'
+];
+const POPULAR_CUISINES = [
+  'Italian', 'Chinese', 'Mexican', 'Indian', 'Japanese', 'Thai', 'American', 'French', 'Mediterranean', 'Korean', 'Vietnamese', 'Spanish', 'Greek', 'Turkish', 'Moroccan', 'Ethiopian', 'Brazilian', 'Caribbean', 'German', 'Russian', 'Polish', 'Swedish', 'British', 'Irish', 'Lebanese', 'Persian', 'Israeli', 'Egyptian', 'South African', 'Australian', 'Other'
+];
 const COOK_TIMES = ['Under 30 mins', 'Under 1 hour', '1 hour+'];
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 
@@ -125,14 +135,46 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
   }, [listening]);
   
   // Add/remove/parse/clean functions (assumed correct, keeping them as is for brevity)
-  const addIngredient = () => { /* ... */ };
-  const removeIngredient = (index: number) => { /* ... */ };
-  const addEquipment = () => { /* ... */ };
-  const removeEquipment = (index: number) => { /* ... */ };
-  const addStaple = () => { /* ... */ };
-  const removeStaple = (index: number) => { /* ... */ };
-  const addDietaryPref = () => { /* ... */ };
-  const removeDietaryPref = (index: number) => { /* ... */ };
+  const addIngredient = () => {
+    const value = newIngredient.trim();
+    if (value && !ingredients.includes(value)) {
+      setIngredients([...ingredients, value]);
+      setNewIngredient('');
+    }
+  };
+  const removeIngredient = (index: number) => {
+    setIngredients(ingredients.filter((_, i) => i !== index));
+  };
+  const addEquipment = () => {
+    const value = newEquipment.trim();
+    if (value && !equipment.includes(value)) {
+      setEquipment([...equipment, value]);
+      setNewEquipment('');
+    }
+  };
+  const removeEquipment = (index: number) => {
+    setEquipment(equipment.filter((_, i) => i !== index));
+  };
+  const addStaple = () => {
+    const value = newStaple.trim();
+    if (value && !staples.includes(value)) {
+      setStaples([...staples, value]);
+      setNewStaple('');
+    }
+  };
+  const removeStaple = (index: number) => {
+    setStaples(staples.filter((_, i) => i !== index));
+  };
+  const addDietaryPref = () => {
+    const value = newDietaryPref.trim();
+    if (value && !dietaryPrefs.includes(value)) {
+      setDietaryPrefs([...dietaryPrefs, value]);
+      setNewDietaryPref('');
+    }
+  };
+  const removeDietaryPref = (index: number) => {
+    setDietaryPrefs(dietaryPrefs.filter((_, i) => i !== index));
+  };
   const capitalizeFirstLetter = (string: string): string => {
     if (!string) return '';
     return string.charAt(0).toUpperCase() + string.slice(1);
@@ -141,7 +183,22 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
   const stopVoiceRecognition = (): void => {};
   const parseItemsFromText = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string[] => { return []; };
   const cleanItem = (text: string, category: 'ingredients' | 'equipment' | 'staples'): string => { return text; };
-  const addCommonItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary') => { /* ... */ };
+  const addCommonItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary') => {
+    switch (category) {
+      case 'ingredients':
+        if (!ingredients.includes(item)) setIngredients([...ingredients, item]);
+        break;
+      case 'equipment':
+        if (!equipment.includes(item)) setEquipment([...equipment, item]);
+        break;
+      case 'staples':
+        if (!staples.includes(item)) setStaples([...staples, item]);
+        break;
+      case 'dietary':
+        if (!dietaryPrefs.includes(item)) setDietaryPrefs([...dietaryPrefs, item]);
+        break;
+    }
+  };
 
   // Navigation functions
   const nextStep = async () => {
@@ -410,55 +467,212 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
               );
             
             case 2:
-                 return (
-                    <CardContent className="space-y-6">
-                        {/* Similar structure for Equipment, ensure disabled={generating} */} 
-                    </CardContent>
-                 ); // Placeholder - copy structure from case 1 and adapt
+              return (
+                <CardContent className="space-y-6">
+                  <div>
+                    <label htmlFor="equipment" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      What equipment do you have?
+                    </label>
+                    <div className="flex gap-2 mb-3">
+                      <Input
+                        id="equipment"
+                        placeholder="Add equipment..."
+                        value={newEquipment}
+                        onChange={(e) => setNewEquipment(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && addEquipment()}
+                        disabled={generating}
+                      />
+                      <Button onClick={addEquipment} disabled={generating}>
+                        <Plus className="h-4 w-4 mr-1" /> Add
+                      </Button>
+                    </div>
+                    <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Common Equipment</h4>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {COMMON_EQUIPMENT.map((item) => (
+                        <Button
+                          key={item}
+                          variant={equipment.includes(item) ? 'secondary' : 'outline'}
+                          size="sm"
+                          onClick={() => addCommonItem(item, 'equipment')}
+                          disabled={generating}
+                        >
+                          {item}
+                        </Button>
+                      ))}
+                    </div>
+                    <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Your Equipment ({equipment.length})</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {equipment.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">No equipment added yet</p>
+                      ) : (
+                        equipment.map((item, index) => (
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+                          >
+                            {item}
+                            {!generating && (
+                              <X
+                                className="ml-1 h-3 w-3 cursor-pointer rounded-full hover:bg-gray-300 dark:hover:bg-gray-600"
+                                onClick={() => removeEquipment(index)}
+                              />
+                            )}
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              );
             case 3:
-                 return (
-                     <CardContent className="space-y-6">
-                         {/* Similar structure for Staples, ensure disabled={generating} */} 
-                     </CardContent>
-                  ); // Placeholder
+              return (
+                <CardContent className="space-y-6">
+                  <div>
+                    <label htmlFor="staple" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      What pantry staples do you have?
+                    </label>
+                    <div className="flex gap-2 mb-3">
+                      <Input
+                        id="staple"
+                        placeholder="Add a staple..."
+                        value={newStaple}
+                        onChange={(e) => setNewStaple(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && addStaple()}
+                        disabled={generating}
+                      />
+                      <Button onClick={addStaple} disabled={generating}>
+                        <Plus className="h-4 w-4 mr-1" /> Add
+                      </Button>
+                    </div>
+                    <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Common Staples</h4>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {COMMON_STAPLES.map((item) => (
+                        <Button
+                          key={item}
+                          variant={staples.includes(item) ? 'secondary' : 'outline'}
+                          size="sm"
+                          onClick={() => addCommonItem(item, 'staples')}
+                          disabled={generating}
+                        >
+                          {item}
+                        </Button>
+                      ))}
+                    </div>
+                    <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Your Staples ({staples.length})</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {staples.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">No staples added yet</p>
+                      ) : (
+                        staples.map((item, index) => (
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+                          >
+                            {item}
+                            {!generating && (
+                              <X
+                                className="ml-1 h-3 w-3 cursor-pointer rounded-full hover:bg-gray-300 dark:hover:bg-gray-600"
+                                onClick={() => removeStaple(index)}
+                              />
+                            )}
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              );
             case 4:
-                 return (
-                    <CardContent className="space-y-6">
-                        {/* Similar structure for Dietary Prefs, ensure disabled={generating} */} 
-                    </CardContent>
-                 ); // Placeholder
+              return (
+                <CardContent className="space-y-6">
+                  <div>
+                    <label htmlFor="dietary" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Any dietary preferences or restrictions?
+                    </label>
+                    <div className="flex gap-2 mb-3">
+                      <Input
+                        id="dietary"
+                        placeholder="Add a dietary preference..."
+                        value={newDietaryPref}
+                        onChange={(e) => setNewDietaryPref(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && addDietaryPref()}
+                        disabled={generating}
+                      />
+                      <Button onClick={addDietaryPref} disabled={generating}>
+                        <Plus className="h-4 w-4 mr-1" /> Add
+                      </Button>
+                    </div>
+                    <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Common Dietary Preferences</h4>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {COMMON_DIETARY_PREFS.map((item) => (
+                        <Button
+                          key={item}
+                          variant={dietaryPrefs.includes(item) ? 'secondary' : 'outline'}
+                          size="sm"
+                          onClick={() => addCommonItem(item, 'dietary')}
+                          disabled={generating}
+                        >
+                          {item}
+                        </Button>
+                      ))}
+                    </div>
+                    <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Your Preferences ({dietaryPrefs.length})</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {dietaryPrefs.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">No preferences added yet</p>
+                      ) : (
+                        dietaryPrefs.map((item, index) => (
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+                          >
+                            {item}
+                            {!generating && (
+                              <X
+                                className="ml-1 h-3 w-3 cursor-pointer rounded-full hover:bg-gray-300 dark:hover:bg-gray-600"
+                                onClick={() => removeDietaryPref(index)}
+                              />
+                            )}
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              );
             case 5:
-                 return (
-                    <CardContent className="space-y-8">
-                        {/* Structure for Cuisine, Cook Time, Difficulty - ensure inputs/buttons are disabled={generating} */} 
-                         <div>
-                           <label htmlFor="cuisine" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                             Cuisine Preference (Optional)
-                           </label>
-                           <Input
-                             id="cuisine"
-                             placeholder="e.g., Italian, Mexican, Any"
-                             value={cuisine}
-                             onChange={(e) => setCuisine(e.target.value)}
-                             className="mb-3"
-                             disabled={generating}
-                           />
-                           <select
-                             id="difficulty"
-                             value={difficulty}
-                             onChange={(e) => setDifficulty(e.target.value as 'Easy' | 'Medium' | 'Hard' | '')}
-                             disabled={generating}
-                             className="mb-3"
-                           >
-                             <option value="">Select difficulty</option>
-                             <option value="Easy">Easy</option>
-                             <option value="Medium">Medium</option>
-                             <option value="Hard">Hard</option>
-                           </select>
-                         </div>
-                         {/* ... other sections for cook time, difficulty ... */} 
-                     </CardContent>
-                  ); // Placeholder
+              return (
+                <CardContent className="space-y-8">
+                  <div>
+                    <label htmlFor="cuisine" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Cuisine Preference (Optional)
+                    </label>
+                    <Input
+                      id="cuisine"
+                      placeholder="e.g., Italian, Mexican, Any"
+                      value={cuisine}
+                      onChange={(e) => setCuisine(e.target.value)}
+                      className="mb-3"
+                      disabled={generating}
+                    />
+                    <select
+                      id="difficulty"
+                      value={difficulty}
+                      onChange={(e) => setDifficulty(e.target.value as 'Easy' | 'Medium' | 'Hard' | '')}
+                      disabled={generating}
+                      className="mb-3"
+                    >
+                      <option value="">Select difficulty</option>
+                      <option value="Easy">Easy</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Hard">Hard</option>
+                    </select>
+                  </div>
+                </CardContent>
+              );
             default:
               return null;
           }
