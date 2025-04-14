@@ -1,304 +1,138 @@
 // src/lib/context/AuthContext.tsx
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+  useCallback,
+  useRef // Import useRef
+} from 'react';
 import { onAuthStateChanged, User, getAuth } from 'firebase/auth';
 import { auth } from '../firebase'; // Assuming 'auth' is correctly initialized
 
-// --- Global State Management --- 
-
-// State stored outside React lifecycle
-let globalUser: User | null = null;
-let globalInitialAuthCheckComplete = false; 
-
-// Simple Pub/Sub for notifying React components
-const authSubscribers = new Set<() => void>();
-
-function notifyAuthSubscribers() {
-  console.log(`[AuthContext-Global] Notifying ${authSubscribers.size} subscribers.`);
-  authSubscribers.forEach(callback => callback());
-}
-
-// Export function to manually set the global user
-// This is used by auth.ts for Google sign-in
-export function setGlobalAuthUser(user: User | null) {
-  console.log("[AuthContext-Global] setGlobalAuthUser called:", user ? `User ID: ${user.uid}` : "No user");
-  
-  // Update the global variables
-  globalUser = user;
-  globalInitialAuthCheckComplete = true; // Also mark auth check as complete when manually setting user
-  
-  // Save to localStorage for persistence
-  if (typeof window !== 'undefined') {
-    try {
-      if (user) {
-        // We can't store the full user object, so just store basic info for detection
-        localStorage.setItem('whattoeat_user', JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          timestamp: Date.now()
-        }));
-        console.log("[AuthContext-Global] Saved user data to localStorage");
-      } else {
-        localStorage.removeItem('whattoeat_user');
-        console.log("[AuthContext-Global] Removed user data from localStorage");
-      }
-    } catch (e) {
-      console.error("[AuthContext-Global] Error accessing localStorage:", e);
-    }
-  }
-  
-  // Make sure we notify all subscribers to update their state
-  console.log("[AuthContext-Global] Explicitly notifying all subscribers after manual auth update");
-  notifyAuthSubscribers();
-  
-  // If we're in the browser, also force a token refresh to ensure tokens are fresh
-  if (typeof window !== 'undefined' && user) {
-    user.getIdToken(true)
-      .then(token => console.log("[AuthContext-Global] Successfully refreshed token after manual auth update, length:", token.length))
-      .catch(err => console.error("[AuthContext-Global] Error refreshing token after manual auth update:", err));
-  }
-}
-
-// Immediately try to get the current user synchronously
-// This helps avoid flashes of unauthenticated content
-try {
-  const currentUser = auth.currentUser;
-  if (currentUser) {
-    console.log("[AuthContext-Global] Detected synchronous currentUser:", currentUser.uid);
-    globalUser = currentUser;
-    // We don't set globalInitialAuthCheckComplete yet because we still need the async check
-  }
-} catch (e) {
-  console.error("[AuthContext-Global] Error accessing auth.currentUser:", e);
-}
-
-// Use a flag to track if we're on the initial render or not
-let isFirstRender = true;
-
-// Attempt to get a fresher token on startup
-try {
-  if (typeof window !== 'undefined' && auth.currentUser) {
-    console.log("[AuthContext-Global] Attempting to get fresher token on initialization");
-    auth.currentUser.getIdToken(true)
-      .then(() => console.log("[AuthContext-Global] Successfully refreshed token on initialization"))
-      .catch(err => console.error("[AuthContext-Global] Failed to refresh token on initialization:", err));
-  }
-} catch (e) {
-  console.error("[AuthContext-Global] Error during token refresh attempt:", e);
-}
-
-// Attach the listener *once* globally
-console.log("[AuthContext-Global] Setting up global onAuthStateChanged listener...");
-onAuthStateChanged(auth, 
-  (user) => {
-    // Success callback
-    console.log("[AuthContext-Global] Listener success callback executed.", user ? `User ID: ${user.uid}` : "No user");
-    globalUser = user;
-    
-    if (!globalInitialAuthCheckComplete) {
-      console.log("[AuthContext-Global] Initial auth check complete.");
-      globalInitialAuthCheckComplete = true;
-      
-      // If this is the first render and we're in the browser, use a small timeout
-      // to ensure subscribers have had a chance to register
-      if (isFirstRender && typeof window !== 'undefined') {
-        isFirstRender = false;
-        console.log("[AuthContext-Global] First render detected, delaying notification to allow subscribers to register");
-        setTimeout(() => {
-          console.log("[AuthContext-Global] Delayed notification triggered");
-          notifyAuthSubscribers();
-        }, 100);
-        return; // Don't notify immediately
-      }
-    }
-    
-    notifyAuthSubscribers();
-  },
-  (error) => {
-    // Error callback
-    console.error("[AuthContext-Global] Listener error callback executed:", error);
-    globalUser = null;
-    
-    if (!globalInitialAuthCheckComplete) {
-      console.log("[AuthContext-Global] Initial auth check complete (due to error).");
-      globalInitialAuthCheckComplete = true;
-    }
-    
-    notifyAuthSubscribers();
-  }
-);
-console.log("[AuthContext-Global] Global listener attached.");
-
-// Set a timeout to force complete the auth check if it takes too long
-setTimeout(() => {
-  if (!globalInitialAuthCheckComplete) {
-    console.log("[AuthContext-Global] Forcing initial auth check completion after timeout");
-    globalInitialAuthCheckComplete = true;
-    notifyAuthSubscribers();
-  }
-}, 3000); // 3 second timeout
-
-// --- React Context --- 
-
+// Define the shape of the context data
 interface AuthContextType {
   currentUser: User | null;
-  loading: boolean; // True until globalInitialAuthCheckComplete is true
-  refreshUser: () => Promise<User | null>; // Function to manually refresh user state
+  loading: boolean; // True while checking initial auth state
+  refreshUserToken: () => Promise<string | null>; // Function to manually refresh user token
 }
 
+// Create the context with default values
 const AuthContext = createContext<AuthContextType>({
-  currentUser: globalUser, // Initial value from global
-  loading: !globalInitialAuthCheckComplete, // Initial value from global
-  refreshUser: async () => null,
+  currentUser: null,
+  loading: true,
+  refreshUserToken: async () => null,
 });
 
+// Custom hook to use the AuthContext
 export const useAuth = () => useContext(AuthContext);
 
 console.log("[AuthContext] React Module loaded.");
 
-/**
- * Force refreshes the current user from Firebase auth
- * Useful when there might be a discrepancy between global state and Firebase
- */
-async function refreshCurrentUser(): Promise<User | null> {
-  try {
-    console.log("[AuthContext] Refreshing current user");
-    // Force auth to refresh
-    const auth = getAuth();
-    
-    // Wait for auth state to be ready
-    console.log("[AuthContext] Waiting for auth state to be ready");
-    await auth.authStateReady();
-    const freshUser = auth.currentUser;
-    
-    // Check if the user exists but might not match global state
-    const needsGlobalUpdate = (freshUser && !globalUser) || 
-                              (!freshUser && globalUser) || 
-                              (freshUser && globalUser && freshUser.uid !== globalUser.uid);
-    
-    if (freshUser) {
-      // Log user details for debugging
-      console.log(`[AuthContext] Current user found: ${freshUser.uid}, email: ${freshUser.email}, display name: ${freshUser.displayName || 'not set'}`);
-      console.log(`[AuthContext] User verified: ${freshUser.emailVerified}, provider: ${freshUser.providerId || 'unknown'}`);
-      
-      try {
-        // Also refresh the token to ensure it's up-to-date
-        console.log("[AuthContext] Refreshing token for user:", freshUser.uid);
-        const token = await freshUser.getIdToken(true);
-        console.log("[AuthContext] Token refreshed successfully, length:", token.length);
-      } catch (tokenError) {
-        console.error("[AuthContext] Error refreshing token:", tokenError);
-        // Continue anyway
-      }
-      
-      try {
-        // Also reload the user to ensure we have latest profile info
-        await freshUser.reload();
-        console.log("[AuthContext] User profile reloaded");
-      } catch (reloadError) {
-        console.error("[AuthContext] Error reloading user profile:", reloadError);
-        // Continue anyway
-      }
-    } else {
-      console.log("[AuthContext] No current user found");
-    }
-    
-    // Update global state if needed
-    if (needsGlobalUpdate) {
-      console.log("[AuthContext] Detected auth state mismatch, updating global state");
-      setGlobalAuthUser(freshUser);
-    } else if (freshUser) {
-      // Even if no mismatch, notify subscribers to ensure UI updates
-      console.log("[AuthContext] No state mismatch, but notifying subscribers anyway to refresh UI");
-      notifyAuthSubscribers();
-    }
-    
-    return freshUser;
-  } catch (e) {
-    console.error("[AuthContext] Error refreshing user:", e);
-    return null;
-  }
-}
-
+// AuthProvider component that wraps the application
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  // React state, initialized from global state
-  const [currentUser, setCurrentUser] = useState<User | null>(globalUser);
-  const [loading, setLoading] = useState<boolean>(!globalInitialAuthCheckComplete);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState<boolean>(true); // Start as loading
+  const listenerAttached = useRef(false); // Prevent duplicate listeners
 
-  // Function to manually refresh user state
-  const refreshUser = async () => {
-    const user = await refreshCurrentUser();
-    return user;
+  // Function to manually refresh the ID token
+  const refreshUserToken = useCallback(async (): Promise<string | null> => {
+    // Add extra check for auth object readiness
+    if (!auth) {
+        console.warn("[AuthContext] refreshUserToken called before auth initialized.");
+        return null;
+    }
+    const user = auth.currentUser;
+    if (user) {
+      try {
+        console.log("[AuthContext] Forcing token refresh for user:", user.uid);
+        const token = await user.getIdToken(true); // Force refresh
+        console.log("[AuthContext] Token refreshed successfully.");
+        return token;
+      } catch (error: any) {
+        console.error("[AuthContext] Error refreshing token:", error);
+        // Sign out the user if token refresh fails significantly (e.g., user deleted, disabled)
+        if (error.code === 'auth/user-token-expired' || error.code === 'auth/user-disabled' || error.code === 'auth/user-not-found') {
+             console.warn("[AuthContext] Signing out due to token refresh error:", error.code);
+             await auth.signOut();
+             setCurrentUser(null); // Update state immediately
+        }
+        return null;
+      }
+    }
+    console.log("[AuthContext] refreshUserToken called but no user was found.");
+    return null;
+  }, []);
+
+  useEffect(() => {
+    // Ensure listener is attached only once
+    if (listenerAttached.current || !auth) return;
+    listenerAttached.current = true;
+
+    console.log("[AuthContext] Setting up onAuthStateChanged listener...");
+
+    // Subscribe to Firebase auth state changes
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (user) => {
+        // Auth state changed
+        console.log("[AuthContext] >>> onAuthStateChanged CALLBACK START <<<");
+        console.log("[AuthContext] Listener triggered. Received user:", user ? user.uid : "null");
+
+        setCurrentUser(user); // Update the user state
+        console.log("[AuthContext] currentUser state updated in context.");
+
+        setLoading(false); // Set loading to false *after* setting user
+        console.log("[AuthContext] loading state set to FALSE in context.");
+        console.log("[AuthContext] >>> onAuthStateChanged CALLBACK END <<<");
+      },
+      (error) => {
+        // Handle errors during listener setup or operation
+        console.error("[AuthContext] XXX Error in onAuthStateChanged listener XXX:", error);
+        setCurrentUser(null);
+        setLoading(false); // Ensure loading is false even on error
+        console.log("[AuthContext] Set loading to FALSE due to listener error.");
+      }
+    );
+
+    console.log("[AuthContext] onAuthStateChanged listener setup complete.");
+
+    // Cleanup: Unsubscribe from the listener when the component unmounts
+    return () => {
+      console.log("[AuthContext] Unsubscribing from onAuthStateChanged listener.");
+      unsubscribe();
+      listenerAttached.current = false;
+    };
+    // Intentionally keeping dependencies minimal for the listener setup itself.
+    // refreshUserToken is stable due to useCallback.
+  }, []); // Run only once on mount
+
+  // Value provided by the context
+  const value = {
+    currentUser,
+    loading,
+    refreshUserToken,
   };
 
-  useEffect(() => {
-    // This function will run whenever the global state changes (via notification)
-    const handleAuthChange = () => {
-      console.log("[AuthContext-Provider] handleAuthChange triggered by notification.");
-      console.log("[AuthContext-Provider] Global state:", globalUser ? `User ID: ${globalUser.uid}` : "No user", "Loading:", !globalInitialAuthCheckComplete);
-      
-      // Update React state from global state
-      setCurrentUser(globalUser);
-      setLoading(!globalInitialAuthCheckComplete); 
-    };
+  // Logging provider state on re-render
+  // console.log(`[AuthContext-Provider] Rendering - Loading: ${loading}, User: ${currentUser?.uid ?? 'null'}`);
 
-    // Initial sync on mount, in case global state changed between module load and mount
-    handleAuthChange(); 
-
-    // Subscribe to future changes
-    console.log("[AuthContext-Provider] Subscribing to global notifications.");
-    authSubscribers.add(handleAuthChange);
-
-    // Cleanup: Unsubscribe on unmount
-    return () => {
-      console.log("[AuthContext-Provider] Unsubscribing from global notifications.");
-      authSubscribers.delete(handleAuthChange);
-    };
-  }, []); // Run subscription effect only once on mount
-
-  // Check for persisted user on page load/refresh
-  useEffect(() => {
-    const checkPersistedUser = async () => {
-      if (!currentUser) {
-        console.log("[AuthContext-Provider] No user in state, checking for persisted user");
-        
-        // First check localStorage
-        if (typeof window !== 'undefined') {
-          try {
-            const storedUser = localStorage.getItem('whattoeat_user');
-            if (storedUser) {
-              const userData = JSON.parse(storedUser);
-              console.log(`[AuthContext-Provider] Found user in localStorage: ${userData.uid}`);
-              
-              // If we find a stored user but no current user, force a refresh of the auth state
-              const refreshedUser = await refreshUser();
-              if (refreshedUser) {
-                console.log(`[AuthContext-Provider] Successfully loaded user from refresh: ${refreshedUser.uid}`);
-                return;
-              } else {
-                console.log(`[AuthContext-Provider] Could not load user from refresh despite localStorage data`);
-                // Clear possibly stale localStorage data
-                localStorage.removeItem('whattoeat_user');
-              }
-            }
-          } catch (e) {
-            console.error('[AuthContext-Provider] Error checking localStorage:', e);
-          }
-        }
-        
-        // If no user in localStorage or failed to load, try normal refresh
-        await refreshUser();
-      }
-    };
-    
-    checkPersistedUser();
-  }, []); // Only run once on mount
-
-  const value = { currentUser, loading, refreshUser };
-
-  console.log(`[AuthContext-Provider] Rendering - Loading: ${loading}, User: ${!!currentUser}`);
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
+
+// Export function to get the current user directly (useful outside components, e.g., API routes)
+export const getCurrentUser = (): User | null => {
+  return auth?.currentUser ?? null; // Add check for auth existence
+};
+
+// Deprecated function - keep for reference or remove if sure it's unused
+export function setGlobalAuthUser(user: User | null) {
+    console.warn("[AuthContext] setGlobalAuthUser is deprecated. Rely on AuthProvider state.");
+}
