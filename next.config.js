@@ -15,14 +15,6 @@ const nextConfig = {
     // This allows you to deploy with TypeScript errors
     ignoreBuildErrors: true,
   },
-  async rewrites() {
-    return [
-      {
-        source: '/whattoeat/generate-recipes',
-        destination: '/whattoeat/api/generate-recipes',
-      },
-    ];
-  },
 }
 
 module.exports = nextConfig
