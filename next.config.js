@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   basePath: '/whattoeat',
-  trailingSlash: true,
   reactStrictMode: true,
   swcMinify: true,
   experimental: {
