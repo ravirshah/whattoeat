@@ -306,10 +306,12 @@ function GenerateRecipes({ initialPreferences }: { initialPreferences: Preferenc
     };
 
     // 5. Make API Call
-    console.log(`[GenerateRecipes] Sending API request to /api/generate-recipes. Has token: ${!!token}`);
+    console.log(`[GenerateRecipes] Sending API request to /whattoeat/api/generate-recipes. Has token: ${!!token}`);
     let recipeData;
     try {
-      const response = await axios.post('/api/generate-recipes', requestData, { 
+      // Prepend basePath to the API route
+      const apiUrl = process.env.NEXT_PUBLIC_BASE_PATH ? `${process.env.NEXT_PUBLIC_BASE_PATH}/api/generate-recipes` : '/api/generate-recipes';
+      const response = await axios.post(apiUrl, requestData, { 
           headers,
           timeout: 60000 // 60 second timeout
       });
