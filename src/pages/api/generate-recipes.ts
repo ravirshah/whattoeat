@@ -43,6 +43,8 @@ type RecipeResponse = {
   apiInfo?: {
     error?: string;
     model?: string;
+    environment?: string;
+    isVercel?: boolean;
   };
   details?: string;
 };
@@ -167,6 +169,8 @@ export default async function handler(
   res: NextApiResponse<RecipeResponse>
 ) {
   console.log("Recipe generation API called");
+  console.log("Environment:", process.env.NODE_ENV);
+  console.log("Request headers user-agent:", req.headers['user-agent']);
   
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -220,9 +224,20 @@ export default async function handler(
       console.log("Getting Gemini API key");
       const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
       
+      // Enhanced logging for environment variables
+      console.log("Environment variables check:");
+      console.log("- GEMINI_API_KEY exists:", !!process.env.GEMINI_API_KEY);
+      console.log("- NEXT_PUBLIC_GEMINI_API_KEY exists:", !!process.env.NEXT_PUBLIC_GEMINI_API_KEY);
+      console.log("- NODE_ENV:", process.env.NODE_ENV);
+      console.log("- VERCEL:", process.env.VERCEL);
+      console.log("- VERCEL_ENV:", process.env.VERCEL_ENV);
+      
       if (!apiKey) {
-        console.error("No Gemini API key found");
-        throw new Error("Gemini API key not found");
+        console.error("No Gemini API key found in environment variables");
+        console.error("Available environment variables:", Object.keys(process.env).filter(key => 
+          key.includes('GEMINI') || key.includes('API') || key.includes('KEY')
+        ));
+        throw new Error("Gemini API key not found in environment");
       }
 
       console.log("Initializing Gemini API with key (first 4 chars):", apiKey.substring(0, 4) + "...");
@@ -328,11 +343,30 @@ Return ONLY a valid JSON array with this exact structure:
       
       // Use slightly shorter timeout for mobile devices, but not too aggressive
       const apiTimeout = isMobile ? 50000 : 60000; // 50s for mobile, 60s for desktop
-      console.log(`Using ${apiTimeout/1000}s timeout for ${isMobile ? 'mobile' : 'desktop'} device`);
+      
+      // Adjust timeout for Vercel limitations
+      let effectiveTimeout = apiTimeout;
+      if (process.env.VERCEL) {
+        // Vercel Hobby plan has 10s limit, Pro has 60s, Enterprise varies
+        // We need to be conservative and assume we might be on a limited plan
+        const vercelMaxTimeout = process.env.VERCEL_ENV === 'production' ? 45000 : apiTimeout;
+        effectiveTimeout = Math.min(apiTimeout, vercelMaxTimeout);
+        console.log(`Vercel detected, adjusting timeout from ${apiTimeout/1000}s to ${effectiveTimeout/1000}s`);
+      }
+      
+      console.log(`Using ${effectiveTimeout/1000}s timeout for ${isMobile ? 'mobile' : 'desktop'} device`);
+      
+      // Additional Vercel-specific logging
+      if (process.env.VERCEL) {
+        console.log("Running on Vercel, function timeout info:");
+        console.log("- VERCEL_REGION:", process.env.VERCEL_REGION);
+        console.log("- VERCEL_ENV:", process.env.VERCEL_ENV);
+        console.log("- Function start time:", new Date().toISOString());
+      }
       
       // Create a timeout promise
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(`Gemini API timeout after ${apiTimeout/1000}s`)), apiTimeout);
+        setTimeout(() => reject(new Error(`Gemini API timeout after ${effectiveTimeout/1000}s`)), effectiveTimeout);
       });
       
       // Race the API call against the timeout
@@ -373,6 +407,7 @@ Return ONLY a valid JSON array with this exact structure:
 
       const text = response.text();
       console.log("Successfully received response from Gemini API");
+      console.log("Response length:", text.length);
       
       // Parse the JSON response
       try {
@@ -382,6 +417,7 @@ Return ONLY a valid JSON array with this exact structure:
         
         if (!match) {
           console.error("Failed to extract JSON from Gemini response");
+          console.error("Response text (first 500 chars):", text.substring(0, 500));
           throw new Error("Invalid response format");
         }
         
@@ -390,6 +426,7 @@ Return ONLY a valid JSON array with this exact structure:
         
         if (!Array.isArray(recipes) || recipes.length === 0) {
           console.error("Invalid recipes format returned by Gemini");
+          console.error("Parsed result:", recipes);
           throw new Error("Invalid recipes format");
         }
         
@@ -397,10 +434,16 @@ Return ONLY a valid JSON array with this exact structure:
         return res.status(200).json({ recipes });
       } catch (parseError) {
         console.error("Error parsing Gemini response:", parseError);
+        console.error("Raw response text:", text);
         throw new Error("Failed to parse recipe data");
       }
     } catch (geminiError) {
-      console.error("Gemini API error:", geminiError);
+      console.error("Gemini API error (detailed):", {
+        error: geminiError,
+        message: geminiError instanceof Error ? geminiError.message : String(geminiError),
+        stack: geminiError instanceof Error ? geminiError.stack : undefined,
+        name: geminiError instanceof Error ? geminiError.name : undefined
+      });
       console.log("Using fallback recipe data instead");
       
       // Return sample recipes with API info
@@ -408,7 +451,9 @@ Return ONLY a valid JSON array with this exact structure:
         recipes: SAMPLE_RECIPES,
         apiInfo: {
           error: geminiError instanceof Error ? geminiError.message : String(geminiError),
-          model: "fallback"
+          model: "fallback",
+          environment: process.env.NODE_ENV,
+          isVercel: !!process.env.VERCEL
         }
       });
     }

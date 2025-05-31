@@ -649,8 +649,20 @@ function GenerateRecipes() {
         );
       
         recipeData = response.data;
+        console.log("Main API response received:", {
+          hasRecipes: !!(recipeData?.recipes),
+          recipeCount: recipeData?.recipes?.length || 0,
+          hasApiInfo: !!(recipeData?.apiInfo),
+          apiInfo: recipeData?.apiInfo
+        });
       } catch (mainApiError: any) {
         console.error("Error with main API, trying fallback:", mainApiError);
+        console.error("Main API error details:", {
+          code: mainApiError?.code,
+          status: mainApiError?.response?.status,
+          statusText: mainApiError?.response?.statusText,
+          data: mainApiError?.response?.data
+        });
         
         // Check if this is a timeout or network error before falling back
         const isTimeoutError = mainApiError?.code === 'ECONNABORTED' || 
@@ -671,6 +683,10 @@ function GenerateRecipes() {
           );
           
           recipeData = fallbackResponse.data;
+          console.log("Fallback API response received:", {
+            hasRecipes: !!(recipeData?.recipes),
+            recipeCount: recipeData?.recipes?.length || 0
+          });
           
           // Only show the fallback message if we're not on mobile or if the original error wasn't just a timeout
           if (!isMobile || !(isTimeoutError || isNetworkError)) {
