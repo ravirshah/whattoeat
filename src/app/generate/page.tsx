@@ -72,6 +72,12 @@ const COOK_TIME_OPTIONS = [
   'Longer dish'
 ];
 
+const DIFFICULTY_OPTIONS = [
+  'Easy',
+  'Medium',
+  'Hard'
+];
+
 function GenerateRecipes() {
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -91,6 +97,7 @@ function GenerateRecipes() {
   const [cuisinePrefs, setCuisinePrefs] = useState<string[]>([]);
   const [newCuisinePref, setNewCuisinePref] = useState('');
   const [cookTimePreference, setCookTimePreference] = useState<string>('');
+  const [difficultyPreference, setDifficultyPreference] = useState<string>('');
   
   // UI states
   const [generating, setGenerating] = useState(false);
@@ -147,6 +154,7 @@ function GenerateRecipes() {
           setDietaryPrefs(prefs.dietaryPrefs || []);
           setCuisinePrefs(prefs.cuisinePrefs || []);
           setCookTimePreference(prefs.cookTimePreference || '');
+          setDifficultyPreference(prefs.difficultyPreference || '');
         }
       } catch (error) {
         console.error('Error loading preferences:', error);
@@ -531,7 +539,8 @@ function GenerateRecipes() {
           staples,
           dietaryPrefs,
           cuisinePrefs,
-          cookTimePreference
+          cookTimePreference,
+          difficultyPreference
         });
       } catch (error) {
         console.error('Error saving preferences:', error);
@@ -603,7 +612,8 @@ function GenerateRecipes() {
         staples, 
         dietaryPrefs,
         cuisinePrefs,
-        cookTimePreference
+        cookTimePreference,
+        difficultyPreference
       };
   
       console.log("Sending API request with data:", {
@@ -742,7 +752,21 @@ function GenerateRecipes() {
   
 
   // Get the current step details
-  const getStepContent = () => {
+  const getStepContent = (): {
+    title: string;
+    description: string;
+    icon: React.ReactNode;
+    inputPlaceholder: string;
+    inputValue: string;
+    setInputValue: (value: string) => void;
+    addItem: () => void;
+    items: string[];
+    removeItem: (index: number) => void;
+    emptyMessage: string;
+    badgeClassName: string;
+    commonItems: string[];
+    category: 'ingredients' | 'equipment' | 'staples' | 'dietary' | 'cuisine';
+  } => {
     switch (step) {
       case 1:
         return {
@@ -1081,6 +1105,41 @@ function GenerateRecipes() {
                   {cookTimePreference && (
                     <div className="text-sm text-gray-600 dark:text-gray-400">
                       Selected: <span className="font-medium text-emerald-600 dark:text-emerald-400">{cookTimePreference}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Difficulty Preference Section */}
+                <div className="space-y-4">
+                  <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 flex items-center">
+                    <CookingPot className="h-4 w-4 mr-2 text-emerald-600" />
+                    How difficult do you want the recipe to be?
+                  </h4>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {DIFFICULTY_OPTIONS.map((option) => (
+                      <Button
+                        key={option}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDifficultyPreference(option)}
+                        className={`${
+                          difficultyPreference === option 
+                            ? `bg-emerald-100 dark:bg-emerald-900/50 border-emerald-300 dark:border-emerald-700 font-medium text-emerald-600 dark:text-emerald-400`
+                            : ''
+                        }`}
+                      >
+                        {option}
+                        {difficultyPreference === option && (
+                          <span className="ml-1">✓</span>
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                  
+                  {difficultyPreference && (
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Selected: <span className="font-medium text-emerald-600 dark:text-emerald-400">{difficultyPreference}</span>
                     </div>
                   )}
                 </div>

@@ -23,6 +23,7 @@ import {
     dietaryPrefs: string[];
     cuisinePrefs: string[];
     cookTimePreference?: string;
+    difficultyPreference?: string;
   }
   
   interface Recipe {

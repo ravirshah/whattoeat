@@ -92,6 +92,7 @@ function Onboarding() {
   const [dietaryPrefs, setDietaryPrefs] = useState<string[]>([]);
   const [cuisinePrefs, setCuisinePrefs] = useState<string[]>([]);
   const [cookTimePreference, setCookTimePreference] = useState<string>('');
+  const [difficultyPreference, setDifficultyPreference] = useState<string>('');
   const [loading, setLoading] = useState(false);
   
   // New state for input fields
@@ -226,7 +227,8 @@ function Onboarding() {
         staples,
         dietaryPrefs,
         cuisinePrefs,
-        cookTimePreference
+        cookTimePreference,
+        difficultyPreference
       });
       
       toast.success('Preferences saved', {

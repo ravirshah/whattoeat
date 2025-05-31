@@ -187,7 +187,7 @@ export default async function handler(
     console.log(`Token verified successfully for user: ${userId}`);
 
     // Get input data from request, if any
-    const { ingredients, equipment, staples, dietaryPrefs, cuisinePrefs, cookTimePreference } = req.body;
+    const { ingredients, equipment, staples, dietaryPrefs, cuisinePrefs, cookTimePreference, difficultyPreference } = req.body;
     
     // Clean the input data 
     const cleanedIngredients = cleanArrayInput(ingredients);
@@ -196,10 +196,12 @@ export default async function handler(
     const cleanedDietaryPrefs = cleanArrayInput(dietaryPrefs);
     const cleanedCuisinePrefs = cleanArrayInput(cuisinePrefs);
     const cleanedCookTimePreference = typeof cookTimePreference === 'string' ? cookTimePreference.trim() : '';
+    const cleanedDifficultyPreference = typeof difficultyPreference === 'string' ? difficultyPreference.trim() : '';
     
     console.log(`User provided: ${cleanedIngredients.length} ingredients, ${cleanedEquipment.length} equipment items,` + 
       ` ${cleanedStaples.length} staples, ${cleanedDietaryPrefs.length} dietary preferences, ${cleanedCuisinePrefs.length} cuisine preferences` +
-      (cleanedCookTimePreference ? `, and cook time preference: ${cleanedCookTimePreference}` : ''));
+      (cleanedCookTimePreference ? `, cook time preference: ${cleanedCookTimePreference}` : '') +
+      (cleanedDifficultyPreference ? `, and difficulty preference: ${cleanedDifficultyPreference}` : ''));
 
     // Update user stats in background (don't await this)
     incrementRecipesGenerated(userId).catch(error => {
