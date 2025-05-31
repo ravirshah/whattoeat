@@ -229,56 +229,95 @@ export default async function handler(
       const model = genAI.getGenerativeModel({ model: modelName });
 
       // Build the prompt
-      let prompt = `Generate 3 original recipes based on these available ingredients, equipment, pantry staples, dietary preferences, and cook time preference.
+      let prompt = `You are a professional chef AI assistant. Generate exactly 3 creative, practical recipes that STRICTLY adhere to the user's available resources and preferences below.
 
-Available ingredients:
-${cleanedIngredients.join(", ")}
+## CRITICAL CONSTRAINTS - MUST FOLLOW:
 
-Available equipment:
-${cleanedEquipment.join(", ")}
+### AVAILABLE INGREDIENTS (USE PRIMARILY FROM THIS LIST):
+${cleanedIngredients.length > 0 ? cleanedIngredients.join(", ") : "No specific ingredients provided"}
 
-Pantry staples:
-${cleanedStaples.join(", ")}
+### AVAILABLE EQUIPMENT (ONLY USE THESE):
+${cleanedEquipment.length > 0 ? cleanedEquipment.join(", ") : "Basic kitchen equipment (stovetop, basic pans)"}
 
-Dietary preferences:
-${cleanedDietaryPrefs.join(", ")}
+### PANTRY STAPLES AVAILABLE:
+${cleanedStaples.length > 0 ? cleanedStaples.join(", ") : "Basic staples (salt, pepper, oil)"}
 
-Cuisine preferences:
-${cleanedCuisinePrefs.join(", ")}
+### DIETARY REQUIREMENTS (MUST RESPECT):
+${cleanedDietaryPrefs.length > 0 ? cleanedDietaryPrefs.join(", ") : "No specific dietary restrictions"}
 
-Cook time preference:
-${cleanedCookTimePreference}
+### CUISINE PREFERENCES:
+${cleanedCuisinePrefs.length > 0 ? cleanedCuisinePrefs.join(", ") : "Any cuisine style"}
 
-Difficulty preference:
-${cleanedDifficultyPreference}
+### TIME CONSTRAINT:
+${cleanedCookTimePreference || "No specific time constraint"}
 
-For each recipe, provide:
-1. Name
-2. Ingredients list with measurements
-3. Step-by-step instructions
-4. Basic nutritional facts
-5. Serving size
-6. Preparation and cooking time
+### DIFFICULTY LEVEL:
+${cleanedDifficultyPreference || "Any difficulty level"}
 
-${cleanedCookTimePreference ? `IMPORTANT: Please ensure all recipes respect the cook time preference of "${cleanedCookTimePreference}". Adjust recipe complexity and cooking methods accordingly.` : ''}
+## STRICT RECIPE REQUIREMENTS:
 
-${cleanedDifficultyPreference ? `IMPORTANT: Please ensure all recipes match the difficulty level "${cleanedDifficultyPreference}":
-- Easy: Simple recipes with basic techniques, minimal prep work, and common ingredients. Should be suitable for beginners.
-- Medium: Moderate complexity with some advanced techniques, more ingredients, and multiple cooking steps.
-- Hard: Complex recipes with advanced techniques, specialty ingredients, and intricate preparation methods.` : ''}
+1. **INGREDIENT USAGE**: Recipes MUST primarily use ingredients from the "Available Ingredients" list. You may suggest 1-2 common additional ingredients per recipe ONLY if absolutely necessary for the recipe to work. Clearly prioritize the provided ingredients.
 
-Return ONLY a JSON array with exactly this format:
+2. **EQUIPMENT COMPLIANCE**: Only use cooking methods and techniques that can be accomplished with the available equipment. If no equipment is specified, assume only basic stovetop and oven access.
+
+3. **TIME ADHERENCE**: ${cleanedCookTimePreference ? `
+   - "${cleanedCookTimePreference}" means:
+     * "Quick (under 30 min)": Total time from start to finish must be under 30 minutes
+     * "Medium (30-60 min)": Total time should be 30-60 minutes 
+     * "Long (60+ min)": Can take over 60 minutes including prep and cooking
+   - Adjust cooking methods, ingredient prep, and recipe complexity to meet this constraint exactly.` : 'No specific time requirements, but provide realistic prep and cook times.'}
+
+4. **DIFFICULTY MATCHING**: ${cleanedDifficultyPreference ? `
+   - "${cleanedDifficultyPreference}" means:
+     * "Easy": Max 6-8 ingredients, basic techniques (sautéing, boiling, baking), minimal knife work, one-pot/pan meals preferred, beginner-friendly steps
+     * "Medium": 8-12 ingredients, intermediate techniques (braising, roasting, making sauces), some multi-step processes, requires basic cooking skills
+     * "Hard": 12+ ingredients allowed, advanced techniques (reduction, emulsification, complex seasoning), multi-step processes, requires experienced cooking skills
+   - Match recipe complexity exactly to this level.` : 'Provide recipes of varying difficulty levels.'}
+
+5. **DIETARY COMPLIANCE**: Every recipe must strictly avoid ingredients that conflict with the dietary preferences. Double-check each ingredient against the dietary restrictions.
+
+6. **CUISINE STYLE**: ${cleanedCuisinePrefs.length > 0 ? 'Incorporate flavors, techniques, and ingredients typical of the preferred cuisines where possible.' : 'Use diverse international flavors.'}
+
+## OUTPUT REQUIREMENTS:
+
+- Generate exactly 3 distinct recipes
+- Each recipe should showcase different cooking techniques
+- Provide precise measurements in standard cooking units
+- Instructions should be clear, numbered, and actionable
+- Include realistic nutritional estimates
+- Specify exact prep and cook times
+
+## RESPONSE FORMAT (JSON ONLY):
+
+Return ONLY a valid JSON array with this exact structure:
+
 [
   {
-    "name": "Recipe Name",
-    "ingredients": ["ingredient 1", "ingredient 2", ...],
-    "instructions": ["step 1", "step 2", ...],
-    "nutritionalFacts": "Calories: X, Protein: Xg, etc.",
-    "servings": "Serves X",
-    "times": "Prep: X min | Cook: X min"
-  },
-  ...
-]`;
+    "name": "Descriptive Recipe Name",
+    "ingredients": [
+      "Precise measurement + ingredient name",
+      "Example: 2 large chicken breasts, boneless and skinless",
+      "1 cup jasmine rice",
+      "2 tbsp olive oil"
+    ],
+    "instructions": [
+      "Step 1: Detailed action with timing if relevant",
+      "Step 2: Clear cooking instruction with temperature/time",
+      "Step 3: Specific technique with visual cues for doneness"
+    ],
+    "nutritionalFacts": "Calories: [amount] per serving, Protein: [amount]g, Carbs: [amount]g, Fat: [amount]g, Fiber: [amount]g",
+    "servings": "Serves [number] people",
+    "times": "Prep: [number] min | Cook: [number] min | Total: [number] min"
+  }
+]
+
+## FINAL CHECKS:
+- Verify each recipe uses primarily available ingredients
+- Confirm cooking methods match available equipment  
+- Ensure total time aligns with user preference
+- Check difficulty matches requested level
+- Validate all dietary restrictions are respected
+- Ensure measurements and instructions are precise and practical`;
 
       console.log("Sending request to Gemini API...");
       const result = await model.generateContent({
