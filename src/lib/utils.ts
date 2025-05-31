@@ -21,6 +21,12 @@ export function withBasePath(path: string): string {
   return `${basePath}${normalizedPath}`;
 }
 
+export function getApiUrl(path: string): string {
+  const basePath = getBasePath();
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${basePath}/whattoeat${normalizedPath}`;
+}
+
 export function navigateTo(path: string, router?: any): void {
   const fullPath = withBasePath(path);
   if (router && typeof router.push === 'function') {
