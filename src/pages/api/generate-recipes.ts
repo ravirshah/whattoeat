@@ -326,8 +326,8 @@ Return ONLY a valid JSON array with this exact structure:
 
       console.log("Sending request to Gemini API...");
       
-      // Use shorter timeout for mobile devices
-      const apiTimeout = isMobile ? 35000 : 50000; // 35s for mobile, 50s for desktop
+      // Use slightly shorter timeout for mobile devices, but not too aggressive
+      const apiTimeout = isMobile ? 50000 : 60000; // 50s for mobile, 60s for desktop
       console.log(`Using ${apiTimeout/1000}s timeout for ${isMobile ? 'mobile' : 'desktop'} device`);
       
       // Create a timeout promise
@@ -341,7 +341,7 @@ Return ONLY a valid JSON array with this exact structure:
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: isMobile ? 3072 : 4096, // Smaller response for mobile
+            maxOutputTokens: 4096, // Keep full response size for both mobile and desktop
           },
           safetySettings: [
             {

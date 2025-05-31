@@ -633,8 +633,8 @@ function GenerateRecipes() {
         window.innerWidth <= 768
       );
       
-      // Use shorter timeout for mobile devices to avoid network issues
-      const mainApiTimeout = isMobile ? 45000 : 60000; // 45s for mobile, 60s for desktop
+      // Use slightly shorter timeout for mobile devices to avoid network issues
+      const mainApiTimeout = isMobile ? 50000 : 60000; // 50s for mobile, 60s for desktop
       
       try {
         const response = await axios.post('/whattoeat/api/generate-recipes', 
@@ -657,60 +657,35 @@ function GenerateRecipes() {
                                mainApiError?.message?.includes('timeout');
         const isNetworkError = mainApiError?.request && !mainApiError?.response;
         
-        // If we're on mobile and hit a timeout/network error, try the main API one more time with even shorter timeout
-        if (isMobile && (isTimeoutError || isNetworkError)) {
-          console.log("Mobile device detected with timeout/network error, retrying with shorter timeout...");
-          try {
-            const retryResponse = await axios.post('/whattoeat/api/generate-recipes', 
-              requestData,
-              {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                },
-                timeout: 30000 // 30 second retry for mobile
-              }
-            );
-            
-            recipeData = retryResponse.data;
-            console.log("Mobile retry succeeded");
-          } catch (retryError) {
-            console.error("Mobile retry also failed, falling back to simple API:", retryError);
-            // Continue to fallback below
-          }
-        }
-        
         // If we still don't have recipe data, use the fallback
-        if (!recipeData) {
-          try {
-            const fallbackResponse = await axios.post('/whattoeat/api/generate-recipes-simple', 
-              requestData,
-              {
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                },
-                timeout: 25000 // 25 second timeout for fallback
-              }
-            );
-            
-            recipeData = fallbackResponse.data;
-            
-            // Only show the fallback message if we're not on mobile or if the original error wasn't just a timeout
-            if (!isMobile || !(isTimeoutError || isNetworkError)) {
-              toast.info('Using sample recipes', {
-                description: 'Our full recipe generator is busy. Showing example recipes instead.'
-              });
-            } else {
-              // For mobile timeout issues, show a more user-friendly message
-              toast.info('Generated recipes', {
-                description: 'Here are some great recipe suggestions for you!'
-              });
+        try {
+          const fallbackResponse = await axios.post('/whattoeat/api/generate-recipes-simple', 
+            requestData,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              timeout: 30000 // 30 second timeout for fallback
             }
-          } catch (fallbackError) {
-            console.error("Fallback API also failed:", fallbackError);
-            throw mainApiError; // Throw the original error for better error messaging
+          );
+          
+          recipeData = fallbackResponse.data;
+          
+          // Only show the fallback message if we're not on mobile or if the original error wasn't just a timeout
+          if (!isMobile || !(isTimeoutError || isNetworkError)) {
+            toast.info('Using sample recipes', {
+              description: 'Our full recipe generator is busy. Showing example recipes instead.'
+            });
+          } else {
+            // For mobile timeout issues, show a more user-friendly message
+            toast.info('Generated recipes', {
+              description: 'Here are some great recipe suggestions for you!'
+            });
           }
+        } catch (fallbackError) {
+          console.error("Fallback API also failed:", fallbackError);
+          throw mainApiError; // Throw the original error for better error messaging
         }
       }
   
