@@ -66,6 +66,11 @@ const COMMON_DIETARY_PREFS = [
   'Kosher', 'No Pork', 'No Shellfish', 'No Red Meat'
 ];
 
+const COMMON_CUISINES = [
+  'American', 'Italian', 'Chinese', 'Thai', 'Indian', 
+  'Japanese', 'Mexican', 'Mediterranean', 'French', 'Korean'
+];
+
 export default function OnboardingPage() {
   return (
     <AuthWrapper>
@@ -85,6 +90,7 @@ function Onboarding() {
   const [equipment, setEquipment] = useState<string[]>([]);
   const [staples, setStaples] = useState<string[]>([]);
   const [dietaryPrefs, setDietaryPrefs] = useState<string[]>([]);
+  const [cuisinePrefs, setCuisinePrefs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   
   // New state for input fields
@@ -92,9 +98,10 @@ function Onboarding() {
   const [newEquipment, setNewEquipment] = useState('');
   const [newStaple, setNewStaple] = useState('');
   const [newDietaryPref, setNewDietaryPref] = useState('');
+  const [newCuisinePref, setNewCuisinePref] = useState('');
   
   // Toggle selection of an item
-  const toggleItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary') => {
+  const toggleItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary' | 'cuisine') => {
     switch (category) {
       case 'ingredients':
         setIngredients(prev => 
@@ -119,6 +126,13 @@ function Onboarding() {
         break;
       case 'dietary':
         setDietaryPrefs(prev => 
+          prev.includes(item) 
+            ? prev.filter(i => i !== item) 
+            : [...prev, item]
+        );
+        break;
+      case 'cuisine':
+        setCuisinePrefs(prev => 
           prev.includes(item) 
             ? prev.filter(i => i !== item) 
             : [...prev, item]
@@ -156,6 +170,13 @@ function Onboarding() {
     }
   };
   
+  const addCuisinePref = () => {
+    if (newCuisinePref.trim() !== '' && !cuisinePrefs.includes(newCuisinePref.trim())) {
+      setCuisinePrefs([...cuisinePrefs, newCuisinePref.trim()]);
+      setNewCuisinePref('');
+    }
+  };
+  
   // Remove item functions
   const removeIngredient = (index: number) => {
     setIngredients(ingredients.filter((_, i) => i !== index));
@@ -173,9 +194,13 @@ function Onboarding() {
     setDietaryPrefs(dietaryPrefs.filter((_, i) => i !== index));
   };
   
+  const removeCuisinePref = (index: number) => {
+    setCuisinePrefs(cuisinePrefs.filter((_, i) => i !== index));
+  };
+  
   // Navigation functions
   const nextStep = () => {
-    if (step < 5) {
+    if (step < 6) {
       setStep(step + 1);
     }
   };
@@ -198,7 +223,8 @@ function Onboarding() {
         ingredients,
         equipment,
         staples,
-        dietaryPrefs
+        dietaryPrefs,
+        cuisinePrefs
       });
       
       toast.success('Preferences saved', {
@@ -260,6 +286,12 @@ function Onboarding() {
           title: "Select Your Dietary Preferences",
           description: "Do you have any dietary preferences or restrictions? Select all that apply.",
           icon: <AlertTriangle className="h-8 w-8 text-emerald-600" />
+        };
+      case 6:
+        return {
+          title: "Select Your Cuisine Preferences",
+          description: "What types of cuisine do you enjoy? Select all that apply.",
+          icon: <UtensilsCrossed className="h-8 w-8 text-emerald-600" />
         };
       default:
         return {
@@ -335,6 +367,21 @@ function Onboarding() {
           darkTextColor: "dark:text-purple-300",
           buttonBgColor: "bg-purple-100 dark:bg-purple-900/50"
         };
+      case 6:
+        return {
+          items: cuisinePrefs,
+          commonItems: COMMON_CUISINES,
+          category: 'cuisine',
+          inputValue: newCuisinePref,
+          setInputValue: setNewCuisinePref,
+          addItem: addCuisinePref,
+          removeItem: removeCuisinePref,
+          bgColor: "bg-pink-50",
+          textColor: "text-pink-700",
+          darkBgColor: "dark:bg-pink-900/20",
+          darkTextColor: "dark:text-pink-300",
+          buttonBgColor: "bg-pink-100 dark:bg-pink-900/50"
+        };
       default:
         return null;
     }
@@ -355,7 +402,7 @@ function Onboarding() {
             value={stepContent.inputValue}
             onChange={(e) => stepContent.setInputValue(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && stepContent.addItem()}
-            placeholder={`Add ${step === 2 ? 'an ingredient' : step === 3 ? 'equipment' : step === 4 ? 'a staple' : 'a dietary preference'}...`}
+            placeholder={`Add ${step === 2 ? 'an ingredient' : step === 3 ? 'equipment' : step === 4 ? 'a staple' : step === 5 ? 'a dietary preference' : 'a cuisine preference'}...`}
             className="flex-1"
           />
           <Button onClick={stepContent.addItem}>
@@ -366,7 +413,7 @@ function Onboarding() {
         
         {/* Common items section */}
         <div>
-          <h4 className="text-sm font-medium mb-3">Common {step === 2 ? 'Ingredients' : step === 3 ? 'Equipment' : step === 4 ? 'Staples' : 'Dietary Preferences'}</h4>
+          <h4 className="text-sm font-medium mb-3">Common {step === 2 ? 'Ingredients' : step === 3 ? 'Equipment' : step === 4 ? 'Staples' : step === 5 ? 'Dietary Preferences' : 'Cuisines'}</h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {stepContent.commonItems.map((item) => (
               <Button
@@ -434,7 +481,7 @@ function Onboarding() {
             <div className="mt-4">
               <Progress value={step * 20} className="h-2" />
               <p className="text-xs text-right mt-1 text-gray-500 dark:text-gray-400">
-                Step {step} of 5
+                Step {step} of 6
               </p>
             </div>
           </CardHeader>
@@ -496,7 +543,7 @@ function Onboarding() {
               </Button>
             )}
             
-            {step < 5 ? (
+            {step < 6 ? (
               <Button onClick={nextStep}>
                 Next
                 <ChevronRight className="h-4 w-4 ml-1" />

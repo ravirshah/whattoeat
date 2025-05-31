@@ -62,6 +62,8 @@ function Profile() {
   const [newStaple, setNewStaple] = useState('');
   const [dietaryPrefs, setDietaryPrefs] = useState<string[]>([]);
   const [newDietaryPref, setNewDietaryPref] = useState('');
+  const [cuisinePrefs, setCuisinePrefs] = useState<string[]>([]);
+  const [newCuisinePref, setNewCuisinePref] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   
@@ -76,6 +78,7 @@ function Profile() {
             setEquipment(prefs.equipment || []);
             setStaples(prefs.staples || []);
             setDietaryPrefs(prefs.dietaryPrefs || []);
+            setCuisinePrefs(prefs.cuisinePrefs || []);
           }
           
           // Set display name from user profile
@@ -140,6 +143,18 @@ function Profile() {
     setDietaryPrefs(dietaryPrefs.filter((_, i) => i !== index));
   };
   
+  // Add/remove handlers for cuisine preferences
+  const addCuisinePref = () => {
+    if (newCuisinePref.trim() !== '' && !cuisinePrefs.includes(newCuisinePref.trim())) {
+      setCuisinePrefs([...cuisinePrefs, newCuisinePref.trim()]);
+      setNewCuisinePref('');
+    }
+  };
+  
+  const removeCuisinePref = (index: number) => {
+    setCuisinePrefs(cuisinePrefs.filter((_, i) => i !== index));
+  };
+  
   // Save all preferences
   const savePreferences = async () => {
     if (!currentUser) return;
@@ -151,7 +166,8 @@ function Profile() {
         ingredients,
         equipment,
         staples,
-        dietaryPrefs
+        dietaryPrefs,
+        cuisinePrefs
       });
       
       toast.success('Preferences saved', {
@@ -186,9 +202,10 @@ function Profile() {
   const commonEquipment = ['Oven', 'Stovetop', 'Microwave', 'Blender', 'Slow Cooker', 'Air Fryer', 'Pressure Cooker', 'Grill'];
   const commonStaples = ['Salt', 'Pepper', 'Olive Oil', 'Flour', 'Sugar', 'Butter', 'Soy Sauce', 'Vinegar', 'Spices'];
   const commonDietaryPrefs = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Low-Carb', 'Keto', 'Paleo', 'Nut-Free'];
+  const commonCuisinePrefs = ['American', 'Italian', 'Chinese', 'Thai', 'Indian', 'Japanese', 'Mexican', 'Mediterranean', 'French', 'Korean'];
   
   // Add a preset item
-  const addPresetItem = (item: string, listType: 'ingredients' | 'equipment' | 'staples' | 'dietary') => {
+  const addPresetItem = (item: string, listType: 'ingredients' | 'equipment' | 'staples' | 'dietary' | 'cuisine') => {
     switch (listType) {
       case 'ingredients':
         if (!ingredients.includes(item)) {
@@ -208,6 +225,11 @@ function Profile() {
       case 'dietary':
         if (!dietaryPrefs.includes(item)) {
           setDietaryPrefs([...dietaryPrefs, item]);
+        }
+        break;
+      case 'cuisine':
+        if (!cuisinePrefs.includes(item)) {
+          setCuisinePrefs([...cuisinePrefs, item]);
         }
         break;
     }
@@ -309,6 +331,7 @@ function Profile() {
                 <TabsTrigger value="equipment" className="flex-1">Equipment</TabsTrigger>
                 <TabsTrigger value="staples" className="flex-1">Staples</TabsTrigger>
                 <TabsTrigger value="dietary" className="flex-1">Dietary</TabsTrigger>
+                <TabsTrigger value="cuisine" className="flex-1">Cuisine</TabsTrigger>
               </TabsList>
               
               {/* Ingredients Tab */}
@@ -583,6 +606,77 @@ function Profile() {
                               type="button"
                               onClick={() => removeDietaryPref(index)}
                               className="ml-1 hover:bg-purple-100 dark:hover:bg-purple-800 rounded-full p-1"
+                            >
+                              <X className="h-3 w-3" />
+                              <span className="sr-only">Remove {item}</span>
+                            </button>
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              {/* Cuisine Tab */}
+              <TabsContent value="cuisine">
+                <div className="space-y-4">
+                  <Alert className="bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800">
+                    <Info className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    <AlertDescription className="text-orange-800 dark:text-orange-300">
+                      Add cuisine types you enjoy or want to explore
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={newCuisinePref}
+                      onChange={(e) => setNewCuisinePref(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addCuisinePref()}
+                      placeholder="Add a cuisine preference..."
+                      className="flex-1"
+                    />
+                    <Button onClick={addCuisinePref}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Popular Cuisines</h4>
+                    <div className="flex flex-wrap gap-2 mb-6">
+                      {commonCuisinePrefs.map((item) => (
+                        <Button
+                          key={item}
+                          size="sm"
+                          variant="outline"
+                          className={cuisinePrefs.includes(item) ? "bg-gray-200 dark:bg-gray-800" : ""}
+                          onClick={() => addPresetItem(item, 'cuisine')}
+                        >
+                          {item}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Your Cuisine Preferences ({cuisinePrefs.length})</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {cuisinePrefs.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">No cuisine preferences added yet</p>
+                      ) : (
+                        cuisinePrefs.map((item, index) => (
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className="bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300"
+                          >
+                            {item}
+                            <button
+                              type="button"
+                              onClick={() => removeCuisinePref(index)}
+                              className="ml-1 hover:bg-orange-100 dark:hover:bg-orange-800 rounded-full p-1"
                             >
                               <X className="h-3 w-3" />
                               <span className="sr-only">Remove {item}</span>

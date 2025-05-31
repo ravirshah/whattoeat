@@ -36,7 +36,6 @@ import {
   Square,
   RefreshCw
 } from 'lucide-react';
-import { getApiUrl } from '@/lib/utils';
 
 // Common preset options
 const COMMON_INGREDIENTS = [
@@ -62,6 +61,11 @@ const COMMON_DIETARY_PREFS = [
   'Low-Carb', 'Keto', 'Paleo', 'Nut-Free', 'Low-Sugar'
 ];
 
+const COMMON_CUISINES = [
+  'American', 'Italian', 'Chinese', 'Thai', 'Indian', 
+  'Japanese', 'Mexican', 'Mediterranean', 'French', 'Korean'
+];
+
 function GenerateRecipes() {
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -78,6 +82,8 @@ function GenerateRecipes() {
   const [newStaple, setNewStaple] = useState('');
   const [dietaryPrefs, setDietaryPrefs] = useState<string[]>([]);
   const [newDietaryPref, setNewDietaryPref] = useState('');
+  const [cuisinePrefs, setCuisinePrefs] = useState<string[]>([]);
+  const [newCuisinePref, setNewCuisinePref] = useState('');
   
   // UI states
   const [generating, setGenerating] = useState(false);
@@ -132,6 +138,7 @@ function GenerateRecipes() {
           setEquipment(prefs.equipment || []);
           setStaples(prefs.staples || []);
           setDietaryPrefs(prefs.dietaryPrefs || []);
+          setCuisinePrefs(prefs.cuisinePrefs || []);
         }
       } catch (error) {
         console.error('Error loading preferences:', error);
@@ -195,6 +202,18 @@ function GenerateRecipes() {
   
   const removeDietaryPref = (index: number) => {
     setDietaryPrefs(dietaryPrefs.filter((_, i) => i !== index));
+  };
+
+  // Add/remove functions for cuisine preferences
+  const addCuisinePref = () => {
+    if (newCuisinePref.trim() !== '' && !cuisinePrefs.includes(newCuisinePref.trim())) {
+      setCuisinePrefs([...cuisinePrefs, newCuisinePref.trim()]);
+      setNewCuisinePref('');
+    }
+  };
+  
+  const removeCuisinePref = (index: number) => {
+    setCuisinePrefs(cuisinePrefs.filter((_, i) => i !== index));
   };
 
   // Helper function to capitalize first letter of each word
@@ -458,7 +477,7 @@ function GenerateRecipes() {
   };
   
   // Add common preset items
-  const addCommonItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary') => {
+  const addCommonItem = (item: string, category: 'ingredients' | 'equipment' | 'staples' | 'dietary' | 'cuisine') => {
     switch (category) {
       case 'ingredients':
         if (!ingredients.includes(item)) {
@@ -480,6 +499,11 @@ function GenerateRecipes() {
           setDietaryPrefs([...dietaryPrefs, item]);
         }
         break;
+      case 'cuisine':
+        if (!cuisinePrefs.includes(item)) {
+          setCuisinePrefs([...cuisinePrefs, item]);
+        }
+        break;
     }
   };
   
@@ -497,7 +521,8 @@ function GenerateRecipes() {
           ingredients,
           equipment,
           staples,
-          dietaryPrefs
+          dietaryPrefs,
+          cuisinePrefs
         });
       } catch (error) {
         console.error('Error saving preferences:', error);
@@ -567,14 +592,16 @@ function GenerateRecipes() {
         ingredients, 
         equipment, 
         staples, 
-        dietaryPrefs
+        dietaryPrefs,
+        cuisinePrefs
       };
   
       console.log("Sending API request with data:", {
         ingredientsCount: ingredients.length,
         equipmentCount: equipment.length,
         staplesCount: staples.length,
-        dietaryPrefsCount: dietaryPrefs.length
+        dietaryPrefsCount: dietaryPrefs.length,
+        cuisinePrefsCount: cuisinePrefs.length
       });
   
       // First try the main API endpoint with a timeout
@@ -855,122 +882,282 @@ function GenerateRecipes() {
               </div>
             </div>
             
-            <div className="flex gap-2">
-              <Input
-                type="text"
-                value={stepContent.inputValue}
-                onChange={(e) => stepContent.setInputValue(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && stepContent.addItem()}
-                placeholder={stepContent.inputPlaceholder}
-                className="flex-1"
-              />
-              <Button onClick={stepContent.addItem}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add
-              </Button>
-              
-              {/* Voice button only shows if speech is supported and in steps 1-3 */}
-              {speechSupported && step <= 3 && (
-                <Button 
-                  variant={listening ? "destructive" : "outline"}
-                  onClick={listening ? stopVoiceRecognition : startVoiceRecognition}
-                  className={listening ? "animate-pulse" : ""}
-                >
-                  {listening ? (
-                    <>
-                      <Square className="h-4 w-4 mr-1" />
-                      Stop
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="h-4 w-4 mr-1" />
-                      Voice
-                    </>
+            {step === 4 ? (
+              // Custom layout for step 4 with both dietary and cuisine preferences
+              <div className="space-y-8">
+                {/* Dietary Preferences Section */}
+                <div className="space-y-4">
+                  <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-2 text-purple-600" />
+                    Dietary Preferences & Restrictions
+                  </h4>
+                  
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={newDietaryPref}
+                      onChange={(e) => setNewDietaryPref(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addDietaryPref()}
+                      placeholder="Add a dietary preference..."
+                      className="flex-1"
+                    />
+                    <Button onClick={addDietaryPref}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                  
+                  <div>
+                    <h5 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Common Dietary Preferences</h5>
+                    <div className="flex flex-wrap gap-2">
+                      {COMMON_DIETARY_PREFS.map((item) => (
+                        <Button
+                          key={item}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addCommonItem(item, 'dietary')}
+                          className={`${
+                            dietaryPrefs.includes(item) 
+                              ? `bg-purple-100 dark:bg-purple-900/50 border-purple-300 dark:border-purple-700 font-medium text-purple-600 dark:text-purple-400`
+                              : ''
+                          }`}
+                        >
+                          {item}
+                          {dietaryPrefs.includes(item) && (
+                            <span className="ml-1">✓</span>
+                          )}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h5 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      {dietaryPrefs.length > 0 ? `Your Dietary Preferences (${dietaryPrefs.length})` : ''}
+                    </h5>
+                    <div className="flex flex-wrap gap-2">
+                      {dietaryPrefs.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">No dietary preferences added yet</p>
+                      ) : (
+                        dietaryPrefs.map((item, index) => (
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                          >
+                            {item}
+                            <button
+                              type="button"
+                              onClick={() => removeDietaryPref(index)}
+                              className="ml-1 hover:bg-purple-200 dark:hover:bg-purple-700 rounded-full p-1"
+                            >
+                              <X className="h-3 w-3" />
+                              <span className="sr-only">Remove {item}</span>
+                            </button>
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cuisine Preferences Section */}
+                <div className="space-y-4">
+                  <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 flex items-center">
+                    <Utensils className="h-4 w-4 mr-2 text-orange-600" />
+                    Cuisine Preferences
+                  </h4>
+                  
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={newCuisinePref}
+                      onChange={(e) => setNewCuisinePref(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addCuisinePref()}
+                      placeholder="Add a cuisine preference..."
+                      className="flex-1"
+                    />
+                    <Button onClick={addCuisinePref}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                  
+                  <div>
+                    <h5 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Popular Cuisines</h5>
+                    <div className="flex flex-wrap gap-2">
+                      {COMMON_CUISINES.map((item) => (
+                        <Button
+                          key={item}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addCommonItem(item, 'cuisine')}
+                          className={`${
+                            cuisinePrefs.includes(item) 
+                              ? `bg-orange-100 dark:bg-orange-900/50 border-orange-300 dark:border-orange-700 font-medium text-orange-600 dark:text-orange-400`
+                              : ''
+                          }`}
+                        >
+                          {item}
+                          {cuisinePrefs.includes(item) && (
+                            <span className="ml-1">✓</span>
+                          )}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h5 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      {cuisinePrefs.length > 0 ? `Your Cuisine Preferences (${cuisinePrefs.length})` : ''}
+                    </h5>
+                    <div className="flex flex-wrap gap-2">
+                      {cuisinePrefs.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">No cuisine preferences added yet</p>
+                      ) : (
+                        cuisinePrefs.map((item, index) => (
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+                          >
+                            {item}
+                            <button
+                              type="button"
+                              onClick={() => removeCuisinePref(index)}
+                              className="ml-1 hover:bg-orange-200 dark:hover:bg-orange-700 rounded-full p-1"
+                            >
+                              <X className="h-3 w-3" />
+                              <span className="sr-only">Remove {item}</span>
+                            </button>
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Original layout for steps 1-3
+              <div className="space-y-6">
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    value={stepContent.inputValue}
+                    onChange={(e) => stepContent.setInputValue(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && stepContent.addItem()}
+                    placeholder={stepContent.inputPlaceholder}
+                    className="flex-1"
+                  />
+                  <Button onClick={stepContent.addItem}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                  
+                  {/* Voice button only shows if speech is supported and in steps 1-3 */}
+                  {speechSupported && step <= 3 && (
+                    <Button 
+                      variant={listening ? "destructive" : "outline"}
+                      onClick={listening ? stopVoiceRecognition : startVoiceRecognition}
+                      className={listening ? "animate-pulse" : ""}
+                    >
+                      {listening ? (
+                        <>
+                          <Square className="h-4 w-4 mr-1" />
+                          Stop
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="h-4 w-4 mr-1" />
+                          Voice
+                        </>
+                      )}
+                    </Button>
                   )}
-                </Button>
-              )}
-            </div>
-            
-            {/* Listening indicator and transcript feedback */}
-            {listening && (
-              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-md">
-                <div className="flex items-center space-x-2">
-                  <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    Listening... Say your {step === 1 ? 'ingredients' : step === 2 ? 'equipment' : 'staples'} and click Stop when done
-                  </p>
+                </div>
+                
+                {/* Listening indicator and transcript feedback */}
+                {listening && (
+                  <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-md">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                      <p className="text-sm text-red-600 dark:text-red-400">
+                        Listening... Say your {step === 1 ? 'ingredients' : step === 2 ? 'equipment' : 'staples'} and click Stop when done
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {transcript && !listening && (
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium">Last recording:</span> "{transcript}"
+                    </p>
+                  </div>
+                )}
+
+                {/* Common Items Section */}
+                <div className="mt-2">
+                  <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    Common {step === 1 ? 'Ingredients' : step === 2 ? 'Equipment' : step === 3 ? 'Staples' : 'Preferences'}
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {stepContent.commonItems.map((item) => (
+                      <Button
+                        key={item}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addCommonItem(item, stepContent.category)}
+                        className={`${
+                          stepContent.items.includes(item) 
+                            ? `bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 font-medium ${
+                              step === 1 ? 'text-emerald-600 dark:text-emerald-400' :
+                              step === 2 ? 'text-blue-600 dark:text-blue-400' :
+                              step === 3 ? 'text-amber-600 dark:text-amber-400' :
+                              'text-purple-600 dark:text-purple-400'
+                            }`
+                            : ''
+                        }`}
+                      >
+                        {item}
+                        {stepContent.items.includes(item) && (
+                          <span className="ml-1">✓</span>
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    {stepContent.items.length > 0 ? `Your ${step === 1 ? 'ingredients' : step === 2 ? 'equipment' : step === 3 ? 'staples' : 'preferences'} (${stepContent.items.length})` : ''}
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {stepContent.items.length === 0 ? (
+                      <p className="text-sm text-gray-500 italic">{stepContent.emptyMessage}</p>
+                    ) : (
+                      stepContent.items.map((item, index) => (
+                        <Badge
+                          key={index}
+                          variant="outline"
+                          className={stepContent.badgeClassName}
+                        >
+                          {item}
+                          <button
+                            type="button"
+                            onClick={() => stepContent.removeItem(index)}
+                            className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-1"
+                          >
+                            <X className="h-3 w-3" />
+                            <span className="sr-only">Remove {item}</span>
+                          </button>
+                        </Badge>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             )}
-
-            {transcript && !listening && (
-              <div className="mt-2">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  <span className="font-medium">Last recording:</span> "{transcript}"
-                </p>
-              </div>
-            )}
-
-            {/* Common Items Section */}
-            <div className="mt-2">
-              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                Common {step === 1 ? 'Ingredients' : step === 2 ? 'Equipment' : step === 3 ? 'Staples' : 'Preferences'}
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {stepContent.commonItems.map((item) => (
-                  <Button
-                    key={item}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addCommonItem(item, stepContent.category)}
-                    className={`${
-                      stepContent.items.includes(item) 
-                        ? `bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 font-medium ${
-                          step === 1 ? 'text-emerald-600 dark:text-emerald-400' :
-                          step === 2 ? 'text-blue-600 dark:text-blue-400' :
-                          step === 3 ? 'text-amber-600 dark:text-amber-400' :
-                          'text-purple-600 dark:text-purple-400'
-                        }`
-                        : ''
-                    }`}
-                  >
-                    {item}
-                    {stepContent.items.includes(item) && (
-                      <span className="ml-1">✓</span>
-                    )}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                {stepContent.items.length > 0 ? `Your ${step === 1 ? 'ingredients' : step === 2 ? 'equipment' : step === 3 ? 'staples' : 'preferences'} (${stepContent.items.length})` : ''}
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {stepContent.items.length === 0 ? (
-                  <p className="text-sm text-gray-500 italic">{stepContent.emptyMessage}</p>
-                ) : (
-                  stepContent.items.map((item, index) => (
-                    <Badge
-                      key={index}
-                      variant="outline"
-                      className={stepContent.badgeClassName}
-                    >
-                      {item}
-                      <button
-                        type="button"
-                        onClick={() => stepContent.removeItem(index)}
-                        className="ml-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-1"
-                      >
-                        <X className="h-3 w-3" />
-                        <span className="sr-only">Remove {item}</span>
-                      </button>
-                    </Badge>
-                  ))
-                )}
-              </div>
-            </div>
           </div>
         </CardContent>
         

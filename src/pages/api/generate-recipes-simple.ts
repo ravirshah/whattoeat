@@ -187,16 +187,17 @@ export default async function handler(
     console.log(`Token verified successfully for user: ${userId}`);
 
     // Get input data from request, if any
-    const { ingredients, equipment, staples, dietaryPrefs } = req.body;
+    const { ingredients, equipment, staples, dietaryPrefs, cuisinePrefs } = req.body;
     
     // Clean the input data 
     const cleanedIngredients = cleanArrayInput(ingredients);
     const cleanedEquipment = cleanArrayInput(equipment);
     const cleanedStaples = cleanArrayInput(staples);
     const cleanedDietaryPrefs = cleanArrayInput(dietaryPrefs);
+    const cleanedCuisinePrefs = cleanArrayInput(cuisinePrefs);
     
     console.log(`User provided: ${cleanedIngredients.length} ingredients, ${cleanedEquipment.length} equipment items,` + 
-      ` ${cleanedStaples.length} staples, and ${cleanedDietaryPrefs.length} dietary preferences`);
+      ` ${cleanedStaples.length} staples, ${cleanedDietaryPrefs.length} dietary preferences, and ${cleanedCuisinePrefs.length} cuisine preferences`);
 
     // Update user stats in background (don't await this)
     incrementRecipesGenerated(userId).catch(error => {

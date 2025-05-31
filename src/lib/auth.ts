@@ -92,7 +92,8 @@ import {
           ingredients: [],
           equipment: [],
           staples: [],
-          dietaryPrefs: []
+          dietaryPrefs: [],
+          cuisinePrefs: []
         },
         usageStats: {
           month: new Date().getMonth(),

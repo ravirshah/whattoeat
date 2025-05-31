@@ -21,6 +21,7 @@ import {
     equipment: string[];
     staples: string[];
     dietaryPrefs: string[];
+    cuisinePrefs: string[];
   }
   
   interface Recipe {
