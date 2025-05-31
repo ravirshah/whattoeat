@@ -66,6 +66,12 @@ const COMMON_CUISINES = [
   'Japanese', 'Mexican', 'Mediterranean', 'French', 'Korean'
 ];
 
+const COOK_TIME_OPTIONS = [
+  'Under 30 minutes',
+  'Under 1 hour', 
+  'Longer dish'
+];
+
 function GenerateRecipes() {
   const { currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -84,6 +90,7 @@ function GenerateRecipes() {
   const [newDietaryPref, setNewDietaryPref] = useState('');
   const [cuisinePrefs, setCuisinePrefs] = useState<string[]>([]);
   const [newCuisinePref, setNewCuisinePref] = useState('');
+  const [cookTimePreference, setCookTimePreference] = useState<string>('');
   
   // UI states
   const [generating, setGenerating] = useState(false);
@@ -139,6 +146,7 @@ function GenerateRecipes() {
           setStaples(prefs.staples || []);
           setDietaryPrefs(prefs.dietaryPrefs || []);
           setCuisinePrefs(prefs.cuisinePrefs || []);
+          setCookTimePreference(prefs.cookTimePreference || '');
         }
       } catch (error) {
         console.error('Error loading preferences:', error);
@@ -268,7 +276,7 @@ function GenerateRecipes() {
         category === 'equipment' ? 'equipment item' : 'staple item';
       
       // Handle recognition results
-      recognition.onresult = (event) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         // Get the last result (most recent utterance)
         const lastResultIndex = event.results.length - 1;
         const transcriptText = event.results[lastResultIndex][0].transcript;
@@ -319,7 +327,7 @@ function GenerateRecipes() {
       };
       
       // Handle errors
-      recognition.onerror = (event) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error', event.error);
         setListening(false);
         recognitionRef.current = null;
@@ -522,7 +530,8 @@ function GenerateRecipes() {
           equipment,
           staples,
           dietaryPrefs,
-          cuisinePrefs
+          cuisinePrefs,
+          cookTimePreference
         });
       } catch (error) {
         console.error('Error saving preferences:', error);
@@ -593,7 +602,8 @@ function GenerateRecipes() {
         equipment, 
         staples, 
         dietaryPrefs,
-        cuisinePrefs
+        cuisinePrefs,
+        cookTimePreference
       };
   
       console.log("Sending API request with data:", {
@@ -1037,6 +1047,161 @@ function GenerateRecipes() {
                   </div>
                 </div>
               </div>
+            ) : step === 1 ? (
+              // Custom layout for step 1 with ingredients and cook time preference
+              <div className="space-y-8">
+                {/* Cook Time Preference Section */}
+                <div className="space-y-4">
+                  <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 flex items-center">
+                    <CookingPot className="h-4 w-4 mr-2 text-emerald-600" />
+                    How much time do you want to spend cooking?
+                  </h4>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {COOK_TIME_OPTIONS.map((option) => (
+                      <Button
+                        key={option}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCookTimePreference(option)}
+                        className={`${
+                          cookTimePreference === option 
+                            ? `bg-emerald-100 dark:bg-emerald-900/50 border-emerald-300 dark:border-emerald-700 font-medium text-emerald-600 dark:text-emerald-400`
+                            : ''
+                        }`}
+                      >
+                        {option}
+                        {cookTimePreference === option && (
+                          <span className="ml-1">✓</span>
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                  
+                  {cookTimePreference && (
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Selected: <span className="font-medium text-emerald-600 dark:text-emerald-400">{cookTimePreference}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Ingredients Section */}
+                <div className="space-y-4">
+                  <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 flex items-center">
+                    <ShoppingBag className="h-4 w-4 mr-2 text-emerald-600" />
+                    What ingredients do you have?
+                  </h4>
+                  
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={newIngredient}
+                      onChange={(e) => setNewIngredient(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addIngredient()}
+                      placeholder="Add an ingredient..."
+                      className="flex-1"
+                    />
+                    <Button onClick={addIngredient}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
+                    </Button>
+                    
+                    {/* Voice button only shows if speech is supported */}
+                    {speechSupported && (
+                      <Button 
+                        variant={listening ? "destructive" : "outline"}
+                        onClick={listening ? stopVoiceRecognition : startVoiceRecognition}
+                        className={listening ? "animate-pulse" : ""}
+                      >
+                        {listening ? (
+                          <>
+                            <Square className="h-4 w-4 mr-1" />
+                            Stop
+                          </>
+                        ) : (
+                          <>
+                            <Mic className="h-4 w-4 mr-1" />
+                            Voice
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {/* Listening indicator and transcript feedback */}
+                  {listening && (
+                    <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-md">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                        <p className="text-sm text-red-600 dark:text-red-400">
+                          Listening... Say your ingredients and click Stop when done
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {transcript && !listening && (
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="font-medium">Last recording:</span> "{transcript}"
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <h5 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Common Ingredients</h5>
+                    <div className="flex flex-wrap gap-2">
+                      {COMMON_INGREDIENTS.map((item) => (
+                        <Button
+                          key={item}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addCommonItem(item, 'ingredients')}
+                          className={`${
+                            ingredients.includes(item) 
+                              ? `bg-emerald-100 dark:bg-emerald-900/50 border-emerald-300 dark:border-emerald-700 font-medium text-emerald-600 dark:text-emerald-400`
+                              : ''
+                          }`}
+                        >
+                          {item}
+                          {ingredients.includes(item) && (
+                            <span className="ml-1">✓</span>
+                          )}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h5 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      {ingredients.length > 0 ? `Your Ingredients (${ingredients.length})` : ''}
+                    </h5>
+                    <div className="flex flex-wrap gap-2">
+                      {ingredients.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic">No ingredients added yet</p>
+                      ) : (
+                        ingredients.map((item, index) => (
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+                          >
+                            {item}
+                            <button
+                              type="button"
+                              onClick={() => removeIngredient(index)}
+                              className="ml-1 hover:bg-emerald-200 dark:hover:bg-emerald-700 rounded-full p-1"
+                            >
+                              <X className="h-3 w-3" />
+                              <span className="sr-only">Remove {item}</span>
+                            </button>
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
               // Original layout for steps 1-3
               <div className="space-y-6">
@@ -1251,7 +1416,11 @@ interface SpeechRecognition extends EventTarget {
 // Extend the Window interface to include SpeechRecognition
 declare global {
   interface Window { 
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
+    SpeechRecognition: {
+      new(): SpeechRecognition;
+    };
+    webkitSpeechRecognition: {
+      new(): SpeechRecognition;
+    };
   }
 }

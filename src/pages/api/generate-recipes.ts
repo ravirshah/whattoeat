@@ -189,7 +189,7 @@ export default async function handler(
     console.log(`Token verified successfully for user: ${userId}`);
 
     // Get input data from request
-    const { ingredients, equipment, staples, dietaryPrefs, cuisinePrefs } = req.body;
+    const { ingredients, equipment, staples, dietaryPrefs, cuisinePrefs, cookTimePreference } = req.body;
     
     // Clean the input data 
     const cleanedIngredients = cleanArrayInput(ingredients);
@@ -197,9 +197,11 @@ export default async function handler(
     const cleanedStaples = cleanArrayInput(staples);
     const cleanedDietaryPrefs = cleanArrayInput(dietaryPrefs);
     const cleanedCuisinePrefs = cleanArrayInput(cuisinePrefs);
+    const cleanedCookTimePreference = typeof cookTimePreference === 'string' ? cookTimePreference.trim() : '';
     
     console.log(`User provided: ${cleanedIngredients.length} ingredients, ${cleanedEquipment.length} equipment items,` + 
-      ` ${cleanedStaples.length} staples, ${cleanedDietaryPrefs.length} dietary preferences, and ${cleanedCuisinePrefs.length} cuisine preferences`);
+      ` ${cleanedStaples.length} staples, ${cleanedDietaryPrefs.length} dietary preferences, ${cleanedCuisinePrefs.length} cuisine preferences` +
+      (cleanedCookTimePreference ? `, and cook time preference: ${cleanedCookTimePreference}` : ''));
     
     // Update user stats in background (don't await this)
     incrementRecipesGenerated(userId).catch(error => {
@@ -225,7 +227,7 @@ export default async function handler(
       const model = genAI.getGenerativeModel({ model: modelName });
 
       // Build the prompt
-      let prompt = `Generate 3 original recipes based on these available ingredients, equipment, pantry staples, and dietary preferences.
+      let prompt = `Generate 3 original recipes based on these available ingredients, equipment, pantry staples, dietary preferences, and cook time preference.
 
 Available ingredients:
 ${cleanedIngredients.join(", ")}
@@ -242,6 +244,9 @@ ${cleanedDietaryPrefs.join(", ")}
 Cuisine preferences:
 ${cleanedCuisinePrefs.join(", ")}
 
+Cook time preference:
+${cleanedCookTimePreference}
+
 For each recipe, provide:
 1. Name
 2. Ingredients list with measurements
@@ -249,6 +254,8 @@ For each recipe, provide:
 4. Basic nutritional facts
 5. Serving size
 6. Preparation and cooking time
+
+${cleanedCookTimePreference ? `IMPORTANT: Please ensure all recipes respect the cook time preference of "${cleanedCookTimePreference}". Adjust recipe complexity and cooking methods accordingly.` : ''}
 
 Return ONLY a JSON array with exactly this format:
 [

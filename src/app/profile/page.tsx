@@ -64,6 +64,7 @@ function Profile() {
   const [newDietaryPref, setNewDietaryPref] = useState('');
   const [cuisinePrefs, setCuisinePrefs] = useState<string[]>([]);
   const [newCuisinePref, setNewCuisinePref] = useState('');
+  const [cookTimePreference, setCookTimePreference] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   
@@ -79,6 +80,7 @@ function Profile() {
             setStaples(prefs.staples || []);
             setDietaryPrefs(prefs.dietaryPrefs || []);
             setCuisinePrefs(prefs.cuisinePrefs || []);
+            setCookTimePreference(prefs.cookTimePreference || '');
           }
           
           // Set display name from user profile
@@ -167,7 +169,8 @@ function Profile() {
         equipment,
         staples,
         dietaryPrefs,
-        cuisinePrefs
+        cuisinePrefs,
+        cookTimePreference
       });
       
       toast.success('Preferences saved', {
@@ -203,6 +206,7 @@ function Profile() {
   const commonStaples = ['Salt', 'Pepper', 'Olive Oil', 'Flour', 'Sugar', 'Butter', 'Soy Sauce', 'Vinegar', 'Spices'];
   const commonDietaryPrefs = ['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Low-Carb', 'Keto', 'Paleo', 'Nut-Free'];
   const commonCuisinePrefs = ['American', 'Italian', 'Chinese', 'Thai', 'Indian', 'Japanese', 'Mexican', 'Mediterranean', 'French', 'Korean'];
+  const cookTimeOptions = ['Under 30 minutes', 'Under 1 hour', 'Longer dish'];
   
   // Add a preset item
   const addPresetItem = (item: string, listType: 'ingredients' | 'equipment' | 'staples' | 'dietary' | 'cuisine') => {
@@ -332,6 +336,7 @@ function Profile() {
                 <TabsTrigger value="staples" className="flex-1">Staples</TabsTrigger>
                 <TabsTrigger value="dietary" className="flex-1">Dietary</TabsTrigger>
                 <TabsTrigger value="cuisine" className="flex-1">Cuisine</TabsTrigger>
+                <TabsTrigger value="cooktime" className="flex-1">Cook Time</TabsTrigger>
               </TabsList>
               
               {/* Ingredients Tab */}
@@ -683,6 +688,62 @@ function Profile() {
                             </button>
                           </Badge>
                         ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              {/* Cook Time Tab */}
+              <TabsContent value="cooktime">
+                <div className="space-y-4">
+                  <Alert className="bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800">
+                    <Info className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <AlertDescription className="text-emerald-800 dark:text-emerald-300">
+                      Set your default cook time preference for recipe generation
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">How much time do you typically want to spend cooking?</h4>
+                    <div className="flex flex-wrap gap-2 mb-6">
+                      {cookTimeOptions.map((option) => (
+                        <Button
+                          key={option}
+                          size="sm"
+                          variant="outline"
+                          className={cookTimePreference === option ? "bg-emerald-100 dark:bg-emerald-900/50 border-emerald-300 dark:border-emerald-700 font-medium text-emerald-600 dark:text-emerald-400" : ""}
+                          onClick={() => setCookTimePreference(option)}
+                        >
+                          {option}
+                          {cookTimePreference === option && (
+                            <span className="ml-1">✓</span>
+                          )}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Current Preference</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {cookTimePreference ? (
+                        <Badge
+                          variant="outline"
+                          className="bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
+                        >
+                          {cookTimePreference}
+                          <button
+                            type="button"
+                            onClick={() => setCookTimePreference('')}
+                            className="ml-1 hover:bg-emerald-100 dark:hover:bg-emerald-800 rounded-full p-1"
+                          >
+                            <X className="h-3 w-3" />
+                            <span className="sr-only">Clear preference</span>
+                          </button>
+                        </Badge>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic">No cook time preference set</p>
                       )}
                     </div>
                   </div>

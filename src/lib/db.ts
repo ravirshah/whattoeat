@@ -22,6 +22,7 @@ import {
     staples: string[];
     dietaryPrefs: string[];
     cuisinePrefs: string[];
+    cookTimePreference?: string;
   }
   
   interface Recipe {
