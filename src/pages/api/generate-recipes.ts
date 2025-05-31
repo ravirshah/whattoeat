@@ -181,6 +181,11 @@ export default async function handler(
     return res.status(401).json({ error: 'Unauthorized - No token provided' });
   }
 
+  // Detect mobile device from user agent for timeout optimization
+  const userAgent = req.headers['user-agent'] || '';
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  console.log(`Request from ${isMobile ? 'mobile' : 'desktop'} device`);
+
   try {
     console.log("Verifying token...");
     // Verify the token
@@ -320,31 +325,45 @@ Return ONLY a valid JSON array with this exact structure:
 - Ensure measurements and instructions are precise and practical`;
 
       console.log("Sending request to Gemini API...");
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 4096,
-        },
-        safetySettings: [
-          {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-          },
-        ],
+      
+      // Use shorter timeout for mobile devices
+      const apiTimeout = isMobile ? 35000 : 50000; // 35s for mobile, 50s for desktop
+      console.log(`Using ${apiTimeout/1000}s timeout for ${isMobile ? 'mobile' : 'desktop'} device`);
+      
+      // Create a timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error(`Gemini API timeout after ${apiTimeout/1000}s`)), apiTimeout);
       });
+      
+      // Race the API call against the timeout
+      const result = await Promise.race([
+        model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: isMobile ? 3072 : 4096, // Smaller response for mobile
+          },
+          safetySettings: [
+            {
+              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+              threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+              threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+              threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+              threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            },
+          ],
+        }),
+        timeoutPromise
+      ]);
 
       const response = result.response;
       if (!response) {
