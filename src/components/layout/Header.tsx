@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui';
-import { Menu, User, ChefHat, LogOut, Home, BookOpen } from 'lucide-react';
+import { Menu, User, ChefHat, LogOut, Home, BookOpen, Calendar } from 'lucide-react';
 
 export default function Header() {
   const { currentUser, loading } = useAuth();
@@ -73,11 +73,18 @@ export default function Header() {
             Generate Recipes
           </Link>
           {currentUser && (
-            <Link href="/recipes" className={`text-sm font-medium transition-colors hover:text-emerald-600 ${
-              isActive('/recipes') ? 'text-emerald-600' : 'text-gray-700 dark:text-gray-200'
-            }`}>
-              My Recipes
-            </Link>
+            <>
+              <Link href="/recipes" className={`text-sm font-medium transition-colors hover:text-emerald-600 ${
+                isActive('/recipes') ? 'text-emerald-600' : 'text-gray-700 dark:text-gray-200'
+              }`}>
+                My Recipes
+              </Link>
+              <Link href="/weekly-planner" className={`text-sm font-medium transition-colors hover:text-emerald-600 ${
+                isActive('/weekly-planner') ? 'text-emerald-600' : 'text-gray-700 dark:text-gray-200'
+              }`}>
+                Weekly Meal Planner
+              </Link>
+            </>
           )}
         </nav>
 
@@ -114,6 +121,12 @@ export default function Header() {
                   <Link href="/recipes" className="cursor-pointer">
                     <BookOpen className="mr-2 h-4 w-4" />
                     <span>My Recipes</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/weekly-planner" className="cursor-pointer">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    <span>Weekly Meal Planner</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -168,13 +181,22 @@ export default function Header() {
                     Generate Recipes
                   </Link>
                   {currentUser && (
-                    <Link 
-                      href="/recipes" 
-                      className="flex items-center px-2 py-1 text-base font-medium text-gray-700 hover:text-emerald-600 hover:bg-gray-100 rounded-md transition dark:text-gray-100 dark:hover:bg-gray-800"
-                    >
-                      <BookOpen className="h-5 w-5 mr-2" />
-                      My Recipes
-                    </Link>
+                    <>
+                      <Link 
+                        href="/recipes" 
+                        className="flex items-center px-2 py-1 text-base font-medium text-gray-700 hover:text-emerald-600 hover:bg-gray-100 rounded-md transition dark:text-gray-100 dark:hover:bg-gray-800"
+                      >
+                        <BookOpen className="h-5 w-5 mr-2" />
+                        My Recipes
+                      </Link>
+                      <Link 
+                        href="/weekly-planner" 
+                        className="flex items-center px-2 py-1 text-base font-medium text-gray-700 hover:text-emerald-600 hover:bg-gray-100 rounded-md transition dark:text-gray-100 dark:hover:bg-gray-800"
+                      >
+                        <Calendar className="h-5 w-5 mr-2" />
+                        Weekly Meal Planner
+                      </Link>
+                    </>
                   )}
                 </nav>
               </div>
