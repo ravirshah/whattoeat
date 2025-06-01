@@ -13,6 +13,8 @@ interface RecipeSelectorProps {
   isOpen: boolean;
   onClose: () => void;
   onRecipeSelect: (meal: PlannedMeal) => void;
+  existingMeal?: PlannedMeal | null;
+  mode?: 'add' | 'view' | 'edit';
 }
 
 interface GoalRecipe {
@@ -49,7 +51,9 @@ export default function RecipeSelector({
   activeGoal,
   isOpen,
   onClose,
-  onRecipeSelect
+  onRecipeSelect,
+  existingMeal,
+  mode = 'add'
 }: RecipeSelectorProps) {
   const [selectedMealType, setSelectedMealType] = useState<MealType>('Lunch');
   const [selectedServings, setSelectedServings] = useState(1);
@@ -59,12 +63,36 @@ export default function RecipeSelector({
   const [selectedRecipe, setSelectedRecipe] = useState<GoalRecipe | null>(null);
   const [showNutritionDetails, setShowNutritionDetails] = useState(false);
 
+  // Initialize state from existing meal if in view/edit mode
   useEffect(() => {
-    if (isOpen && activeGoal) {
-      // Auto-generate recipes when opened if we have a goal
-      generateGoalBasedRecipes();
+    if (existingMeal && (mode === 'view' || mode === 'edit')) {
+      setSelectedMealType(existingMeal.mealType);
+      setSelectedServings(existingMeal.servings);
+      setSelectedCarbBase(existingMeal.carbBase || '');
+      
+      // If we have recipe details, show them
+      if (existingMeal.recipeDetails) {
+        const existingRecipe: GoalRecipe = {
+          name: existingMeal.recipeName,
+          ingredients: existingMeal.recipeDetails.ingredients,
+          instructions: existingMeal.recipeDetails.instructions,
+          nutritionalFacts: existingMeal.recipeDetails.nutritionalFacts,
+          servings: existingMeal.servings.toString(),
+          times: existingMeal.recipeDetails.times,
+          goalAlignment: existingMeal.recipeDetails.goalAlignment || {
+            macroFit: 'Previously selected recipe',
+            calorieTarget: 'N/A'
+          }
+        };
+        setGeneratedRecipes([existingRecipe]);
+        setSelectedRecipe(existingRecipe);
+      }
+    } else {
+      // Reset for add mode
+      setGeneratedRecipes([]);
+      setSelectedRecipe(null);
     }
-  }, [isOpen, activeGoal, selectedMealType]);
+  }, [existingMeal, mode, isOpen]);
 
   const generateGoalBasedRecipes = async () => {
     if (!activeGoal) {
@@ -118,18 +146,31 @@ export default function RecipeSelector({
 
   const handleRecipeSelect = (recipe: GoalRecipe) => {
     const newMeal: PlannedMeal = {
-      id: `meal_${Date.now()}`,
+      id: existingMeal?.id || `meal_${Date.now()}`,
       recipeName: recipe.name,
       mealType: selectedMealType,
       servings: selectedServings,
-      notes: '',
+      notes: existingMeal?.notes || '',
       carbBase: selectedCarbBase || undefined,
-      plannedAt: Timestamp.now()
+      plannedAt: existingMeal?.plannedAt || Timestamp.now(),
+      // Save full recipe details for future viewing
+      recipeDetails: {
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+        nutritionalFacts: recipe.nutritionalFacts,
+        times: recipe.times,
+        goalAlignment: recipe.goalAlignment
+      }
     };
 
     onRecipeSelect(newMeal);
     onClose();
-    toast.success(`Added "${recipe.name}" to ${selectedDay}`);
+    
+    if (mode === 'edit') {
+      toast.success(`Updated "${recipe.name}" in ${selectedDay}`);
+    } else {
+      toast.success(`Added "${recipe.name}" to ${selectedDay}`);
+    }
   };
 
   const getMacroBarWidth = (value: number, goal: number) => {
@@ -155,10 +196,13 @@ export default function RecipeSelector({
             <Sparkles className="h-6 w-6 text-emerald-600" />
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                Add Meal to {selectedDay}
+                {mode === 'view' ? `View Recipe - ${selectedDay}` : 
+                 mode === 'edit' ? `Edit Meal - ${selectedDay}` :
+                 `Add Meal to ${selectedDay}`}
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {activeGoal ? `Recipes tailored for your ${activeGoal.name} goal` : 'Select a recipe for your meal plan'}
+                {mode === 'view' ? `Recipe details for ${existingMeal?.recipeName}` :
+                 activeGoal ? `Recipes tailored for your ${activeGoal.name} goal` : 'Select a recipe for your meal plan'}
               </p>
             </div>
           </div>
@@ -182,6 +226,7 @@ export default function RecipeSelector({
                       size="sm"
                       onClick={() => setSelectedMealType(type)}
                       className="text-xs"
+                      disabled={mode === 'view'}
                     >
                       {type}
                     </Button>
@@ -197,7 +242,7 @@ export default function RecipeSelector({
                     variant="outline"
                     size="sm"
                     onClick={() => setSelectedServings(Math.max(1, selectedServings - 1))}
-                    disabled={selectedServings <= 1}
+                    disabled={selectedServings <= 1 || mode === 'view'}
                   >
                     -
                   </Button>
@@ -206,7 +251,7 @@ export default function RecipeSelector({
                     variant="outline"
                     size="sm"
                     onClick={() => setSelectedServings(Math.min(8, selectedServings + 1))}
-                    disabled={selectedServings >= 8}
+                    disabled={selectedServings >= 8 || mode === 'view'}
                   >
                     +
                   </Button>
@@ -220,6 +265,7 @@ export default function RecipeSelector({
                   value={selectedCarbBase}
                   onChange={(e) => setSelectedCarbBase(e.target.value)}
                   className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  disabled={mode === 'view'}
                 >
                   <option value="">No preference</option>
                   {CARB_BASE_OPTIONS.map(base => (
@@ -251,23 +297,25 @@ export default function RecipeSelector({
               )}
 
               {/* Generate Button */}
-              <Button
-                onClick={generateGoalBasedRecipes}
-                disabled={isGenerating || !activeGoal}
-                className="w-full"
-              >
-                {isGenerating ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Generating...
-                  </div>
-                ) : (
-                  <div className="flex items-center">
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Generate Goal-Based Recipes
-                  </div>
-                )}
-              </Button>
+              {mode !== 'view' && (
+                <Button
+                  onClick={generateGoalBasedRecipes}
+                  disabled={isGenerating || !activeGoal}
+                  className="w-full"
+                >
+                  {isGenerating ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Generating...
+                    </div>
+                  ) : (
+                    <div className="flex items-center">
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate Goal-Based Recipes
+                    </div>
+                  )}
+                </Button>
+              )}
             </div>
           </div>
 

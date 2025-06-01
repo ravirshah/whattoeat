@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { WeeklyPlan, UserGoal, PlannerViewState, DayOfWeek, PlannedMeal } from '@/types/weekly-planner';
 import { Button } from '@/components/ui';
-import { Plus, Calendar, ChevronLeft, ChevronRight, Target, Clock, User, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Calendar, ChevronLeft, ChevronRight, Target, Clock, User, Edit2, Trash2, Eye, Copy } from 'lucide-react';
 import { addMealToPlan, removeMealFromPlan, updateWeeklyPlan } from '@/lib/weekly-planner-db';
 import { toast } from 'sonner';
 import { Timestamp } from 'firebase/firestore';
@@ -37,6 +37,7 @@ export default function PlannerView({
   onPlanUpdate
 }: PlannerViewProps) {
   const [draggedMeal, setDraggedMeal] = useState<{ meal: PlannedMeal; sourceDay: DayOfWeek } | null>(null);
+  const [copyMode, setCopyMode] = useState<{ meal: PlannedMeal; sourceDay: DayOfWeek } | null>(null);
 
   // Handle different date types (Date object or Firestore Timestamp)
   const weekStartDate = weeklyPlan.weekStartDate instanceof Date 
@@ -50,25 +51,50 @@ export default function PlannerView({
   };
 
   const handleAddMeal = (day: DayOfWeek) => {
+    // If in copy mode, copy the meal to this day
+    if (copyMode) {
+      copyMealToDay(day);
+      return;
+    }
+
     onStateUpdate({
       selectedDay: day,
-      isAddingMeal: true
+      isAddingMeal: true,
+      modalMode: 'add'
     });
   };
 
   const handleRecipeSelect = async (meal: PlannedMeal) => {
     try {
-      const updatedPlan = {
-        ...weeklyPlan,
-        meals: {
-          ...weeklyPlan.meals,
-          [plannerState.selectedDay!]: [
-            ...weeklyPlan.meals[plannerState.selectedDay!],
-            meal
-          ]
-        },
-        updatedAt: Timestamp.now()
-      };
+      let updatedPlan;
+      
+      if (plannerState.modalMode === 'edit' && plannerState.selectedMeal) {
+        // Update existing meal
+        const dayMeals = weeklyPlan.meals[plannerState.selectedDay!];
+        const updatedMeals = dayMeals.map(m => m.id === plannerState.selectedMeal!.id ? meal : m);
+        
+        updatedPlan = {
+          ...weeklyPlan,
+          meals: {
+            ...weeklyPlan.meals,
+            [plannerState.selectedDay!]: updatedMeals
+          },
+          updatedAt: Timestamp.now()
+        };
+      } else {
+        // Add new meal
+        updatedPlan = {
+          ...weeklyPlan,
+          meals: {
+            ...weeklyPlan.meals,
+            [plannerState.selectedDay!]: [
+              ...weeklyPlan.meals[plannerState.selectedDay!],
+              meal
+            ]
+          },
+          updatedAt: Timestamp.now()
+        };
+      }
 
       // Update in database
       await updateWeeklyPlan(weeklyPlan.id, {
@@ -80,13 +106,15 @@ export default function PlannerView({
       onStateUpdate({ 
         isAddingMeal: false, 
         selectedDay: null,
-        selectedMeal: null
+        selectedMeal: null,
+        modalMode: undefined
       });
 
-      toast.success(`Added "${meal.recipeName}" to ${plannerState.selectedDay}`);
+      const action = plannerState.modalMode === 'edit' ? 'Updated' : 'Added';
+      toast.success(`${action} "${meal.recipeName}" ${plannerState.modalMode === 'edit' ? 'in' : 'to'} ${plannerState.selectedDay}`);
     } catch (error) {
-      console.error('Error adding meal:', error);
-      toast.error('Failed to add meal. Please try again.');
+      console.error('Error saving meal:', error);
+      toast.error('Failed to save meal. Please try again.');
     }
   };
 
@@ -94,8 +122,59 @@ export default function PlannerView({
     onStateUpdate({
       selectedDay: day,
       selectedMeal: meal,
-      isAddingMeal: true // Reuse the same modal for editing
+      isAddingMeal: true,
+      modalMode: 'edit'
     });
+  };
+
+  const handleMealView = (day: DayOfWeek, meal: PlannedMeal) => {
+    onStateUpdate({
+      selectedDay: day,
+      selectedMeal: meal,
+      isAddingMeal: true,
+      modalMode: 'view'
+    });
+  };
+
+  const handleMealCopy = (day: DayOfWeek, meal: PlannedMeal) => {
+    setCopyMode({ meal, sourceDay: day });
+    toast.info(`Click on any day to copy "${meal.recipeName}" there. Click elsewhere to cancel.`);
+  };
+
+  const copyMealToDay = async (targetDay: DayOfWeek) => {
+    if (!copyMode) return;
+
+    try {
+      // Create a copy of the meal with a new ID
+      const copiedMeal: PlannedMeal = {
+        ...copyMode.meal,
+        id: `meal_${Date.now()}`,
+        plannedAt: Timestamp.now()
+      };
+
+      // Add to target day
+      const updatedPlan = {
+        ...weeklyPlan,
+        meals: {
+          ...weeklyPlan.meals,
+          [targetDay]: [...weeklyPlan.meals[targetDay], copiedMeal]
+        },
+        updatedAt: Timestamp.now()
+      };
+
+      // Update in database
+      await updateWeeklyPlan(weeklyPlan.id, {
+        meals: updatedPlan.meals,
+        updatedAt: updatedPlan.updatedAt
+      });
+
+      onPlanUpdate(updatedPlan);
+      setCopyMode(null);
+      toast.success(`Copied "${copiedMeal.recipeName}" to ${targetDay}`);
+    } catch (error) {
+      console.error('Error copying meal:', error);
+      toast.error('Failed to copy meal. Please try again.');
+    }
   };
 
   const handleMealDelete = async (day: DayOfWeek, mealId: string) => {
@@ -191,8 +270,16 @@ export default function PlannerView({
     }
   };
 
+  // Cancel copy mode when clicking outside
+  const handleCancelCopy = () => {
+    if (copyMode) {
+      setCopyMode(null);
+      toast.info('Copy cancelled');
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" onClick={handleCancelCopy}>
       {/* Week Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -214,17 +301,55 @@ export default function PlannerView({
         </div>
       </div>
 
+      {/* Copy Mode Banner */}
+      {copyMode && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Copy className="h-5 w-5 text-blue-600" />
+              <div>
+                <h4 className="font-medium text-blue-900 dark:text-blue-100">
+                  Copy Mode Active
+                </h4>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  Click on any day to copy "{copyMode.meal.recipeName}" there
+                </p>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCancelCopy();
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Weekly Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
         {DAYS_OF_WEEK.map((day, index) => {
           const dayMeals = weeklyPlan.meals[day] || [];
+          const isCopyTarget = copyMode && copyMode.sourceDay !== day;
 
           return (
             <div
               key={day}
-              className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 min-h-[300px] flex flex-col"
+              className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 min-h-[300px] flex flex-col ${
+                isCopyTarget ? 'border-blue-300 bg-blue-50 dark:bg-blue-900/10 shadow-md' : ''
+              }`}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, day)}
+              onClick={(e) => {
+                if (copyMode) {
+                  e.stopPropagation();
+                  copyMealToDay(day);
+                }
+              }}
             >
               {/* Day Header */}
               <div className="flex items-center justify-between mb-4">
@@ -235,12 +360,20 @@ export default function PlannerView({
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {formatDate(weekStartDate, index)}
                   </p>
+                  {isCopyTarget && (
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                      Click to copy here
+                    </p>
+                  )}
                 </div>
                 
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleAddMeal(day)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddMeal(day);
+                  }}
                   className="h-8 w-8 p-0"
                 >
                   <Plus className="h-4 w-4" />
@@ -268,7 +401,7 @@ export default function PlannerView({
                             </span>
                           )}
                         </div>
-                        <h4 className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                        <h4 className="font-medium text-sm text-gray-900 dark:text-white line-clamp-2 leading-tight">
                           {meal.recipeName}
                         </h4>
                         {meal.carbBase && (
@@ -294,6 +427,28 @@ export default function PlannerView({
                           className="h-6 w-6 p-0"
                         >
                           <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMealView(day, meal);
+                          }}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMealCopy(day, meal);
+                          }}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Copy className="h-3 w-3" />
                         </Button>
                         <Button
                           size="sm"
@@ -326,7 +481,10 @@ export default function PlannerView({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleAddMeal(day)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddMeal(day);
+                      }}
                       className="mt-2"
                     >
                       Add meal
@@ -410,8 +568,10 @@ export default function PlannerView({
         selectedDay={plannerState.selectedDay!}
         activeGoal={activeGoal}
         isOpen={plannerState.isAddingMeal}
-        onClose={() => onStateUpdate({ isAddingMeal: false, selectedDay: null })}
+        onClose={() => onStateUpdate({ isAddingMeal: false, selectedDay: null, selectedMeal: null, modalMode: undefined })}
         onRecipeSelect={handleRecipeSelect}
+        existingMeal={plannerState.selectedMeal}
+        mode={plannerState.modalMode || 'add'}
       />
     </div>
   );

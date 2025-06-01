@@ -13,6 +13,26 @@ export interface PlannedMeal {
   carbBase?: string; // For flexible carb substitutions (e.g., "rice", "quinoa")
   modifications?: string[]; // Array of modifications like "extra protein", "no dairy"
   plannedAt: Timestamp;
+  // Add full recipe details for viewing saved recipes
+  recipeDetails?: {
+    ingredients: string[];
+    instructions: string[];
+    nutritionalFacts: {
+      calories: number;
+      protein: number;
+      carbs: number;
+      fat: number;
+      fiber: number;
+      sugar: number;
+      sodium: number;
+    };
+    times: string;
+    goalAlignment?: {
+      macroFit: string;
+      calorieTarget: string;
+      nutritionalBenefits?: string;
+    };
+  };
 }
 
 export interface WeeklyPlan {
@@ -89,6 +109,7 @@ export interface PlannerViewState {
   isEditingGoals: boolean;
   showGroceryList: boolean;
   draggedMeal: PlannedMeal | null;
+  modalMode?: 'add' | 'edit' | 'view'; // Track the mode of the recipe selector modal
 }
 
 // For recipe selection modal

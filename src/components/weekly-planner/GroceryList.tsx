@@ -52,33 +52,64 @@ export default function GroceryList({
         return;
       }
 
-      // For now, we'll create a simplified grocery list
-      // In a full implementation, we'd fetch actual recipe ingredients
-      const mockIngredients: GroceryItem[] = allMeals.map((meal, index) => ({
-        id: `item_${index}`,
-        name: `Ingredients for ${meal.recipeName}`,
-        quantity: `${meal.servings} servings`,
-        category: 'General',
-        fromRecipes: [meal.recipeName],
-        isChecked: false
-      }));
+      // Extract ingredients from meals that have recipe details
+      const groceryItems: GroceryItem[] = [];
+      let itemIndex = 0;
 
-      // Add common ingredients based on meal types
-      const additionalItems: GroceryItem[] = [];
-      
-      // Add carb bases
+      allMeals.forEach((meal) => {
+        if (meal.recipeDetails && meal.recipeDetails.ingredients) {
+          // Add each ingredient from the recipe
+          meal.recipeDetails.ingredients.forEach((ingredient) => {
+            // Check if this ingredient already exists in the list
+            const existingItem = groceryItems.find(item => 
+              item.name.toLowerCase().includes(ingredient.toLowerCase()) ||
+              ingredient.toLowerCase().includes(item.name.toLowerCase())
+            );
+
+            if (existingItem) {
+              // Add this recipe to the existing item's fromRecipes
+              if (!existingItem.fromRecipes.includes(meal.recipeName)) {
+                existingItem.fromRecipes.push(meal.recipeName);
+              }
+            } else {
+              // Create new grocery item
+              groceryItems.push({
+                id: `item_${itemIndex++}`,
+                name: ingredient,
+                quantity: `${meal.servings} servings`,
+                category: categorizeIngredient(ingredient),
+                fromRecipes: [meal.recipeName],
+                isChecked: false
+              });
+            }
+          });
+        } else {
+          // Fallback for meals without recipe details
+          groceryItems.push({
+            id: `item_${itemIndex++}`,
+            name: `Ingredients for ${meal.recipeName}`,
+            quantity: `${meal.servings} servings`,
+            category: 'General',
+            fromRecipes: [meal.recipeName],
+            isChecked: false
+          });
+        }
+      });
+
+      // Add carb bases as separate items
       const carbBases = allMeals
         .filter(meal => meal.carbBase)
         .map(meal => meal.carbBase!)
         .filter((base, index, array) => array.indexOf(base) === index);
       
-      carbBases.forEach((base, index) => {
-        additionalItems.push({
-          id: `carb_${index}`,
+      carbBases.forEach((base) => {
+        const relatedMeals = allMeals.filter(meal => meal.carbBase === base);
+        groceryItems.push({
+          id: `carb_${itemIndex++}`,
           name: base,
-          quantity: '1 lb',
-          category: 'Grains',
-          fromRecipes: allMeals.filter(meal => meal.carbBase === base).map(meal => meal.recipeName),
+          quantity: `${relatedMeals.reduce((sum, meal) => sum + meal.servings, 0)} servings`,
+          category: 'Grains & Starches',
+          fromRecipes: relatedMeals.map(meal => meal.recipeName),
           isChecked: false
         });
       });
@@ -86,7 +117,7 @@ export default function GroceryList({
       const newGroceryList: Omit<GroceryListType, 'id'> = {
         userId,
         weeklyPlanId: weeklyPlan.id,
-        items: [...mockIngredients, ...additionalItems],
+        items: groceryItems,
         userIngredients,
         generatedAt: new Date() as any,
         isCompleted: false
@@ -99,13 +130,51 @@ export default function GroceryList({
       };
 
       setGroceryList(createdList);
-      toast.success('Grocery list generated successfully!');
+      toast.success(`Grocery list generated with ${groceryItems.length} items!`);
     } catch (error) {
       console.error('Error generating grocery list:', error);
       toast.error('Failed to generate grocery list');
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Helper function to categorize ingredients
+  const categorizeIngredient = (ingredient: string): string => {
+    const lowerIngredient = ingredient.toLowerCase();
+    
+    if (lowerIngredient.includes('chicken') || lowerIngredient.includes('beef') || 
+        lowerIngredient.includes('pork') || lowerIngredient.includes('fish') ||
+        lowerIngredient.includes('salmon') || lowerIngredient.includes('turkey')) {
+      return 'Meat & Seafood';
+    }
+    
+    if (lowerIngredient.includes('milk') || lowerIngredient.includes('cheese') || 
+        lowerIngredient.includes('yogurt') || lowerIngredient.includes('butter') ||
+        lowerIngredient.includes('cream')) {
+      return 'Dairy';
+    }
+    
+    if (lowerIngredient.includes('tomato') || lowerIngredient.includes('onion') || 
+        lowerIngredient.includes('carrot') || lowerIngredient.includes('pepper') ||
+        lowerIngredient.includes('lettuce') || lowerIngredient.includes('spinach') ||
+        lowerIngredient.includes('broccoli') || lowerIngredient.includes('cucumber')) {
+      return 'Produce';
+    }
+    
+    if (lowerIngredient.includes('rice') || lowerIngredient.includes('pasta') || 
+        lowerIngredient.includes('bread') || lowerIngredient.includes('quinoa') ||
+        lowerIngredient.includes('oats') || lowerIngredient.includes('flour')) {
+      return 'Grains & Starches';
+    }
+    
+    if (lowerIngredient.includes('oil') || lowerIngredient.includes('vinegar') || 
+        lowerIngredient.includes('salt') || lowerIngredient.includes('pepper') ||
+        lowerIngredient.includes('spice') || lowerIngredient.includes('herb')) {
+      return 'Pantry';
+    }
+    
+    return 'General';
   };
 
   const toggleItemChecked = async (itemId: string) => {
