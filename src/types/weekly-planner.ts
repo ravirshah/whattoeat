@@ -33,6 +33,15 @@ export interface PlannedMeal {
       nutritionalBenefits?: string;
     };
   };
+  // New fields for enhanced features
+  isFavorite?: boolean;
+  rating?: number; // 1-5 star rating
+  lastCooked?: Timestamp;
+  timesCooked?: number;
+  prepTime?: number; // in minutes
+  cookTime?: number; // in minutes
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
+  tags?: string[]; // e.g., ['quick', 'healthy', 'comfort-food']
 }
 
 export interface WeeklyPlan {
@@ -80,6 +89,12 @@ export interface GroceryItem {
   fromRecipes: string[]; // Array of recipe names that require this ingredient
   isChecked: boolean;
   estimatedCost?: number;
+  // New fields for store layout
+  storeSection?: string; // More specific than category
+  aisle?: number;
+  priority?: 'high' | 'medium' | 'low'; // For meal prep planning
+  shelfLife?: number; // days until expiration
+  storageInstructions?: string;
 }
 
 export interface GroceryList {
@@ -110,6 +125,13 @@ export interface PlannerViewState {
   showGroceryList: boolean;
   draggedMeal: PlannedMeal | null;
   modalMode?: 'add' | 'edit' | 'view'; // Track the mode of the recipe selector modal
+  // New UI states for enhanced features
+  showNutritionTracker: boolean;
+  showRecipeHistory: boolean;
+  showFavorites: boolean;
+  showMealPrepPlanner: boolean;
+  showStoreLayoutEditor: boolean;
+  selectedNutritionDate?: Date;
 }
 
 // For recipe selection modal
@@ -127,4 +149,119 @@ export interface RecipeForPlanning {
     carbs?: number;
     fat?: number;
   };
+}
+
+// New interface for recipe history
+export interface RecipeHistory {
+  id: string;
+  userId: string;
+  recipeId: string;
+  recipeName: string;
+  cookedAt: Timestamp;
+  rating?: number;
+  notes?: string;
+  modifications?: string[];
+  servings: number;
+  nutritionalInfo: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber: number;
+  };
+}
+
+// New interface for favorite recipes
+export interface FavoriteRecipe {
+  id: string;
+  userId: string;
+  recipeName: string;
+  recipeDetails: {
+    ingredients: string[];
+    instructions: string[];
+    nutritionalFacts: {
+      calories: number;
+      protein: number;
+      carbs: number;
+      fat: number;
+      fiber: number;
+      sugar: number;
+      sodium: number;
+    };
+    times: string;
+  };
+  tags?: string[];
+  rating: number;
+  addedAt: Timestamp;
+  lastCooked?: Timestamp;
+  timesCooked: number;
+  averageCookTime?: number;
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
+}
+
+// New interface for store layout customization
+export interface StoreLayout {
+  id: string;
+  userId: string;
+  storeName: string;
+  isDefault: boolean;
+  sections: StoreSection[];
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface StoreSection {
+  id: string;
+  name: string;
+  aisle?: number;
+  order: number; // for custom ordering
+  categories: string[]; // which categories belong to this section
+}
+
+// New interface for nutrition tracking
+export interface NutritionEntry {
+  id: string;
+  userId: string;
+  date: Date;
+  meals: {
+    breakfast: MacroTarget;
+    lunch: MacroTarget;
+    dinner: MacroTarget;
+    snacks: MacroTarget;
+  };
+  dailyTotals: MacroTarget;
+  goalTargets: MacroTarget;
+  waterIntake?: number; // in oz
+  notes?: string;
+}
+
+// New interface for meal prep planning
+export interface MealPrepPlan {
+  id: string;
+  userId: string;
+  weeklyPlanId: string;
+  prepSessions: PrepSession[];
+  totalPrepTime: number; // estimated minutes
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface PrepSession {
+  id: string;
+  date: Date;
+  recipes: PrepRecipe[];
+  estimatedTime: number; // minutes
+  priority: 'high' | 'medium' | 'low';
+  status: 'planned' | 'in-progress' | 'completed';
+  actualTime?: number; // actual time taken
+  notes?: string;
+}
+
+export interface PrepRecipe {
+  recipeName: string;
+  servings: number;
+  prepSteps: string[];
+  storageInstructions: string;
+  shelfLife: number; // days
+  reheatingInstructions?: string;
 } 

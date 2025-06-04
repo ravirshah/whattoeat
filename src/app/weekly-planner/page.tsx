@@ -8,6 +8,10 @@ import MainLayout from '@/components/layout/MainLayout';
 import PlannerView from '@/components/weekly-planner/PlannerView';
 import GoalSetter from '@/components/weekly-planner/GoalSetter';
 import GroceryList from '@/components/weekly-planner/GroceryList';
+import RecipeHistory from '@/components/weekly-planner/RecipeHistory';
+import Favorites from '@/components/weekly-planner/Favorites';
+import NutritionTracker from '@/components/weekly-planner/NutritionTracker';
+import MealPrepPlanner from '@/components/weekly-planner/MealPrepPlanner';
 import { Button } from '@/components/ui';
 import { 
   Calendar, 
@@ -17,7 +21,11 @@ import {
   Settings,
   Download,
   User,
-  X
+  X,
+  History,
+  Heart,
+  BarChart3,
+  ChefHat
 } from 'lucide-react';
 import { 
   getCurrentWeeklyPlan, 
@@ -42,7 +50,14 @@ export default function WeeklyMealPlannerPage() {
     isAddingMeal: false,
     isEditingGoals: false,
     showGroceryList: false,
-    draggedMeal: null
+    draggedMeal: null,
+    // New UI states for enhanced features
+    showNutritionTracker: false,
+    showRecipeHistory: false,
+    showFavorites: false,
+    showMealPrepPlanner: false,
+    showStoreLayoutEditor: false,
+    selectedNutritionDate: undefined
   });
   const [isLoading, setIsLoading] = useState(true);
   // Keep test user option for development, but don't default to it
@@ -293,7 +308,8 @@ export default function WeeklyMealPlannerPage() {
               </p>
             </div>
             
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
+              {/* Core Features */}
               <Button
                 variant={plannerState.isEditingGoals ? "default" : "outline"}
                 size="sm"
@@ -310,6 +326,43 @@ export default function WeeklyMealPlannerPage() {
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Grocery List
+              </Button>
+
+              {/* Phase 1 Features */}
+              <Button
+                variant={plannerState.showRecipeHistory ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleStateUpdate({ showRecipeHistory: !plannerState.showRecipeHistory })}
+              >
+                <History className="h-4 w-4 mr-2" />
+                History
+              </Button>
+
+              <Button
+                variant={plannerState.showFavorites ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleStateUpdate({ showFavorites: !plannerState.showFavorites })}
+              >
+                <Heart className="h-4 w-4 mr-2" />
+                Favorites
+              </Button>
+
+              <Button
+                variant={plannerState.showNutritionTracker ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleStateUpdate({ showNutritionTracker: !plannerState.showNutritionTracker })}
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Nutrition
+              </Button>
+
+              <Button
+                variant={plannerState.showMealPrepPlanner ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleStateUpdate({ showMealPrepPlanner: !plannerState.showMealPrepPlanner })}
+              >
+                <ChefHat className="h-4 w-4 mr-2" />
+                Meal Prep
               </Button>
               
               <Button
@@ -369,6 +422,59 @@ export default function WeeklyMealPlannerPage() {
               weeklyPlan={currentPlan}
               userId={effectiveUser.uid}
               onClose={() => handleStateUpdate({ showGroceryList: false })}
+            />
+          </div>
+        )}
+
+        {/* Recipe History Panel */}
+        {plannerState.showRecipeHistory && (
+          <div className="mb-6">
+            <RecipeHistory
+              userId={effectiveUser.uid}
+              onClose={() => handleStateUpdate({ showRecipeHistory: false })}
+              onSelectRecipe={(recipeName) => {
+                // TODO: Implement adding recipe from history to current plan
+                toast.info(`Adding "${recipeName}" to plan - feature coming soon!`);
+                handleStateUpdate({ showRecipeHistory: false });
+              }}
+            />
+          </div>
+        )}
+
+        {/* Favorites Panel */}
+        {plannerState.showFavorites && (
+          <div className="mb-6">
+            <Favorites
+              userId={effectiveUser.uid}
+              onClose={() => handleStateUpdate({ showFavorites: false })}
+              onSelectRecipe={(recipe) => {
+                // TODO: Implement adding favorite recipe to current plan
+                toast.info(`Adding "${recipe.recipeName}" to your meal plan`);
+                handleStateUpdate({ showFavorites: false });
+              }}
+            />
+          </div>
+        )}
+
+        {/* Meal Prep Planner Panel */}
+        {plannerState.showMealPrepPlanner && currentPlan && (
+          <div className="mb-6">
+            <MealPrepPlanner
+              userId={effectiveUser.uid}
+              weeklyPlan={currentPlan}
+              onClose={() => handleStateUpdate({ showMealPrepPlanner: false })}
+            />
+          </div>
+        )}
+
+        {/* Nutrition Tracker Panel */}
+        {plannerState.showNutritionTracker && currentPlan && (
+          <div className="mb-6">
+            <NutritionTracker
+              userId={effectiveUser.uid}
+              activeGoal={activeGoal}
+              weeklyPlan={currentPlan}
+              onClose={() => handleStateUpdate({ showNutritionTracker: false })}
             />
           </div>
         )}

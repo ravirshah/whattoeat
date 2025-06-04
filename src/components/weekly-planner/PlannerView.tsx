@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { WeeklyPlan, UserGoal, PlannerViewState, DayOfWeek, PlannedMeal } from '@/types/weekly-planner';
+import { WeeklyPlan, UserGoal, PlannerViewState, DayOfWeek, PlannedMeal, MealType } from '@/types/weekly-planner';
 import { Button } from '@/components/ui';
-import { Plus, Calendar, ChevronLeft, ChevronRight, Target, Clock, User, Edit2, Trash2, Eye, Copy } from 'lucide-react';
+import { Plus, Calendar, ChevronLeft, ChevronRight, Target, Clock, User, Edit2, Trash2, Eye, Copy, History, Heart, BarChart3, ChefHat } from 'lucide-react';
 import { addMealToPlan, removeMealFromPlan, updateWeeklyPlan } from '@/lib/weekly-planner-db';
 import { toast } from 'sonner';
 import { Timestamp } from 'firebase/firestore';
 import RecipeSelector from './RecipeSelector';
+import RecipeHistory from './RecipeHistory';
+import Favorites from './Favorites';
 
 interface PlannerViewProps {
   weeklyPlan: WeeklyPlan;
@@ -27,6 +29,22 @@ const formatDate = (baseDate: Date, dayOffset: number) => {
   const date = new Date(baseDate);
   date.setDate(date.getDate() + dayOffset);
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+// Helper function to remove undefined values from objects before saving to Firestore
+const cleanUndefinedValues = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(cleanUndefinedValues);
+  } else if (obj !== null && typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = cleanUndefinedValues(value);
+      }
+    }
+    return cleaned;
+  }
+  return obj;
 };
 
 export default function PlannerView({
@@ -98,7 +116,7 @@ export default function PlannerView({
 
       // Update in database
       await updateWeeklyPlan(weeklyPlan.id, {
-        meals: updatedPlan.meals,
+        meals: cleanUndefinedValues(updatedPlan.meals),
         updatedAt: updatedPlan.updatedAt
       });
 
@@ -164,7 +182,7 @@ export default function PlannerView({
 
       // Update in database
       await updateWeeklyPlan(weeklyPlan.id, {
-        meals: updatedPlan.meals,
+        meals: cleanUndefinedValues(updatedPlan.meals),
         updatedAt: updatedPlan.updatedAt
       });
 
@@ -191,7 +209,7 @@ export default function PlannerView({
 
       // Update in database
       await updateWeeklyPlan(weeklyPlan.id, {
-        meals: updatedPlan.meals,
+        meals: cleanUndefinedValues(updatedPlan.meals),
         updatedAt: updatedPlan.updatedAt
       });
 
@@ -242,7 +260,7 @@ export default function PlannerView({
 
       // Update in database
       await updateWeeklyPlan(weeklyPlan.id, {
-        meals: updatedPlan.meals,
+        meals: cleanUndefinedValues(updatedPlan.meals),
         updatedAt: updatedPlan.updatedAt
       });
 
@@ -251,6 +269,70 @@ export default function PlannerView({
     } catch (error) {
       console.error('Error moving meal:', error);
       toast.error('Failed to move meal. Please try again.');
+    } finally {
+      setDraggedMeal(null);
+    }
+  };
+
+  const handleMealTypeChange = async (draggedMealData: { meal: PlannedMeal; sourceDay: DayOfWeek }, targetDay: DayOfWeek, newMealType: MealType) => {
+    if (!draggedMealData) return;
+    
+    const { meal, sourceDay } = draggedMealData;
+    
+    try {
+      // Create updated meal with new meal type
+      const updatedMeal = {
+        ...meal,
+        mealType: newMealType
+      };
+
+      let updatedPlan;
+      
+      if (sourceDay === targetDay) {
+        // Same day, just changing meal type
+        const dayMeals = weeklyPlan.meals[sourceDay];
+        const updatedMeals = dayMeals.map(m => m.id === meal.id ? updatedMeal : m);
+        
+        updatedPlan = {
+          ...weeklyPlan,
+          meals: {
+            ...weeklyPlan.meals,
+            [sourceDay]: updatedMeals
+          },
+          updatedAt: Timestamp.now()
+        };
+      } else {
+        // Different day, move and change meal type
+        const sourceMeals = weeklyPlan.meals[sourceDay].filter(m => m.id !== meal.id);
+        const targetMeals = [...weeklyPlan.meals[targetDay], updatedMeal];
+        
+        updatedPlan = {
+          ...weeklyPlan,
+          meals: {
+            ...weeklyPlan.meals,
+            [sourceDay]: sourceMeals,
+            [targetDay]: targetMeals
+          },
+          updatedAt: Timestamp.now()
+        };
+      }
+
+      // Update in database
+      await updateWeeklyPlan(weeklyPlan.id, {
+        meals: cleanUndefinedValues(updatedPlan.meals),
+        updatedAt: updatedPlan.updatedAt
+      });
+
+      onPlanUpdate(updatedPlan);
+      
+      if (sourceDay === targetDay) {
+        toast.success(`Changed "${meal.recipeName}" to ${newMealType}`);
+      } else {
+        toast.success(`Moved "${meal.recipeName}" from ${sourceDay} to ${targetDay} as ${newMealType}`);
+      }
+    } catch (error) {
+      console.error('Error changing meal type:', error);
+      toast.error('Failed to change meal type. Please try again.');
     } finally {
       setDraggedMeal(null);
     }
@@ -336,10 +418,18 @@ export default function PlannerView({
           const dayMeals = weeklyPlan.meals[day] || [];
           const isCopyTarget = copyMode && copyMode.sourceDay !== day;
 
+          // Group meals by type for better organization
+          const mealsByType = {
+            Breakfast: dayMeals.filter(meal => meal.mealType === 'Breakfast'),
+            Lunch: dayMeals.filter(meal => meal.mealType === 'Lunch'),
+            Dinner: dayMeals.filter(meal => meal.mealType === 'Dinner'),
+            Snack: dayMeals.filter(meal => meal.mealType === 'Snack')
+          };
+
           return (
             <div
               key={day}
-              className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 min-h-[300px] flex flex-col ${
+              className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 min-h-[400px] flex flex-col ${
                 isCopyTarget ? 'border-blue-300 bg-blue-50 dark:bg-blue-900/10 shadow-md' : ''
               }`}
               onDragOver={handleDragOver}
@@ -352,7 +442,7 @@ export default function PlannerView({
               }}
             >
               {/* Day Header */}
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                 <div>
                   <h3 className="font-medium text-gray-900 dark:text-white">
                     {day}
@@ -380,117 +470,148 @@ export default function PlannerView({
                 </Button>
               </div>
 
-              {/* Meals for the day */}
-              <div className="space-y-3">
-                {dayMeals.map((meal) => (
-                  <div
-                    key={meal.id}
-                    draggable
-                    onDragStart={() => handleDragStart(meal, day)}
-                    className="group bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 hover:shadow-sm transition-all cursor-move"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className={`px-2 py-0.5 rounded-full text-xs border ${getMealTypeColor(meal.mealType)}`}>
-                            {meal.mealType}
-                          </span>
-                          {meal.servings > 1 && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {meal.servings}x
-                            </span>
-                          )}
+              {/* Meals organized by type */}
+              <div className="flex-1 space-y-4 p-4">
+                {Object.entries(mealsByType).map(([mealType, meals]) => (
+                  <div key={mealType} className="space-y-2">
+                    {/* Meal Type Header */}
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        {mealType} {meals.length > 0 && `(${meals.length})`}
+                      </h4>
+                    </div>
+
+                    {/* Meal Type Drop Zone */}
+                    <div 
+                      className={`min-h-[60px] rounded-lg border-2 border-dashed transition-all ${
+                        draggedMeal ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/10' 
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (draggedMeal) {
+                          handleMealTypeChange(draggedMeal, day, mealType as any);
+                        }
+                      }}
+                    >
+                      {meals.length === 0 ? (
+                        <div className="flex items-center justify-center h-full p-4">
+                          <p className="text-xs text-gray-400 text-center">
+                            {draggedMeal ? `Drop to change to ${mealType}` : `No ${mealType.toLowerCase()} planned`}
+                          </p>
                         </div>
-                        <h4 className="font-medium text-sm text-gray-900 dark:text-white line-clamp-2 leading-tight">
-                          {meal.recipeName}
-                        </h4>
-                        {meal.carbBase && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                            with {meal.carbBase}
-                          </p>
-                        )}
-                        {meal.notes && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 italic">
-                            {meal.notes}
-                          </p>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMealEdit(day, meal);
-                          }}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Edit2 className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMealView(day, meal);
-                          }}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMealCopy(day, meal);
-                          }}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMealDelete(day, meal.id);
-                          }}
-                          className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                      ) : (
+                        <div className="space-y-2 p-2">
+                          {meals.map((meal) => (
+                            <div
+                              key={meal.id}
+                              draggable
+                              onDragStart={() => handleDragStart(meal, day)}
+                              className="group bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 hover:shadow-sm transition-all cursor-move relative"
+                            >
+                              {/* Recipe Name - with proper text wrapping */}
+                              <div className="mb-2">
+                                <h4 className="font-medium text-sm text-gray-900 dark:text-white leading-tight break-words">
+                                  {meal.recipeName}
+                                </h4>
+                                <div className="flex items-center justify-between mt-1">
+                                  {meal.servings > 1 && (
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      {meal.servings}x servings
+                                    </span>
+                                  )}
+                                  {meal.carbBase && (
+                                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                                      with {meal.carbBase}
+                                    </span>
+                                  )}
+                                </div>
+                                {meal.notes && (
+                                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 italic break-words">
+                                    {meal.notes}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              {/* Action Buttons - positioned at bottom and properly spaced */}
+                              <div className="flex items-center justify-end space-x-1 pt-2 border-t border-gray-200 dark:border-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMealView(day, meal);
+                                  }}
+                                  className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900"
+                                  title="View Recipe"
+                                >
+                                  <Eye className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMealEdit(day, meal);
+                                  }}
+                                  className="h-6 w-6 p-0 hover:bg-yellow-100 dark:hover:bg-yellow-900"
+                                  title="Edit Meal"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMealCopy(day, meal);
+                                  }}
+                                  className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900"
+                                  title="Copy Meal"
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMealDelete(day, meal.id);
+                                  }}
+                                  className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900"
+                                  title="Delete Meal"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
                 
-                {/* Drop Zone */}
-                {draggedMeal && (
-                  <div className="border-2 border-dashed border-emerald-300 dark:border-emerald-700 rounded-lg p-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                    Drop meal here
-                  </div>
-                )}
-                
-                {/* Empty state for day */}
-                {(!weeklyPlan.meals[day] || weeklyPlan.meals[day].length === 0) && !draggedMeal && (
-                  <div className="text-center py-8 text-gray-400 dark:text-gray-600">
-                    <Plus className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No meals planned</p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddMeal(day);
-                      }}
-                      className="mt-2"
-                    >
-                      Add meal
-                    </Button>
-                  </div>
-                )}
+                {/* Add Meal Button */}
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddMeal(day);
+                    }}
+                    className="w-full"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Meal
+                  </Button>
+                </div>
               </div>
             </div>
           );
