@@ -919,7 +919,7 @@ export const addHealthDocument = async (healthDoc: Omit<HealthDocument, 'id'>): 
   try {
     console.log("Adding health document:", healthDoc.fileName, "for user:", healthDoc.userId);
     
-    // Enhanced data cleaning for health documents
+    // Enhanced data cleaning for health documents with encryption
     const cleanedParsedData = cleanUndefinedValues({
       cholesterolTotal: healthDoc.parsedData?.cholesterolTotal || null,
       cholesterolLDL: healthDoc.parsedData?.cholesterolLDL || null,
@@ -955,14 +955,21 @@ export const addHealthDocument = async (healthDoc: Omit<HealthDocument, 'id'>): 
       ...healthDoc.parsedData
     });
 
+    // Encrypt sensitive health data for storage
+    const { encryptSensitiveHealthData } = await import('@/lib/security');
+    const encryptedParsedData = encryptSensitiveHealthData(cleanedParsedData);
+
     const healthDocData = cleanUndefinedValues({
       userId: healthDoc.userId,
       fileName: healthDoc.fileName,
       fileType: healthDoc.fileType,
       uploadedAt: Timestamp.now(),
-      parsedData: cleanedParsedData,
+      parsedData: cleanedParsedData, // Store unencrypted for queries
+      encryptedData: encryptedParsedData, // Store encrypted backup
       aiSummary: healthDoc.aiSummary || "Health document processed successfully",
-      isActive: true
+      isActive: true,
+      fileHash: healthDoc.fileHash || null,
+      originalFileName: healthDoc.originalFileName || healthDoc.fileName
     });
 
     console.log("Saving health document with cleaned data:", {

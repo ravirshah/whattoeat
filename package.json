@@ -45,9 +45,12 @@
   },
   "devDependencies": {
     "@shadcn/ui": "^0.0.4",
+    "@types/crypto-js": "^4.2.2",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@types/sanitize-html": "^2.16.0",
+    "@types/validator": "^13.15.1",
     "autoprefixer": "^10.4.21",
     "eslint": "^8.0.0",
     "eslint-config-next": "^14.0.0",

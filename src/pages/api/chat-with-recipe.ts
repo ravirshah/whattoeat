@@ -1,37 +1,7 @@
 // src/pages/api/chat-with-recipe.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
-import { getAuth } from 'firebase-admin/auth';
-import { getApps, initializeApp, cert } from 'firebase-admin/app';
-import { ServiceAccount } from 'firebase-admin';
-
-// Initialize Firebase Admin if it hasn't been already
-if (!getApps().length) {
-  try {
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-      const serviceAccount: ServiceAccount = JSON.parse(
-        Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY, 'base64').toString()
-      );
-      initializeApp({
-        credential: cert(serviceAccount),
-      });
-      console.log('Firebase Admin initialized with service account');
-    } else {
-      initializeApp({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      });
-      console.log('Firebase Admin initialized with project ID only');
-    }
-  } catch (error) {
-    console.error('Error initializing Firebase Admin:', error);
-    initializeApp({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    });
-    console.log('Firebase Admin initialized with fallback');
-  }
-}
-
-const adminAuth = getAuth();
+import { adminAuth } from '@/lib/firebase-admin';
 
 type ChatResponse = {
   reply?: string;

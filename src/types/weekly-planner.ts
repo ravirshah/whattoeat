@@ -314,6 +314,9 @@ export interface HealthDocument {
   };
   aiSummary?: string; // AI-generated summary of health insights
   isActive: boolean; // Whether to use this document for meal planning
+  // Security enhancements
+  fileHash?: string; // SHA256 hash for file integrity verification
+  originalFileName?: string; // Original filename before sanitization
 }
 
 // Enhanced user preferences to include health documents

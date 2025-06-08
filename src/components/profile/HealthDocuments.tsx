@@ -24,10 +24,17 @@ import {
   BarChart3,
   AlertTriangle,
   Info,
-  CheckCircle
+  CheckCircle,
+  Shield
 } from 'lucide-react';
 import { HealthDocument } from '@/types/weekly-planner';
 import { addHealthDocument, getUserHealthDocuments, updateHealthDocument, deleteHealthDocument } from '@/lib/weekly-planner-db';
+import { 
+  validateHealthDocumentFile, 
+  secureFileRead, 
+  checkRateLimit, 
+  sanitizeErrorMessage 
+} from '@/lib/security';
 
 interface HealthDocumentsProps {
   userId: string;
@@ -70,91 +77,34 @@ export default function HealthDocuments({ userId, onDocumentsChange }: HealthDoc
     }
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Check file type
-      const allowedTypes = [
-        'text/plain',
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'image/jpeg',
-        'image/png'
-      ];
-      
-      if (!allowedTypes.includes(file.type)) {
-        toast.error('Please select a PDF, Word document, text file, or image');
-        return;
-      }
-      
-      // Check file size (max 10MB for health documents)
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error('File size must be less than 10MB');
-        return;
-      }
-      
-      setSelectedFile(file);
-      toast.success(`File "${file.name}" selected`);
-    }
-  };
-
-  const readFileContent = async (file: File): Promise<string> => {
-    // Handle PDF files with browser-side text extraction fallback
-    if (file.type === 'application/pdf') {
       try {
-        // For now, convert PDF to base64 and let the AI processing endpoint handle it
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          
-          reader.onload = (e) => {
-            const result = e.target?.result;
-            if (typeof result === 'string') {
-              // Return the base64 data with a marker that this is a PDF
-              resolve(`[PDF_BASE64_DATA]${result}`);
-            } else {
-              reject(new Error('Failed to read PDF file'));
-            }
-          };
-          
-          reader.onerror = () => {
-            reject(new Error('Failed to read PDF file'));
-          };
-          
-          reader.readAsDataURL(file);
-        });
-
-      } catch (pdfError) {
-        console.error('PDF reading error:', pdfError);
-        throw new Error(`Failed to read PDF file: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}`);
+        // Use secure file validation
+        const validation = await validateHealthDocumentFile(file);
+        
+        if (!validation.isValid) {
+          toast.error(validation.error || 'File validation failed');
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
+        }
+        
+        setSelectedFile(file);
+        toast.success(`File "${validation.sanitizedFileName}" selected and validated`);
+      } catch (error) {
+        console.error('File validation error:', error);
+        toast.error('File validation failed. Please try again.');
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     }
-
-    // Handle other file types
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        const result = e.target?.result;
-        if (typeof result === 'string') {
-          resolve(result);
-        } else {
-          reject(new Error('Failed to read file as text'));
-        }
-      };
-      
-      reader.onerror = () => {
-        reject(new Error('Failed to read file'));
-      };
-      
-      if (file.type.startsWith('image/')) {
-        // For images, we'll need OCR - for now, use filename as fallback
-        resolve(`Image file: ${file.name} - Manual review required for health data extraction.`);
-      } else {
-        reader.readAsText(file);
-      }
-    });
   };
+
+  // Removed insecure readFileContent function - now using secureFileRead from security.ts
 
   const handleUpload = async () => {
     if (!selectedFile) {
@@ -162,24 +112,30 @@ export default function HealthDocuments({ userId, onDocumentsChange }: HealthDoc
       return;
     }
 
+    // Check rate limit for file uploads
+    const { getAuth } = await import('firebase/auth');
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error('User not authenticated');
+      return;
+    }
+
+    if (!checkRateLimit(user.uid, 'file_upload')) {
+      toast.error('Upload rate limit exceeded. Please try again in an hour.');
+      return;
+    }
+
     setIsUploading(true);
 
     try {
-      // Read file content
-      console.log(`Reading file content for: ${selectedFile.name}, type: ${selectedFile.type}`);
-      const fileContent = await readFileContent(selectedFile);
+      // Use secure file reading
+      console.log(`Securely reading file: ${selectedFile.name}, type: ${selectedFile.type}`);
+      const { content: fileContent, metadata } = await secureFileRead(selectedFile);
       console.log(`Successfully extracted ${fileContent.length} characters from file`);
+      console.log('File metadata:', metadata);
       
-      // Log a preview of the content for debugging (first 500 chars)
-      console.log('File content preview:', fileContent.substring(0, 500));
-
-      // Get auth token
-      const { getAuth } = await import('firebase/auth');
-      const auth = getAuth();
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
+      // No longer logging file content preview for security reasons
       
       const token = await user.getIdToken();
 
@@ -194,7 +150,9 @@ export default function HealthDocuments({ userId, onDocumentsChange }: HealthDoc
         body: JSON.stringify({
           fileContent,
           fileType: selectedDocType,
-          fileName: selectedFile.name
+          fileName: metadata.sanitizedName,
+          fileHash: metadata.hash,
+          originalFileName: metadata.originalName
         })
       });
 
@@ -215,15 +173,17 @@ export default function HealthDocuments({ userId, onDocumentsChange }: HealthDoc
       const analysisResult = await response.json();
       console.log('AI analysis result:', analysisResult);
 
-      // Save to database
+      // Save to database with encrypted sensitive data
       const healthDoc: Omit<HealthDocument, 'id'> = {
         userId,
-        fileName: selectedFile.name,
+        fileName: metadata.sanitizedName,
         fileType: selectedDocType as HealthDocument['fileType'],
         uploadedAt: new Date() as any, // Will be converted to Timestamp in DB function
-        parsedData: analysisResult.parsedData,
+        parsedData: analysisResult.parsedData, // Will be encrypted in the database layer
         aiSummary: analysisResult.aiSummary,
-        isActive: true
+        isActive: true,
+        fileHash: metadata.hash, // Add file integrity hash
+        originalFileName: metadata.originalName
       };
 
       const docId = await addHealthDocument(healthDoc);
@@ -250,16 +210,18 @@ export default function HealthDocuments({ userId, onDocumentsChange }: HealthDoc
     } catch (error) {
       console.error('Error uploading health document:', error);
       
-      // Show a more helpful error message
-      const errorMessage = error instanceof Error ? error.message : 'Failed to upload health document. Please try again.';
+      // Use secure error message sanitization
+      const sanitizedError = sanitizeErrorMessage(error);
       
-      // If the error message contains suggestions (multiple lines), show it as a detailed toast
-      if (errorMessage.includes('\n')) {
-        // For now, show a simplified error message, but log the full details
-        console.error('Detailed error information:', errorMessage);
-        toast.error('PDF processing failed. Check the console for detailed alternatives, or try converting your PDF to text format first.');
+      // Show sanitized error message to user
+      if (sanitizedError.includes('rate limit')) {
+        toast.error('Upload rate limit exceeded. Please try again later.');
+      } else if (sanitizedError.includes('PDF')) {
+        toast.error('Document processing failed. Please try converting to text format or contact support.');
+      } else if (sanitizedError.includes('validation')) {
+        toast.error('File validation failed. Please check your file and try again.');
       } else {
-        toast.error(errorMessage);
+        toast.error('Upload failed. Please try again or contact support if the issue persists.');
       }
     } finally {
       setIsUploading(false);
@@ -391,7 +353,7 @@ export default function HealthDocuments({ userId, onDocumentsChange }: HealthDoc
             <input
               ref={fileInputRef}
               type="file"
-              accept=".txt,.pdf,.doc,.docx,.jpg,.jpeg,.png"
+              accept=".txt,.pdf,.doc,.docx"
               onChange={handleFileSelect}
               className="hidden"
               disabled={isUploading}
@@ -403,8 +365,8 @@ export default function HealthDocuments({ userId, onDocumentsChange }: HealthDoc
               disabled={isUploading}
               className="w-full"
             >
-              <Upload className="h-4 w-4 mr-2" />
-              Select Health Document (PDF, Word, Image, Text)
+              <Shield className="h-4 w-4 mr-2 text-green-600" />
+              Select Health Document (PDF, Word, Text) - Secure Upload
             </Button>
 
             {selectedFile && (
@@ -482,19 +444,23 @@ export default function HealthDocuments({ userId, onDocumentsChange }: HealthDoc
                       doc.isActive ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-900/10' : 'border-gray-200 dark:border-gray-700'
                     }`}
                   >
-                    <div className="flex items-start justify-between">
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                       <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <Icon className={`h-5 w-5 ${typeInfo.color}`} />
-                          <h3 className="font-medium text-gray-900 dark:text-white">
-                            {doc.fileName}
-                          </h3>
-                          <Badge variant={doc.isActive ? "default" : "secondary"}>
-                            {doc.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                          <Badge variant="outline">
-                            {typeInfo.label}
-                          </Badge>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                          <div className="flex items-center gap-2">
+                            <Icon className={`h-5 w-5 ${typeInfo.color}`} />
+                            <h3 className="font-medium text-gray-900 dark:text-white truncate">
+                              {doc.fileName}
+                            </h3>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant={doc.isActive ? "default" : "secondary"}>
+                              {doc.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                            <Badge variant="outline">
+                              {typeInfo.label}
+                            </Badge>
+                          </div>
                         </div>
 
                         {doc.aiSummary && (
@@ -504,7 +470,7 @@ export default function HealthDocuments({ userId, onDocumentsChange }: HealthDoc
                         )}
 
                         {metrics.length > 0 && (
-                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
                             {metrics.slice(0, 4).map((metric, index) => (
                               <div key={index} className="text-sm">
                                 <span className="font-medium text-gray-900 dark:text-white">
@@ -536,29 +502,32 @@ export default function HealthDocuments({ userId, onDocumentsChange }: HealthDoc
                         )}
                       </div>
 
-                      <div className="flex items-center space-x-2 ml-4">
+                      <div className="flex flex-row lg:flex-col gap-2 lg:gap-2 lg:ml-4 flex-shrink-0">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setExpandedDoc(isExpanded ? null : doc.id)}
+                          className="flex-1 lg:flex-none"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-4 w-4 lg:mr-0" />
+                          <span className="ml-1 lg:hidden">View</span>
                         </Button>
                         
                         <Button
                           variant={doc.isActive ? "outline" : "default"}
                           size="sm"
                           onClick={() => handleToggleActive(doc.id, !doc.isActive)}
+                          className="flex-1 lg:flex-none"
                         >
                           {doc.isActive ? (
                             <>
-                              <X className="h-4 w-4 mr-1" />
-                              Deactivate
+                              <X className="h-4 w-4 lg:mr-0" />
+                              <span className="ml-1 lg:hidden">Deactivate</span>
                             </>
                           ) : (
                             <>
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Activate
+                              <CheckCircle className="h-4 w-4 lg:mr-0" />
+                              <span className="ml-1 lg:hidden">Activate</span>
                             </>
                           )}
                         </Button>
@@ -567,9 +536,10 @@ export default function HealthDocuments({ userId, onDocumentsChange }: HealthDoc
                           variant="outline"
                           size="sm"
                           onClick={() => handleDelete(doc.id)}
-                          className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          className="flex-1 lg:flex-none text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 lg:mr-0" />
+                          <span className="ml-1 lg:hidden">Delete</span>
                         </Button>
                       </div>
                     </div>

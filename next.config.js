@@ -5,11 +5,17 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   eslint: {
+    // Allow production builds to successfully complete even if there are ESLint warnings
     ignoreDuringBuilds: true,
   },
   typescript: {
-    // This allows you to deploy with TypeScript errors
-    ignoreBuildErrors: true,
+    // Allow deployment with TypeScript warnings (but not errors)
+    ignoreBuildErrors: false,
+  },
+  // Optimize for Vercel deployment
+  experimental: {
+    // Enable modern bundling optimizations
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
   async rewrites() {
     return [

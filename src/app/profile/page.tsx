@@ -341,16 +341,18 @@ function Profile() {
           
           <CardContent>
             <Tabs defaultValue="ingredients">
-              <TabsList className="w-full mb-6">
-                <TabsTrigger value="ingredients" className="flex-1">Ingredients</TabsTrigger>
-                <TabsTrigger value="equipment" className="flex-1">Equipment</TabsTrigger>
-                <TabsTrigger value="staples" className="flex-1">Staples</TabsTrigger>
-                <TabsTrigger value="dietary" className="flex-1">Dietary</TabsTrigger>
-                <TabsTrigger value="cuisine" className="flex-1">Cuisine</TabsTrigger>
-                <TabsTrigger value="cooktime" className="flex-1">Cook Time</TabsTrigger>
-                <TabsTrigger value="difficulty" className="flex-1">Difficulty</TabsTrigger>
-                <TabsTrigger value="health" className="flex-1">Health Documents</TabsTrigger>
-              </TabsList>
+              <div className="w-full mb-6 overflow-x-auto">
+                <TabsList className="w-full min-w-max md:w-full">
+                  <TabsTrigger value="ingredients" className="md:flex-1 whitespace-nowrap">Ingredients</TabsTrigger>
+                  <TabsTrigger value="equipment" className="md:flex-1 whitespace-nowrap">Equipment</TabsTrigger>
+                  <TabsTrigger value="staples" className="md:flex-1 whitespace-nowrap">Staples</TabsTrigger>
+                  <TabsTrigger value="dietary" className="md:flex-1 whitespace-nowrap">Dietary</TabsTrigger>
+                  <TabsTrigger value="cuisine" className="md:flex-1 whitespace-nowrap">Cuisine</TabsTrigger>
+                  <TabsTrigger value="cooktime" className="md:flex-1 whitespace-nowrap">Cook Time</TabsTrigger>
+                  <TabsTrigger value="difficulty" className="md:flex-1 whitespace-nowrap">Difficulty</TabsTrigger>
+                  <TabsTrigger value="health" className="md:flex-1 whitespace-nowrap">Health Docs</TabsTrigger>
+                </TabsList>
+              </div>
               
               {/* Ingredients Tab */}
               <TabsContent value="ingredients">

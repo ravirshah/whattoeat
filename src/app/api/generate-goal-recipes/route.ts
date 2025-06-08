@@ -1,38 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { ServiceAccount } from 'firebase-admin';
-
-// Firebase Admin SDK initialization (reusing existing pattern)
-if (!getApps().length) {
-  try {
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-      const serviceAccount: ServiceAccount = JSON.parse(
-        Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY, 'base64').toString()
-      );
-      
-      initializeApp({
-        credential: cert(serviceAccount),
-      });
-      console.log("Firebase Admin initialized with service account");
-    } else {
-      initializeApp({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      });
-      console.log("Firebase Admin initialized with project ID only");
-    }
-  } catch (error) {
-    console.error('Error initializing Firebase Admin:', error);
-    initializeApp({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    });
-    console.log("Firebase Admin initialized with fallback after error");
-  }
-}
-
-const adminAuth = getAuth();
+import { adminAuth } from '@/lib/firebase-admin';
 
 type GoalRecipeResponse = {
   recipes?: any[];

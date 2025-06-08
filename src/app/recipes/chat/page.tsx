@@ -101,7 +101,7 @@ function RecipeChat() {
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!input.trim() || !recipe || loading) return;
+    if (!input.trim() || !recipe || loading || !currentUser) return;
 
     const userMessage: ChatMessage = { role: 'user', content: input, timestamp: new Date() };
     setMessages((prev) => [...prev, userMessage]);

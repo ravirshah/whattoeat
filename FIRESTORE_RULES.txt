@@ -109,14 +109,19 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
     
-    // Health Documents - CRITICAL PRIVACY
+    // Health Documents - CRITICAL PRIVACY - ENHANCED SECURITY
     match /healthDocuments/{documentId} {
       allow read: if isAuthenticated() && 
-        (resource == null || request.auth.uid == resource.data.userId);
+        (resource == null || request.auth.uid == resource.data.userId) &&
+        request.auth.uid != null;
       allow write: if isAuthenticated() && 
-        (resource == null || request.auth.uid == resource.data.userId);
-      allow create: if isCreatingOwn();
-      allow delete: if isOwner();
+        (resource == null || request.auth.uid == resource.data.userId) &&
+        request.auth.uid != null &&
+        request.resource.data.userId == request.auth.uid;
+      allow create: if isCreatingOwn() && 
+        request.resource.data.keys().hasAll(['userId', 'fileName', 'fileType', 'uploadedAt']) &&
+        request.resource.data.userId == request.auth.uid;
+      allow delete: if isOwner() && request.auth.uid != null;
     }
     
     // Meal Prep Plans

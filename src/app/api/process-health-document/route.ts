@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import { adminAuth } from '@/lib/firebase-admin';
+import { 
+  sanitizeAIInput, 
+  sanitizeErrorMessage, 
+  checkRateLimit,
+  encryptSensitiveHealthData 
+} from '@/lib/security';
 
 type HealthDocumentResponse = {
   parsedData?: any;
@@ -234,22 +240,30 @@ export async function POST(request: NextRequest) {
     const userId = decodedToken.uid;
     console.log(`Token verified for user: ${userId}`);
 
+    // Check rate limit for AI requests
+    if (!checkRateLimit(userId, 'ai_request')) {
+      return NextResponse.json({ 
+        error: 'Rate limit exceeded. Please try again later.' 
+      }, { status: 429 });
+    }
+
     // Get input data from request
-    const { fileContent, fileType, fileName } = await request.json();
+    const { fileContent, fileType, fileName, fileHash, originalFileName } = await request.json();
     
     if (!fileContent || !fileType) {
       return NextResponse.json({ error: 'File content and type are required' }, { status: 400 });
     }
 
     console.log(`Processing health document: ${fileName}, type: ${fileType}, content length: ${fileContent.length}`);
+    console.log(`File hash: ${fileHash?.substring(0, 16)}...`); // Log only first 16 chars for debugging
 
-    // Enhanced PDF data extraction
+    // Enhanced PDF data extraction with security
     let processedFileContent = fileContent;
-    if (fileContent.startsWith('[PDF_BASE64_DATA]')) {
+    if (fileContent.startsWith('[SECURE_PDF_BASE64]')) {
       console.log('Detected PDF base64 data, using enhanced extraction...');
       try {
-        // Remove the marker and extract base64 data
-        const base64Data = fileContent.replace('[PDF_BASE64_DATA]data:application/pdf;base64,', '');
+        // Remove the security marker and extract base64 data
+        const base64Data = fileContent.replace('[SECURE_PDF_BASE64]data:application/pdf;base64,', '');
         
         // Use enhanced PDF extraction
         processedFileContent = await extractPDFText(base64Data);
@@ -308,7 +322,9 @@ export async function POST(request: NextRequest) {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
-      const prompt = buildHealthDocumentPrompt(processedFileContent, fileType);
+      // Sanitize input before sending to AI
+      const sanitizedContent = sanitizeAIInput(processedFileContent);
+      const prompt = buildHealthDocumentPrompt(sanitizedContent, fileType);
       
       console.log("Sending enhanced health document to Gemini API...");
       
@@ -400,7 +416,20 @@ export async function POST(request: NextRequest) {
           hasRecommendations: analysisResult.parsedData.dietaryRecommendations?.length > 0
         });
         
-        return NextResponse.json(analysisResult);
+        // Encrypt sensitive parsed data before returning
+        const encryptedParsedData = encryptSensitiveHealthData(analysisResult.parsedData);
+        
+        return NextResponse.json({
+          ...analysisResult,
+          encryptedData: encryptedParsedData,
+          fileHash: fileHash,
+          originalFileName: originalFileName,
+          apiInfo: {
+            model: "gemini-2.0-flash-exp",
+            environment: process.env.NODE_ENV,
+            securityLevel: "enhanced"
+          }
+        });
         
       } catch (parseError) {
         console.error("Error parsing enhanced Gemini response:", parseError);
@@ -451,9 +480,13 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error processing enhanced health document:', error);
+    
+    // Use secure error message sanitization
+    const sanitizedError = sanitizeErrorMessage(error);
+    
     return NextResponse.json({ 
-      error: 'Failed to process health document',
-      details: error instanceof Error ? error.message : String(error),
+      error: 'Health document processing failed',
+      details: sanitizedError,
       timestamp: new Date().toISOString()
     }, { status: 500 });
   }
