@@ -82,7 +82,7 @@ export default function Header() {
               <Link href="/weekly-planner" className={`text-sm font-medium transition-colors hover:text-emerald-600 ${
                 isActive('/weekly-planner') ? 'text-emerald-600' : 'text-gray-700 dark:text-gray-200'
               }`}>
-                Weekly Meal Planner
+                Weekly Meal Planner <span className="text-xs text-gray-500 dark:text-gray-400">(beta)</span>
               </Link>
             </>
           )}
@@ -126,7 +126,7 @@ export default function Header() {
                 <DropdownMenuItem asChild>
                   <Link href="/weekly-planner" className="cursor-pointer">
                     <Calendar className="mr-2 h-4 w-4" />
-                    <span>Weekly Meal Planner</span>
+                    <span>Weekly Meal Planner <span className="text-xs text-gray-500 dark:text-gray-400">(beta)</span></span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -194,7 +194,7 @@ export default function Header() {
                         className="flex items-center px-2 py-1 text-base font-medium text-gray-700 hover:text-emerald-600 hover:bg-gray-100 rounded-md transition dark:text-gray-100 dark:hover:bg-gray-800"
                       >
                         <Calendar className="h-5 w-5 mr-2" />
-                        Weekly Meal Planner
+                        Weekly Meal Planner <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">(beta)</span>
                       </Link>
                     </>
                   )}

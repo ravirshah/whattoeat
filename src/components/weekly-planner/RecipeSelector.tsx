@@ -11,6 +11,8 @@ import { getSavedRecipes } from '@/lib/db';
 import { useAuth } from '@/lib/context/AuthContext';
 import ChatInput from './ChatInput';
 
+type ModalMode = 'add' | 'view' | 'edit';
+
 interface RecipeSelectorProps {
   selectedDay: DayOfWeek;
   activeGoal: UserGoal | null;
@@ -18,7 +20,7 @@ interface RecipeSelectorProps {
   onClose: () => void;
   onRecipeSelect: (meal: PlannedMeal) => void;
   existingMeal?: PlannedMeal | null;
-  mode?: 'add' | 'view' | 'edit';
+  mode?: ModalMode;
 }
 
 interface GoalRecipe {
@@ -57,7 +59,7 @@ export default function RecipeSelector({
   onClose,
   onRecipeSelect,
   existingMeal,
-  mode = 'add'
+  mode = 'add' as ModalMode
 }: RecipeSelectorProps) {
   const { currentUser } = useAuth();
   const [selectedMealType, setSelectedMealType] = useState<MealType>('Lunch');
@@ -612,434 +614,579 @@ export default function RecipeSelector({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-lg w-full h-full sm:max-w-4xl sm:w-full sm:max-h-[90vh] sm:h-auto overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-3">
-            <Sparkles className="h-6 w-6 text-emerald-600" />
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
+            <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 flex-shrink-0" />
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white truncate">
                 {mode === 'view' ? `View Recipe - ${selectedDay}` : 
                  mode === 'edit' ? `Edit Meal - ${selectedDay}` :
                  `Add Meal to ${selectedDay}`}
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">
                 {mode === 'view' ? `Recipe details for ${existingMeal?.recipeName}` :
                  activeGoal ? `Recipes tailored for your ${activeGoal.name} goal` : 'Select a recipe for your meal plan'}
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={onClose} className="flex-shrink-0 ml-2">
             <X className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="flex flex-col lg:flex-row max-h-[calc(90vh-80px)]">
-          {/* Left Panel - Controls */}
-          <div className="lg:w-1/3 p-6 border-r border-gray-200 dark:border-gray-700">
-            <div className="space-y-6">
-              {/* Meal Type Selection */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Meal Type</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {MEAL_TYPES.map(type => (
-                    <Button
-                      key={type}
-                      variant={selectedMealType === type ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedMealType(type)}
-                      className="text-xs"
-                      disabled={mode === 'view'}
-                    >
-                      {type}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Servings */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Servings</label>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedServings(Math.max(1, selectedServings - 1))}
-                    disabled={selectedServings <= 1 || mode === 'view'}
-                  >
-                    -
-                  </Button>
-                  <span className="w-8 text-center">{selectedServings}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedServings(Math.min(8, selectedServings + 1))}
-                    disabled={selectedServings >= 8 || mode === 'view'}
-                  >
-                    +
-                  </Button>
-                </div>
-              </div>
-
-              {/* Carb Base (Optional) */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Carb Base (Optional)</label>
-                <select
-                  value={selectedCarbBase}
-                  onChange={(e) => setSelectedCarbBase(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  disabled={mode === 'view'}
-                >
-                  <option value="">No preference</option>
-                  {CARB_BASE_OPTIONS.map(base => (
-                    <option key={base} value={base}>{base}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Goal Info */}
-              {activeGoal && (
-                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Target className="h-4 w-4 text-emerald-600" />
-                    <span className="font-medium text-emerald-900 dark:text-emerald-100">
-                      {activeGoal.name}
-                    </span>
-                  </div>
-                  {activeGoal.macroTargets.perMeal && (
-                    <div className="text-xs text-emerald-700 dark:text-emerald-300 space-y-1">
-                      {activeGoal.macroTargets.perMeal.calories && (
-                        <div>Target: {activeGoal.macroTargets.perMeal.calories} cal</div>
-                      )}
-                      {activeGoal.macroTargets.perMeal.protein && (
-                        <div>Protein: {activeGoal.macroTargets.perMeal.protein}g</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Generate Button */}
-              {mode !== 'view' && (
-                <Button
-                  onClick={generateGoalBasedRecipes}
-                  disabled={isGenerating || !activeGoal}
-                  className="w-full"
-                >
-                  {isGenerating ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Generating...
-                    </div>
-                  ) : (
-                    <div className="flex items-center">
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Generate Goal-Based Recipes
-                    </div>
-                  )}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Right Panel - Recipe Results */}
-          <div className="lg:w-2/3 overflow-y-auto">
-            {/* Tab Navigation */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex space-x-1">
-                <Button
-                  variant={!showFavorites && !showChatInput ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => {
-                    setShowFavorites(false);
-                    setShowChatInput(false);
-                  }}
-                >
-                  Generated Recipes ({generatedRecipes.length})
-                </Button>
-                <Button
-                  variant={showFavorites && !showChatInput ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => {
-                    setShowFavorites(true);
-                    setShowChatInput(false);
-                  }}
-                >
-                  My Favorite Recipes ({favoriteRecipes.length})
-                </Button>
-                <Button
-                  variant={showChatInput ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => {
-                    setShowFavorites(false);
-                    setShowChatInput(true);
-                  }}
-                >
-                  <MessageCircle className="h-3 w-3 mr-1" />
-                  Input by Chat
-                </Button>
-              </div>
-            </div>
-
-            {/* Content based on active tab */}
-            {showFavorites ? (
-              // Saved Recipes Tab
-              <div className="p-6">
-                {isLoadingFavorites ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-                  </div>
-                ) : favoriteRecipes.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Sparkles className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                      No Favorite Recipes Yet
-                    </h4>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">
-                      Heart recipes here or save them from the Generate page to see them in your favorites
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-gray-900 dark:text-white">
-                      Your Favorite Recipes
-                    </h4>
-                    {favoriteRecipes.map((favoriteRecipe, index) => (
-                      <div
-                        key={favoriteRecipe.id || index}
-                        className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
+        {/* Main Content - Mobile Optimized */}
+        <div className="flex flex-col lg:flex-row flex-1 min-h-0">
+                     {/* Left Panel - Controls (Hidden in view mode on mobile) */}
+           {(mode === 'add' || mode === 'edit') && (
+            <div className="lg:w-1/3 p-4 sm:p-6 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700 flex-shrink-0 lg:overflow-y-auto">
+              <div className="space-y-4 sm:space-y-6">
+                {/* Meal Type Selection */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Meal Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {MEAL_TYPES.map(type => (
+                      <Button
+                        key={type}
+                        variant={selectedMealType === type ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedMealType(type)}
+                        className="text-xs"
+                        disabled={mode === 'view'}
                       >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <h5 className="font-medium text-gray-900 dark:text-white mb-1">
-                              {favoriteRecipe.recipeName}
-                            </h5>
-                            <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-                              <div className="flex items-center">
-                                <Clock className="h-3 w-3 mr-1" />
-                                {favoriteRecipe.recipeDetails.times}
-                              </div>
-                              {favoriteRecipe.rating && (
-                                <div className="flex items-center">
-                                  <span className="text-yellow-500">★</span>
-                                  <span className="ml-1">{favoriteRecipe.rating}/5</span>
-                                </div>
-                              )}
-                              {favoriteRecipe.isFromSavedRecipes && (
-                                <span className="text-blue-500 text-xs">From Generate</span>
-                              )}
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSelectSavedRecipe(favoriteRecipe)}
-                            className="ml-4"
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Add
-                          </Button>
-                        </div>
-
-                        {/* Ingredients preview */}
-                        <div className="mb-3">
-                          <div className="flex flex-wrap gap-1">
-                            {favoriteRecipe.recipeDetails.ingredients.slice(0, 3).map((ingredient: string, idx: number) => (
-                              <Badge key={idx} variant="outline" className="text-xs">
-                                {ingredient.split(' ').slice(0, 2).join(' ')}
-                              </Badge>
-                            ))}
-                            {favoriteRecipe.recipeDetails.ingredients.length > 3 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{favoriteRecipe.recipeDetails.ingredients.length - 3} more
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                        {type}
+                      </Button>
                     ))}
                   </div>
+                </div>
+
+                {/* Servings */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Servings</label>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedServings(Math.max(1, selectedServings - 1))}
+                      disabled={selectedServings <= 1 || mode === 'view'}
+                    >
+                      -
+                    </Button>
+                    <span className="w-8 text-center">{selectedServings}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedServings(Math.min(8, selectedServings + 1))}
+                      disabled={selectedServings >= 8 || mode === 'view'}
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Carb Base (Optional) */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Carb Base (Optional)</label>
+                  <select
+                    value={selectedCarbBase}
+                    onChange={(e) => setSelectedCarbBase(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    disabled={mode === 'view'}
+                  >
+                    <option value="">No preference</option>
+                    {CARB_BASE_OPTIONS.map(base => (
+                      <option key={base} value={base}>{base}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Goal Info */}
+                {activeGoal && (
+                  <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Target className="h-4 w-4 text-emerald-600" />
+                      <span className="font-medium text-emerald-900 dark:text-emerald-100">
+                        {activeGoal.name}
+                      </span>
+                    </div>
+                    {activeGoal.macroTargets.perMeal && (
+                      <div className="text-xs text-emerald-700 dark:text-emerald-300 space-y-1">
+                        {activeGoal.macroTargets.perMeal.calories && (
+                          <div>Target: {activeGoal.macroTargets.perMeal.calories} cal</div>
+                        )}
+                        {activeGoal.macroTargets.perMeal.protein && (
+                          <div>Protein: {activeGoal.macroTargets.perMeal.protein}g</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Generate Button */}
+                {mode !== 'view' && (
+                  <Button
+                    onClick={generateGoalBasedRecipes}
+                    disabled={isGenerating || !activeGoal}
+                    className="w-full"
+                  >
+                    {isGenerating ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Generating...
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate Goal-Based Recipes
+                      </div>
+                    )}
+                  </Button>
                 )}
               </div>
-            ) : showChatInput ? (
-              // Chat Input Tab
-              <ChatInput 
-                mealType={selectedMealType}
-                servings={selectedServings}
-                onRecipeSelect={handleRecipeSelect}
-                onFavorite={handleChatFavorite}
-              />
-            ) : (
-              // Generated Recipes Tab
-              generatedRecipes.length === 0 ? (
-                <div className="p-8 text-center">
-                  <Sparkles className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    {activeGoal ? 'Generate Recipes for Your Goal' : 'Set a Goal First'}
-                  </h4>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    {activeGoal 
-                      ? 'Click "Generate Goal-Based Recipes" to get personalized meal suggestions'
-                      : 'Please set a dietary goal to get personalized recipe recommendations'
-                    }
-                  </p>
-                </div>
-              ) : (
-                <div className="p-6 space-y-4">
-                  <h4 className="font-medium text-gray-900 dark:text-white">
+            </div>
+          )}
+
+          {/* Right Panel - Recipe Results */}
+          <div className={`${mode === 'view' ? 'w-full' : 'lg:w-2/3'} flex flex-col min-h-0 flex-1`}>
+                         {/* Tab Navigation - Only show in non-view mode */}
+             {(mode === 'add' || mode === 'edit') && (
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+                <div className="flex space-x-1 overflow-x-auto">
+                  <Button
+                    variant={!showFavorites && !showChatInput ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => {
+                      setShowFavorites(false);
+                      setShowChatInput(false);
+                    }}
+                    className="whitespace-nowrap"
+                  >
                     Generated Recipes ({generatedRecipes.length})
-                  </h4>
-                  
-                  {generatedRecipes.map((recipe, index) => (
-                    <div
-                      key={index}
-                      className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h5 className="font-medium text-gray-900 dark:text-white mb-1">
-                            {recipe.name}
-                          </h5>
-                          <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-                            <div className="flex items-center">
-                              <Clock className="h-3 w-3 mr-1" />
-                              {recipe.times}
-                            </div>
-                            <div className="flex items-center">
-                              <Users className="h-3 w-3 mr-1" />
-                              {recipe.servings}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2 ml-4">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleToggleFavorite(recipe)}
-                            className={`p-2 ${favoriteStatus[recipe.name] ? 'text-red-500 hover:text-red-600' : 'text-gray-400 hover:text-red-500'}`}
-                          >
-                            <Heart className={`h-4 w-4 ${favoriteStatus[recipe.name] ? 'fill-current' : ''}`} />
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleRecipeSelect(recipe)}
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Add
-                          </Button>
-                        </div>
-                      </div>
+                  </Button>
+                  <Button
+                    variant={showFavorites && !showChatInput ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => {
+                      setShowFavorites(true);
+                      setShowChatInput(false);
+                    }}
+                    className="whitespace-nowrap"
+                  >
+                    My Favorite Recipes ({favoriteRecipes.length})
+                  </Button>
+                  <Button
+                    variant={showChatInput ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => {
+                      setShowFavorites(false);
+                      setShowChatInput(true);
+                    }}
+                    className="whitespace-nowrap"
+                  >
+                    <MessageCircle className="h-3 w-3 mr-1" />
+                    Input by Chat
+                  </Button>
+                </div>
+              </div>
+            )}
 
-                      {/* Nutrition Summary */}
-                      <div className="grid grid-cols-4 gap-2 mb-3">
-                        <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {recipe.nutritionalFacts.calories}
-                          </div>
-                          <div className="text-gray-500">cal</div>
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ WebkitOverflowScrolling: 'touch' }}>
+              {/* View Mode - Show Existing Meal Details */}
+              {mode === 'view' && existingMeal && (
+                <div className="p-4 sm:p-6">
+                  <div className="max-w-none">
+                    {/* Recipe Header */}
+                    <div className="mb-6">
+                      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                        {existingMeal.recipeName}
+                      </h2>
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                        <div className="flex items-center">
+                          <Users className="h-4 w-4 mr-1" />
+                          <span>{existingMeal.servings} servings</span>
                         </div>
-                        <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {recipe.nutritionalFacts.protein}g
-                          </div>
-                          <div className="text-gray-500">protein</div>
-                        </div>
-                        <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {recipe.nutritionalFacts.carbs}g
-                          </div>
-                          <div className="text-gray-500">carbs</div>
-                        </div>
-                        <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {recipe.nutritionalFacts.fat}g
-                          </div>
-                          <div className="text-gray-500">fat</div>
-                        </div>
-                      </div>
-
-                      {/* Goal Alignment */}
-                      <div className="space-y-2">
-                        <Badge variant="outline" className="text-xs">
-                          Goal Alignment: {recipe.goalAlignment.macroFit}
-                        </Badge>
-                        
-                        {/* Macro Progress Bars */}
-                        {activeGoal?.macroTargets.perMeal && (
-                          <div className="space-y-1">
-                            {activeGoal.macroTargets.perMeal.calories && (
-                              <div className="flex items-center space-x-2 text-xs">
-                                <span className="w-12">Cal:</span>
-                                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1">
-                                  <div 
-                                    className={`h-1 rounded-full ${getMacroColor(recipe.nutritionalFacts.calories, activeGoal.macroTargets.perMeal.calories)}`}
-                                    style={{
-                                      width: `${getMacroBarWidth(recipe.nutritionalFacts.calories, activeGoal.macroTargets.perMeal.calories)}%`
-                                    }}
-                                  />
-                                </div>
-                                <span className="text-gray-500">
-                                  {recipe.nutritionalFacts.calories}/{activeGoal.macroTargets.perMeal.calories}
-                                </span>
-                              </div>
-                            )}
-                            {activeGoal.macroTargets.perMeal.protein && (
-                              <div className="flex items-center space-x-2 text-xs">
-                                <span className="w-12">Pro:</span>
-                                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1">
-                                  <div 
-                                    className={`h-1 rounded-full ${getMacroColor(recipe.nutritionalFacts.protein, activeGoal.macroTargets.perMeal.protein)}`}
-                                    style={{
-                                      width: `${getMacroBarWidth(recipe.nutritionalFacts.protein, activeGoal.macroTargets.perMeal.protein)}%`
-                                    }}
-                                  />
-                                </div>
-                                <span className="text-gray-500">
-                                  {recipe.nutritionalFacts.protein}g/{activeGoal.macroTargets.perMeal.protein}g
-                                </span>
-                              </div>
-                            )}
+                        {existingMeal.recipeDetails?.times && (
+                          <div className="flex items-center">
+                            <Clock className="h-4 w-4 mr-1" />
+                            <span>{existingMeal.recipeDetails.times}</span>
                           </div>
                         )}
-                      </div>
-
-                      {/* Expandable ingredients/instructions */}
-                      <div className="mt-3">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedRecipe(selectedRecipe?.name === recipe.name ? null : recipe)}
-                          className="text-xs"
-                        >
-                          {selectedRecipe?.name === recipe.name ? 'Hide Details' : 'View Recipe Details'}
-                        </Button>
-                        
-                        {selectedRecipe?.name === recipe.name && (
-                          <div className="mt-3 space-y-3 text-sm">
-                            <div>
-                              <h6 className="font-medium mb-1">Ingredients:</h6>
-                              <ul className="text-xs space-y-1 text-gray-600 dark:text-gray-400">
-                                {recipe.ingredients.map((ingredient, idx) => (
-                                  <li key={idx}>• {ingredient}</li>
-                                ))}
-                              </ul>
-                            </div>
-                            <div>
-                              <h6 className="font-medium mb-1">Instructions:</h6>
-                              <ol className="text-xs space-y-1 text-gray-600 dark:text-gray-400">
-                                {recipe.instructions.map((step, idx) => (
-                                  <li key={idx}>{idx + 1}. {step}</li>
-                                ))}
-                              </ol>
-                            </div>
-                          </div>
-                        )}
+                        <div className="px-2 py-1 bg-emerald-100 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-200 rounded-full text-xs font-medium">
+                          {existingMeal.mealType}
+                        </div>
                       </div>
                     </div>
-                  ))}
+
+                    {/* Nutritional Facts */}
+                    {existingMeal.recipeDetails?.nutritionalFacts && (
+                      <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <h3 className="text-sm font-semibold mb-3 text-gray-900 dark:text-white">Nutritional Information</h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          <div className="text-center p-2 bg-white dark:bg-gray-700 rounded text-xs">
+                            <div className="font-medium text-gray-900 dark:text-white text-sm">
+                              {existingMeal.recipeDetails.nutritionalFacts.calories}
+                            </div>
+                            <div className="text-gray-500 dark:text-gray-400">calories</div>
+                          </div>
+                          <div className="text-center p-2 bg-white dark:bg-gray-700 rounded text-xs">
+                            <div className="font-medium text-gray-900 dark:text-white text-sm">
+                              {existingMeal.recipeDetails.nutritionalFacts.protein}g
+                            </div>
+                            <div className="text-gray-500 dark:text-gray-400">protein</div>
+                          </div>
+                          <div className="text-center p-2 bg-white dark:bg-gray-700 rounded text-xs">
+                            <div className="font-medium text-gray-900 dark:text-white text-sm">
+                              {existingMeal.recipeDetails.nutritionalFacts.carbs}g
+                            </div>
+                            <div className="text-gray-500 dark:text-gray-400">carbs</div>
+                          </div>
+                          <div className="text-center p-2 bg-white dark:bg-gray-700 rounded text-xs">
+                            <div className="font-medium text-gray-900 dark:text-white text-sm">
+                              {existingMeal.recipeDetails.nutritionalFacts.fat}g
+                            </div>
+                            <div className="text-gray-500 dark:text-gray-400">fat</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Ingredients Section */}
+                    {existingMeal.recipeDetails?.ingredients && (
+                      <div className="mb-6">
+                        <h3 className="text-base sm:text-lg font-semibold mb-3 text-gray-900 dark:text-white flex items-center">
+                          <span className="inline-block h-2 w-2 rounded-full bg-emerald-600 mr-2"></span>
+                          Ingredients
+                        </h3>
+                        <div className="space-y-2">
+                          {existingMeal.recipeDetails.ingredients.map((ingredient, index) => (
+                            <div key={index} className="flex items-start py-2 px-3 bg-gray-50 dark:bg-gray-800 rounded-md">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-600 mt-2 mr-3 flex-shrink-0"></span>
+                              <span className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{ingredient}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Instructions Section */}
+                    {existingMeal.recipeDetails?.instructions && (
+                      <div className="mb-6">
+                        <h3 className="text-base sm:text-lg font-semibold mb-3 text-gray-900 dark:text-white flex items-center">
+                          <span className="inline-block h-2 w-2 rounded-full bg-blue-600 mr-2"></span>
+                          Instructions
+                        </h3>
+                        <div className="space-y-3">
+                          {existingMeal.recipeDetails.instructions.map((instruction, index) => (
+                            <div key={index} className="flex items-start py-3 px-3 bg-gray-50 dark:bg-gray-800 rounded-md">
+                              <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 text-xs font-medium text-blue-800 dark:text-blue-200 mr-3 flex-shrink-0 mt-0.5">
+                                {index + 1}
+                              </span>
+                              <span className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{instruction}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Goal Alignment (if available) */}
+                    {existingMeal.recipeDetails?.goalAlignment && (
+                      <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                        <h3 className="text-sm font-semibold mb-2 text-emerald-900 dark:text-emerald-100">Goal Alignment</h3>
+                        <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                          {existingMeal.recipeDetails.goalAlignment.macroFit}
+                        </p>
+                        {existingMeal.recipeDetails.goalAlignment.nutritionalBenefits && (
+                          <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
+                            {existingMeal.recipeDetails.goalAlignment.nutritionalBenefits}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Additional spacing for mobile safe area */}
+                    <div className="h-4 sm:h-0"></div>
+                  </div>
                 </div>
-              )
-            )}
+              )}
+
+                             {/* Non-View Mode Content */}
+               {(mode === 'add' || mode === 'edit') && (
+                <>
+                  {/* Content based on active tab */}
+                  {showFavorites ? (
+                    // Saved Recipes Tab
+                    <div className="p-4 sm:p-6">
+                      {isLoadingFavorites ? (
+                        <div className="flex justify-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                        </div>
+                      ) : favoriteRecipes.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Sparkles className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                            No Favorite Recipes Yet
+                          </h4>
+                          <p className="text-gray-600 dark:text-gray-400 mb-4">
+                            Heart recipes here or save them from the Generate page to see them in your favorites
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <h4 className="font-medium text-gray-900 dark:text-white">
+                            Your Favorite Recipes
+                          </h4>
+                          {favoriteRecipes.map((favoriteRecipe, index) => (
+                            <div
+                              key={favoriteRecipe.id || index}
+                              className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
+                            >
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1 min-w-0">
+                                  <h5 className="font-medium text-gray-900 dark:text-white mb-1 truncate">
+                                    {favoriteRecipe.recipeName}
+                                  </h5>
+                                  <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                    <div className="flex items-center">
+                                      <Clock className="h-3 w-3 mr-1" />
+                                      {favoriteRecipe.recipeDetails.times}
+                                    </div>
+                                    {favoriteRecipe.rating && (
+                                      <div className="flex items-center">
+                                        <span className="text-yellow-500">★</span>
+                                        <span className="ml-1">{favoriteRecipe.rating}/5</span>
+                                      </div>
+                                    )}
+                                    {favoriteRecipe.isFromSavedRecipes && (
+                                      <span className="text-blue-500 text-xs">From Generate</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSelectSavedRecipe(favoriteRecipe)}
+                                  className="ml-4 flex-shrink-0"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add
+                                </Button>
+                              </div>
+
+                              {/* Ingredients preview */}
+                              <div className="mb-3">
+                                <div className="flex flex-wrap gap-1">
+                                  {favoriteRecipe.recipeDetails.ingredients.slice(0, 3).map((ingredient: string, idx: number) => (
+                                    <Badge key={idx} variant="outline" className="text-xs">
+                                      {ingredient.split(' ').slice(0, 2).join(' ')}
+                                    </Badge>
+                                  ))}
+                                  {favoriteRecipe.recipeDetails.ingredients.length > 3 && (
+                                    <Badge variant="outline" className="text-xs">
+                                      +{favoriteRecipe.recipeDetails.ingredients.length - 3} more
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : showChatInput ? (
+                    // Chat Input Tab
+                    <ChatInput 
+                      mealType={selectedMealType}
+                      servings={selectedServings}
+                      onRecipeSelect={handleRecipeSelect}
+                      onFavorite={handleChatFavorite}
+                    />
+                  ) : (
+                    // Generated Recipes Tab
+                    generatedRecipes.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <Sparkles className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                          {activeGoal ? 'Generate Recipes for Your Goal' : 'Set a Goal First'}
+                        </h4>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {activeGoal 
+                            ? 'Click "Generate Goal-Based Recipes" to get personalized meal suggestions'
+                            : 'Please set a dietary goal to get personalized recipe recommendations'
+                          }
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-4 sm:p-6 space-y-4">
+                        <h4 className="font-medium text-gray-900 dark:text-white">
+                          Generated Recipes ({generatedRecipes.length})
+                        </h4>
+                        
+                        {generatedRecipes.map((recipe, index) => (
+                          <div
+                            key={index}
+                            className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
+                          >
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1 min-w-0">
+                                <h5 className="font-medium text-gray-900 dark:text-white mb-1 truncate">
+                                  {recipe.name}
+                                </h5>
+                                <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                  <div className="flex items-center">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    {recipe.times}
+                                  </div>
+                                  <div className="flex items-center">
+                                    <Users className="h-3 w-3 mr-1" />
+                                    {recipe.servings}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleToggleFavorite(recipe)}
+                                  className={`p-2 ${favoriteStatus[recipe.name] ? 'text-red-500 hover:text-red-600' : 'text-gray-400 hover:text-red-500'}`}
+                                >
+                                  <Heart className={`h-4 w-4 ${favoriteStatus[recipe.name] ? 'fill-current' : ''}`} />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleRecipeSelect(recipe)}
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Nutrition Summary */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                              <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">
+                                <div className="font-medium text-gray-900 dark:text-white">
+                                  {recipe.nutritionalFacts.calories}
+                                </div>
+                                <div className="text-gray-500">cal</div>
+                              </div>
+                              <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">
+                                <div className="font-medium text-gray-900 dark:text-white">
+                                  {recipe.nutritionalFacts.protein}g
+                                </div>
+                                <div className="text-gray-500">protein</div>
+                              </div>
+                              <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">
+                                <div className="font-medium text-gray-900 dark:text-white">
+                                  {recipe.nutritionalFacts.carbs}g
+                                </div>
+                                <div className="text-gray-500">carbs</div>
+                              </div>
+                              <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">
+                                <div className="font-medium text-gray-900 dark:text-white">
+                                  {recipe.nutritionalFacts.fat}g
+                                </div>
+                                <div className="text-gray-500">fat</div>
+                              </div>
+                            </div>
+
+                            {/* Goal Alignment */}
+                            <div className="space-y-2">
+                              <Badge variant="outline" className="text-xs">
+                                Goal Alignment: {recipe.goalAlignment.macroFit}
+                              </Badge>
+                              
+                              {/* Macro Progress Bars */}
+                              {activeGoal?.macroTargets.perMeal && (
+                                <div className="space-y-1">
+                                  {activeGoal.macroTargets.perMeal.calories && (
+                                    <div className="flex items-center space-x-2 text-xs">
+                                      <span className="w-12">Cal:</span>
+                                      <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1">
+                                        <div 
+                                          className={`h-1 rounded-full ${getMacroColor(recipe.nutritionalFacts.calories, activeGoal.macroTargets.perMeal.calories)}`}
+                                          style={{
+                                            width: `${getMacroBarWidth(recipe.nutritionalFacts.calories, activeGoal.macroTargets.perMeal.calories)}%`
+                                          }}
+                                        />
+                                      </div>
+                                      <span className="text-gray-500">
+                                        {recipe.nutritionalFacts.calories}/{activeGoal.macroTargets.perMeal.calories}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {activeGoal.macroTargets.perMeal.protein && (
+                                    <div className="flex items-center space-x-2 text-xs">
+                                      <span className="w-12">Pro:</span>
+                                      <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1">
+                                        <div 
+                                          className={`h-1 rounded-full ${getMacroColor(recipe.nutritionalFacts.protein, activeGoal.macroTargets.perMeal.protein)}`}
+                                          style={{
+                                            width: `${getMacroBarWidth(recipe.nutritionalFacts.protein, activeGoal.macroTargets.perMeal.protein)}%`
+                                          }}
+                                        />
+                                      </div>
+                                      <span className="text-gray-500">
+                                        {recipe.nutritionalFacts.protein}g/{activeGoal.macroTargets.perMeal.protein}g
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Expandable ingredients/instructions - Mobile Optimized */}
+                            <div className="mt-3">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedRecipe(selectedRecipe?.name === recipe.name ? null : recipe)}
+                                className="text-xs"
+                              >
+                                {selectedRecipe?.name === recipe.name ? 'Hide Details' : 'View Recipe Details'}
+                              </Button>
+                              
+                              {selectedRecipe?.name === recipe.name && (
+                                <div className="mt-3 space-y-4 text-sm border-t pt-3 border-gray-200 dark:border-gray-600">
+                                  <div>
+                                    <h6 className="font-medium mb-2 text-gray-900 dark:text-white">Ingredients:</h6>
+                                    <div className="space-y-1">
+                                      {recipe.ingredients.map((ingredient, idx) => (
+                                        <div key={idx} className="flex items-start py-1 px-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">
+                                          <span className="inline-block h-1 w-1 rounded-full bg-emerald-600 mt-1.5 mr-2 flex-shrink-0"></span>
+                                          <span className="text-gray-600 dark:text-gray-400 leading-relaxed">{ingredient}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <h6 className="font-medium mb-2 text-gray-900 dark:text-white">Instructions:</h6>
+                                    <div className="space-y-2">
+                                      {recipe.instructions.map((step, idx) => (
+                                        <div key={idx} className="flex items-start py-2 px-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">
+                                          <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-blue-100 dark:bg-blue-900 text-xs font-medium text-blue-800 dark:text-blue-200 mr-2 flex-shrink-0 mt-0.5">
+                                            {idx + 1}
+                                          </span>
+                                          <span className="text-gray-600 dark:text-gray-400 leading-relaxed">{step}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {/* Additional spacing for mobile safe area */}
+                        <div className="h-4 sm:h-0"></div>
+                      </div>
+                    )
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
