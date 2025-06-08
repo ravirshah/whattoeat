@@ -542,6 +542,12 @@ export default function RecipeSelector({
     onClose();
   };
 
+  // Handler specifically for ChatInput which already provides a complete PlannedMeal object
+  const handleChatRecipeSelect = (meal: PlannedMeal) => {
+    onRecipeSelect(meal);
+    onClose();
+  };
+
   const handleChatFavorite = async (chatResult: any) => {
     if (!currentUser) {
       toast.error('Please sign in to save favorites');
@@ -997,7 +1003,7 @@ export default function RecipeSelector({
                     <ChatInput 
                       mealType={selectedMealType}
                       servings={selectedServings}
-                      onRecipeSelect={handleRecipeSelect}
+                      onRecipeSelect={handleChatRecipeSelect}
                       onFavorite={handleChatFavorite}
                     />
                   ) : (

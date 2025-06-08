@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/context/AuthContext';
+import { Timestamp } from 'firebase/firestore';
 
 interface ParsedNutritionItem {
   name: string;
@@ -259,7 +260,7 @@ export default function ChatInput({
         recipeName: result.recipe.name,
         mealType: mealType as any,
         servings: servings,
-        plannedAt: new Date() as any,
+        plannedAt: Timestamp.now(),
         recipeDetails: {
           ingredients: result.recipe.ingredients,
           instructions: result.recipe.instructions,
@@ -285,7 +286,7 @@ export default function ChatInput({
         recipeName: mealName || 'Chat Nutrition Entry',
         mealType: mealType as any,
         servings: servings,
-        plannedAt: new Date() as any,
+        plannedAt: Timestamp.now(),
         recipeDetails: {
           ingredients: result.nutritionEntry.items.map((item: ParsedNutritionItem) => 
             `${item.amount} ${item.name}`),
