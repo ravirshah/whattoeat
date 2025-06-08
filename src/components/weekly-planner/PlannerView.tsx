@@ -17,6 +17,7 @@ interface PlannerViewProps {
   plannerState: PlannerViewState;
   onStateUpdate: (updates: Partial<PlannerViewState>) => void;
   onPlanUpdate: (updatedPlan: WeeklyPlan) => void;
+  onNavigateWeek?: (direction: 'previous' | 'next') => void;
 }
 
 const DAYS_OF_WEEK: DayOfWeek[] = [
@@ -31,19 +32,40 @@ const formatDate = (baseDate: Date, dayOffset: number) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-// Helper function to remove undefined values from objects before saving to Firestore
+// Enhanced helper function to remove undefined values from objects before saving to Firestore
 const cleanUndefinedValues = (obj: any): any => {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  
   if (Array.isArray(obj)) {
-    return obj.map(cleanUndefinedValues);
-  } else if (obj !== null && typeof obj === 'object') {
+    return obj
+      .filter(item => item !== undefined && item !== null)
+      .map(cleanUndefinedValues);
+  }
+  
+  if (obj instanceof Date || obj instanceof Object && obj.constructor === Date) {
+    return obj;
+  }
+  
+  // Handle Firestore Timestamp objects
+  if (obj && typeof obj === 'object' && obj.toDate) {
+    return obj;
+  }
+  
+  if (typeof obj === 'object') {
     const cleaned: any = {};
     for (const [key, value] of Object.entries(obj)) {
       if (value !== undefined) {
-        cleaned[key] = cleanUndefinedValues(value);
+        const cleanedValue = cleanUndefinedValues(value);
+        if (cleanedValue !== null && cleanedValue !== undefined) {
+          cleaned[key] = cleanedValue;
+        }
       }
     }
     return cleaned;
   }
+  
   return obj;
 };
 
@@ -52,19 +74,39 @@ export default function PlannerView({
   activeGoal,
   plannerState,
   onStateUpdate,
-  onPlanUpdate
+  onPlanUpdate,
+  onNavigateWeek
 }: PlannerViewProps) {
   const [draggedMeal, setDraggedMeal] = useState<{ meal: PlannedMeal; sourceDay: DayOfWeek } | null>(null);
   const [copyMode, setCopyMode] = useState<{ meal: PlannedMeal; sourceDay: DayOfWeek } | null>(null);
 
   // Handle different date types (Date object or Firestore Timestamp)
-  const weekStartDate = weeklyPlan.weekStartDate instanceof Date 
-    ? weeklyPlan.weekStartDate 
-    : new Date(weeklyPlan.weekStartDate);
+  const getDateFromValue = (dateValue: any): Date => {
+    if (dateValue && typeof dateValue === 'object' && dateValue.toDate) {
+      return dateValue.toDate();
+    } else if (dateValue instanceof Date) {
+      return dateValue;
+    } else {
+      return new Date(dateValue);
+    }
+  };
+  
+  const weekStartDate = getDateFromValue(weeklyPlan.weekStartDate);
 
   const formatDateRange = () => {
-    const start = new Date(weeklyPlan.weekStartDate);
-    const end = new Date(weeklyPlan.weekEndDate);
+    // Handle both Date objects and Firestore Timestamps
+    const getDateFromValue = (dateValue: any): Date => {
+      if (dateValue && typeof dateValue === 'object' && dateValue.toDate) {
+        return dateValue.toDate();
+      } else if (dateValue instanceof Date) {
+        return dateValue;
+      } else {
+        return new Date(dateValue);
+      }
+    };
+    
+    const start = getDateFromValue(weeklyPlan.weekStartDate);
+    const end = getDateFromValue(weeklyPlan.weekEndDate);
     return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
   };
 
@@ -372,11 +414,21 @@ export default function PlannerView({
         </div>
         
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => onNavigateWeek?.('previous')}
+            disabled={!onNavigateWeek}
+          >
             <ChevronLeft className="h-4 w-4" />
             Previous Week
           </Button>
-          <Button variant="outline" size="sm">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => onNavigateWeek?.('next')}
+            disabled={!onNavigateWeek}
+          >
             Next Week
             <ChevronRight className="h-4 w-4" />
           </Button>

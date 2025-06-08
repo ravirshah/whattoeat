@@ -76,6 +76,14 @@ export interface UserGoal {
     perMeal?: MacroTarget; // Optional per-meal targets
   };
   dietaryRestrictions: string[]; // e.g., ["low_carb", "high_protein", "vegetarian"]
+  // New: Health document integration
+  healthDocumentIds?: string[]; // References to health documents
+  healthBasedAdjustments?: {
+    avoidIngredients?: string[]; // Based on health conditions
+    recommendIngredients?: string[]; // Based on deficiencies
+    macroModifications?: string[]; // AI recommendations from health data
+    supplementSuggestions?: string[];
+  };
   isActive: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -264,4 +272,61 @@ export interface PrepRecipe {
   storageInstructions: string;
   shelfLife: number; // days
   reheatingInstructions?: string;
+}
+
+// New interface for health documents
+export interface HealthDocument {
+  id: string;
+  userId: string;
+  fileName: string;
+  fileType: 'blood_panel' | 'inbody_scan' | 'dexascan' | 'medical_report' | 'other';
+  uploadedAt: Timestamp;
+  parsedData: {
+    // Blood panel data
+    cholesterolTotal?: number;
+    cholesterolLDL?: number;
+    cholesterolHDL?: number;
+    triglycerides?: number;
+    glucose?: number;
+    hemoglobinA1c?: number;
+    vitaminD?: number;
+    vitaminB12?: number;
+    iron?: number;
+    ferritin?: number;
+    tsh?: number;
+    creatinine?: number;
+    // InBody scan data
+    bodyFatPercentage?: number;
+    muscleMass?: number;
+    bodyWeight?: number;
+    BMI?: number;
+    visceralFat?: number;
+    basalMetabolicRate?: number;
+    // General health indicators
+    bloodPressureSystolic?: number;
+    bloodPressureDiastolic?: number;
+    restingHeartRate?: number;
+    // Dietary recommendations from documents
+    dietaryRecommendations?: string[];
+    healthConcerns?: string[];
+    rawExtractedText?: string;
+    abnormalValues?: string[];
+  };
+  aiSummary?: string; // AI-generated summary of health insights
+  isActive: boolean; // Whether to use this document for meal planning
+}
+
+// Enhanced user preferences to include health documents
+export interface UserPreferences {
+  ingredients: string[];
+  equipment: string[];
+  staples: string[];
+  dietaryPrefs: string[];
+  cuisinePrefs: string[];
+  cookTimePreference?: string;
+  difficultyPreference?: string;
+  // New: Health document management
+  healthDocuments?: HealthDocument[];
+  healthDataConsent: boolean; // User consent for health data usage
+  lastHealthDataSync?: Timestamp;
 } 

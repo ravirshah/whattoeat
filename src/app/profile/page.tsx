@@ -7,6 +7,8 @@ import { getUserPreferences, updateUserPreferences } from '@/lib/db';
 import { signOut } from '@/lib/auth';
 import MainLayout from '@/components/layout/MainLayout';
 import AuthWrapper from '@/components/auth/AuthWrapper';
+import HealthDocuments from '@/components/profile/HealthDocuments';
+import { HealthDocument } from '@/types/weekly-planner';
 import { 
   Card, 
   CardContent, 
@@ -35,7 +37,9 @@ import {
   LogOut, 
   Info,
   Edit,
-  Trash2
+  Trash2,
+  FileText,
+  Heart
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -68,6 +72,9 @@ function Profile() {
   const [difficultyPreference, setDifficultyPreference] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  // New state for health documents
+  const [healthDocuments, setHealthDocuments] = useState<HealthDocument[]>([]);
+  const [healthDataConsent, setHealthDataConsent] = useState(false);
   
   // Load user preferences
   useEffect(() => {
@@ -342,6 +349,7 @@ function Profile() {
                 <TabsTrigger value="cuisine" className="flex-1">Cuisine</TabsTrigger>
                 <TabsTrigger value="cooktime" className="flex-1">Cook Time</TabsTrigger>
                 <TabsTrigger value="difficulty" className="flex-1">Difficulty</TabsTrigger>
+                <TabsTrigger value="health" className="flex-1">Health Documents</TabsTrigger>
               </TabsList>
               
               {/* Ingredients Tab */}
@@ -809,6 +817,11 @@ function Profile() {
                     </div>
                   </div>
                 </div>
+              </TabsContent>
+              
+              {/* Health Documents Tab */}
+              <TabsContent value="health">
+                <HealthDocuments userId={currentUser?.uid || ''} />
               </TabsContent>
             </Tabs>
           </CardContent>

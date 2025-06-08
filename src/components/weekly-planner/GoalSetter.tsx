@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { UserGoal } from '@/types/weekly-planner';
+import { UserGoal, HealthDocument } from '@/types/weekly-planner';
 import { Button } from '@/components/ui';
-import { X, Target, Save, AlertCircle } from 'lucide-react';
-import { createUserGoal, updateUserGoal } from '@/lib/weekly-planner-db';
+import { X, Target, Save, AlertCircle, Sparkles, Brain, Info, CheckCircle, Clock, Activity } from 'lucide-react';
+import { createUserGoal, updateUserGoal, getActiveHealthDocuments } from '@/lib/weekly-planner-db';
 import { toast } from 'sonner';
 import { Timestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 interface GoalSetterProps {
   currentGoal: UserGoal | null;
@@ -52,10 +53,57 @@ const DIETARY_RESTRICTIONS = [
   'paleo',
   'pescatarian',
   'nut_free',
-  'low_sodium'
+  'low_sodium',
+  'heart_healthy',
+  'diabetic_friendly',
+  'low_saturated_fat',
+  'anti_inflammatory',
+  'low_glycemic'
 ];
 
 type GoalType = typeof GOAL_TYPES[number]['value'];
+
+interface GoalSuggestion {
+  goalType: GoalType;
+  goalName: string;
+  description: string;
+  macroTargets: {
+    daily: {
+      calories: number;
+      protein: number;
+      carbs: number;
+      fat: number;
+      fiber: number;
+    };
+    perMeal: {
+      calories: number;
+      protein: number;
+      carbs: number;
+      fat: number;
+      fiber: number;
+    };
+  };
+  dietaryRestrictions: string[];
+  healthBasedAdjustments: {
+    avoidIngredients: string[];
+    recommendIngredients: string[];
+    macroModifications: string[];
+    supplementSuggestions: string[];
+  };
+  confidence: number;
+  reasoning: string[];
+}
+
+interface HealthAnalysis {
+  concerns: string[];
+  positives: string[];
+  recommendedRestrictions: string[];
+  avoidIngredients: string[];
+  recommendIngredients: string[];
+  macroModifications: string[];
+  supplementSuggestions: string[];
+  reasoningPoints: string[];
+}
 
 export default function GoalSetter({ currentGoal, userId, onGoalUpdate, onClose }: GoalSetterProps) {
   const [formData, setFormData] = useState({
@@ -72,6 +120,14 @@ export default function GoalSetter({ currentGoal, userId, onGoalUpdate, onClose 
   });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Smart suggestions state
+  const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [healthDocuments, setHealthDocuments] = useState<HealthDocument[]>([]);
+  const [goalSuggestion, setGoalSuggestion] = useState<GoalSuggestion | null>(null);
+  const [healthAnalysis, setHealthAnalysis] = useState<HealthAnalysis | null>(null);
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentGoal) {
@@ -89,6 +145,31 @@ export default function GoalSetter({ currentGoal, userId, onGoalUpdate, onClose 
       });
     }
   }, [currentGoal]);
+
+  // Load health documents for smart suggestions
+  useEffect(() => {
+    const loadHealthDocuments = async () => {
+      try {
+        console.log('Loading health documents for user:', userId);
+        const docs = await getActiveHealthDocuments(userId);
+        console.log('Loaded health documents:', docs.length, docs);
+        setHealthDocuments(docs);
+        
+        if (docs.length > 0) {
+          console.log('Found active health documents, smart suggestions should be available');
+        } else {
+          console.log('No active health documents found');
+        }
+      } catch (error) {
+        console.error('Error loading health documents:', error);
+        toast.error('Failed to load health documents for smart suggestions');
+      }
+    };
+
+    if (userId) {
+      loadHealthDocuments();
+    }
+  }, [userId]);
 
   const handleGoalTypeChange = (goalType: GoalType) => {
     const goalTypeConfig = GOAL_TYPES.find(g => g.value === goalType);
@@ -113,6 +194,83 @@ export default function GoalSetter({ currentGoal, userId, onGoalUpdate, onClose 
         ? prev.dietaryRestrictions.filter(r => r !== restriction)
         : [...prev.dietaryRestrictions, restriction]
     }));
+  };
+
+  // Generate smart suggestions based on health documents
+  const generateSmartSuggestions = async () => {
+    if (healthDocuments.length === 0) {
+      setSuggestionsError('No active health documents found. Please upload and activate health documents in your profile first.');
+      return;
+    }
+
+    setIsLoadingSuggestions(true);
+    setSuggestionsError(null);
+
+    try {
+      // Get auth token
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      
+      const token = await user.getIdToken();
+
+      // Call the smart suggestions API
+      const response = await fetch('/whattoeat/api/generate-goal-suggestions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          healthDocuments,
+          userInfo: {
+            // Could include additional user info like age, gender, activity level
+            // from user profile if available
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate suggestions');
+      }
+
+      const { suggestion, healthAnalysis: analysis } = await response.json();
+      
+      setGoalSuggestion(suggestion);
+      setHealthAnalysis(analysis);
+      setShowSmartSuggestions(true);
+
+      toast.success('Smart suggestions generated based on your health data!');
+    } catch (error) {
+      console.error('Error generating smart suggestions:', error);
+      setSuggestionsError(error instanceof Error ? error.message : 'Failed to generate suggestions');
+      toast.error('Failed to generate smart suggestions. Please try again.');
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  // Apply the smart suggestion to the form
+  const applySuggestion = (suggestion: GoalSuggestion) => {
+    setFormData(prev => ({
+      ...prev,
+      goalType: suggestion.goalType,
+      name: suggestion.goalName,
+      description: suggestion.description,
+      dailyCalories: suggestion.macroTargets.daily.calories,
+      dailyProtein: suggestion.macroTargets.daily.protein,
+      dailyCarbs: suggestion.macroTargets.daily.carbs,
+      dailyFat: suggestion.macroTargets.daily.fat,
+      dailyFiber: suggestion.macroTargets.daily.fiber,
+      dietaryRestrictions: suggestion.dietaryRestrictions,
+      autoPerMeal: true
+    }));
+
+    setShowSmartSuggestions(false);
+    toast.success('Smart suggestion applied! You can still customize the settings before saving.');
   };
 
   const validateForm = () => {
@@ -158,31 +316,38 @@ export default function GoalSetter({ currentGoal, userId, onGoalUpdate, onClose 
     setIsLoading(true);
     try {
       const goalData = {
-        userId,
-        goalType: formData.goalType,
-        name: formData.name,
-        description: formData.description,
-        macroTargets: {
-          daily: {
-            calories: formData.dailyCalories,
-            protein: formData.dailyProtein,
-            carbs: formData.dailyCarbs,
-            fat: formData.dailyFat,
-            fiber: formData.dailyFiber
-          },
-          ...(formData.autoPerMeal && {
-            perMeal: {
-              calories: Math.round(formData.dailyCalories / 3),
-              protein: Math.round(formData.dailyProtein / 3),
-              carbs: Math.round(formData.dailyCarbs / 3),
-              fat: Math.round(formData.dailyFat / 3),
-              fiber: Math.round(formData.dailyFiber / 3)
-            }
-          })
+      userId,
+      goalType: formData.goalType,
+      name: formData.name,
+      description: formData.description,
+      macroTargets: {
+        daily: {
+          calories: formData.dailyCalories,
+          protein: formData.dailyProtein,
+          carbs: formData.dailyCarbs,
+          fat: formData.dailyFat,
+          fiber: formData.dailyFiber
         },
-        dietaryRestrictions: formData.dietaryRestrictions,
-        isActive: true
-      };
+        ...(formData.autoPerMeal && {
+          perMeal: {
+            calories: Math.round(formData.dailyCalories / 3),
+            protein: Math.round(formData.dailyProtein / 3),
+            carbs: Math.round(formData.dailyCarbs / 3),
+            fat: Math.round(formData.dailyFat / 3),
+            fiber: Math.round(formData.dailyFiber / 3)
+          }
+        })
+      },
+      dietaryRestrictions: formData.dietaryRestrictions,
+      // Include health document IDs and adjustments if available
+      ...(healthDocuments.length > 0 && {
+        healthDocumentIds: healthDocuments.map(doc => doc.id),
+        ...(goalSuggestion?.healthBasedAdjustments && {
+          healthBasedAdjustments: goalSuggestion.healthBasedAdjustments
+        })
+      }),
+      isActive: true
+    };
 
       let savedGoal: UserGoal;
 
@@ -244,6 +409,11 @@ export default function GoalSetter({ currentGoal, userId, onGoalUpdate, onClose 
     }
   };
 
+  // Debug logging
+  console.log('GoalSetter render - healthDocuments:', healthDocuments.length, healthDocuments);
+  console.log('GoalSetter render - showSmartSuggestions:', showSmartSuggestions);
+  console.log('GoalSetter render - goalSuggestion:', goalSuggestion);
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
       <div className="flex items-center justify-between mb-6">
@@ -259,6 +429,189 @@ export default function GoalSetter({ currentGoal, userId, onGoalUpdate, onClose 
       </div>
 
       <div className="space-y-6">
+        {/* Smart Suggestions Section */}
+        {healthDocuments.length > 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-2">
+                <Brain className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <h4 className="font-medium text-blue-900 dark:text-blue-100">
+                  AI-Powered Smart Suggestions
+                </h4>
+                <div className="flex items-center space-x-1 text-xs text-blue-700 dark:text-blue-300">
+                  <Activity className="h-3 w-3" />
+                  <span>{healthDocuments.length} health document{healthDocuments.length !== 1 ? 's' : ''} analyzed</span>
+                </div>
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={generateSmartSuggestions}
+                disabled={isLoadingSuggestions}
+                className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:text-blue-300 dark:hover:bg-blue-900/30"
+              >
+                {isLoadingSuggestions ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate Suggestions
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+              Get personalized goal recommendations based on your health documents and AI analysis.
+            </p>
+
+            {suggestionsError && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-3">
+                <div className="flex items-center text-red-800 dark:text-red-200">
+                  <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span className="text-sm">{suggestionsError}</span>
+                </div>
+              </div>
+            )}
+
+            {showSmartSuggestions && goalSuggestion && (
+              <div className="space-y-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h5 className="font-medium text-gray-900 dark:text-white mb-1">
+                        {goalSuggestion.goalName}
+                      </h5>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        {goalSuggestion.description}
+                      </p>
+                      <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center">
+                          <Target className="h-3 w-3 mr-1" />
+                          <span>{goalSuggestion.goalType.replace('_', ' ')}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          <span>{goalSuggestion.confidence}% confidence</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <Button
+                      size="sm"
+                      onClick={() => applySuggestion(goalSuggestion)}
+                      className="ml-4"
+                    >
+                      Apply Suggestion
+                    </Button>
+                  </div>
+
+                  {/* Macro Preview */}
+                  <div className="grid grid-cols-5 gap-2 mb-3">
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Calories</div>
+                      <div className="font-medium text-sm">{goalSuggestion.macroTargets.daily.calories}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Protein</div>
+                      <div className="font-medium text-sm">{goalSuggestion.macroTargets.daily.protein}g</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Carbs</div>
+                      <div className="font-medium text-sm">{goalSuggestion.macroTargets.daily.carbs}g</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Fat</div>
+                      <div className="font-medium text-sm">{goalSuggestion.macroTargets.daily.fat}g</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Fiber</div>
+                      <div className="font-medium text-sm">{goalSuggestion.macroTargets.daily.fiber}g</div>
+                    </div>
+                  </div>
+
+                  {/* Health-Based Adjustments Preview */}
+                  {(goalSuggestion.healthBasedAdjustments.avoidIngredients.length > 0 || 
+                    goalSuggestion.healthBasedAdjustments.recommendIngredients.length > 0) && (
+                    <div className="space-y-2">
+                      {goalSuggestion.healthBasedAdjustments.avoidIngredients.length > 0 && (
+                        <div>
+                          <span className="text-xs font-medium text-red-600 dark:text-red-400">Limit: </span>
+                          <span className="text-xs text-gray-600 dark:text-gray-400">
+                            {goalSuggestion.healthBasedAdjustments.avoidIngredients.slice(0, 3).join(', ')}
+                            {goalSuggestion.healthBasedAdjustments.avoidIngredients.length > 3 && '...'}
+                          </span>
+                        </div>
+                      )}
+                      {goalSuggestion.healthBasedAdjustments.recommendIngredients.length > 0 && (
+                        <div>
+                          <span className="text-xs font-medium text-green-600 dark:text-green-400">Emphasize: </span>
+                          <span className="text-xs text-gray-600 dark:text-gray-400">
+                            {goalSuggestion.healthBasedAdjustments.recommendIngredients.slice(0, 3).join(', ')}
+                            {goalSuggestion.healthBasedAdjustments.recommendIngredients.length > 3 && '...'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Key Reasoning Points */}
+                  {goalSuggestion.reasoning.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Key Health Factors:</div>
+                      <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                        {goalSuggestion.reasoning.slice(0, 2).map((reason, index) => (
+                          <li key={index} className="flex items-start">
+                            <span className="w-1 h-1 bg-blue-400 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                            {reason}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSmartSuggestions(false)}
+                  className="w-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Hide Suggestions
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {healthDocuments.length === 0 && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+            <div className="flex items-center mb-2">
+              <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mr-2" />
+              <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                Smart Suggestions Available
+              </span>
+            </div>
+            <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
+              Upload health documents in your profile to get AI-powered goal recommendations based on your health data.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open('/whattoeat/profile', '_blank')}
+              className="border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-900/30"
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              Go to Profile
+            </Button>
+          </div>
+        )}
+
         {/* Goal Type Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">

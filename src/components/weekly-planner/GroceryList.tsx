@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { WeeklyPlan, GroceryList as GroceryListType, GroceryItem, StoreLayout } from '@/types/weekly-planner';
+import { WeeklyPlan, GroceryList as GroceryListType, GroceryItem } from '@/types/weekly-planner';
 import { Button, Badge } from '@/components/ui';
-import { ShoppingCart, X, Check, Download, RefreshCw, Plus, MapPin, Settings } from 'lucide-react';
-import { createGroceryList, getGroceryList, updateGroceryList, getUserStoreLayouts, getDefaultStoreLayout } from '@/lib/weekly-planner-db';
-import { getSavedRecipes } from '@/lib/db';
+import { ShoppingCart, X, Check, Download, RefreshCw, Plus, MapPin, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { createGroceryList, getGroceryList, updateGroceryList } from '@/lib/weekly-planner-db';
 import { toast } from 'sonner';
 import { Timestamp } from 'firebase/firestore';
 
@@ -13,6 +12,13 @@ interface GroceryListProps {
   weeklyPlan: WeeklyPlan;
   userId: string;
   onClose: () => void;
+}
+
+interface ProcessedIngredient {
+  name: string;
+  quantity: string;
+  fromRecipes: string[];
+  category: string;
 }
 
 export default function GroceryList({
@@ -23,322 +29,486 @@ export default function GroceryList({
   const [groceryList, setGroceryList] = useState<GroceryListType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [userIngredients, setUserIngredients] = useState<string[]>([]);
-  const [newIngredient, setNewIngredient] = useState('');
-  const [storeLayouts, setStoreLayouts] = useState<StoreLayout[]>([]);
-  const [selectedStoreLayout, setSelectedStoreLayout] = useState<StoreLayout | null>(null);
-  const [showStoreLayoutEditor, setShowStoreLayoutEditor] = useState(false);
-  const [sortByStore, setSortByStore] = useState(false);
+  const [generationStep, setGenerationStep] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadGroceryList();
-    loadStoreLayouts();
   }, [weeklyPlan.id]);
+
+  // Separate effect to handle plan updates without reloading grocery list
+  useEffect(() => {
+    if (groceryList && groceryList.weeklyPlanId === weeklyPlan.id) {
+      // Plan updated but same week - keep grocery list
+      console.log('Weekly plan updated for same week, preserving grocery list');
+    }
+  }, [weeklyPlan.updatedAt]);
 
   const loadGroceryList = async () => {
     try {
       setIsLoading(true);
+      setError(null);
+      
       console.log('Loading grocery list for weekly plan:', weeklyPlan.id);
-      console.log('Weekly plan user ID:', weeklyPlan.userId);
       
       const existingList = await getGroceryList(weeklyPlan.id);
       console.log('Loaded grocery list:', existingList);
       
+      setGroceryList(existingList);
+      
       if (existingList) {
-        console.log('Found existing grocery list with', existingList.items.length, 'items');
-        console.log('Checked items:', existingList.items.filter(item => item.isChecked).length);
+        console.log(`Found existing grocery list with ${existingList.items.length} items`);
       } else {
         console.log('No existing grocery list found for this weekly plan');
       }
-      
-      setGroceryList(existingList);
     } catch (error: any) {
       console.error('Error loading grocery list:', error);
-      if (error?.code === 'permission-denied') {
-        console.warn('Permission denied loading grocery list - user may not have access');
-        toast.error('Unable to load grocery list - permission denied');
-      } else {
-        toast.error('Failed to load grocery list');
-      }
+      setError(`Failed to load grocery list: ${error.message}`);
+      toast.error('Failed to load grocery list');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loadStoreLayouts = async () => {
-    try {
-      // Temporarily disable store layouts due to missing Firestore index
-      // TODO: Create the Firestore index and re-enable this
-      // const layouts = await getUserStoreLayouts(userId);
-      const layouts: StoreLayout[] = [];
-      setStoreLayouts(layouts);
-      
-      // Set default store layout if available
-      const defaultLayout = layouts.find(layout => layout.isDefault) || layouts[0];
-      if (defaultLayout) {
-        setSelectedStoreLayout(defaultLayout);
-      }
-    } catch (error) {
-      console.error('Error loading store layouts:', error);
-    }
-  };
-
-  // Helper function to extract original servings from recipe details
-  const extractServingsFromRecipe = (recipeDetails: any): number => {
-    // Try to extract from times field (e.g., "Serves 4" or "4 servings")
-    if (recipeDetails.times) {
-      const servesMatch = recipeDetails.times.match(/serves?\s+(\d+)/i);
-      if (servesMatch) return parseInt(servesMatch[1]);
-      
-      const servingsMatch = recipeDetails.times.match(/(\d+)\s+servings?/i);
-      if (servingsMatch) return parseInt(servingsMatch[1]);
+  // Comprehensive data validation and cleaning
+  const validateAndCleanData = (data: any): any => {
+    if (data === null || data === undefined) {
+      return null;
     }
     
-    // Default to 1 if not found
-    return 1;
+    if (Array.isArray(data)) {
+      return data
+        .map(validateAndCleanData)
+        .filter(item => item !== null && item !== undefined);
+    }
+    
+    if (typeof data === 'object') {
+      const cleaned: any = {};
+      
+      for (const [key, value] of Object.entries(data)) {
+        const cleanedValue = validateAndCleanData(value);
+        if (cleanedValue !== null && cleanedValue !== undefined) {
+          cleaned[key] = cleanedValue;
+        }
+      }
+      
+      return cleaned;
+    }
+    
+    // For primitive values, only exclude undefined
+    return data !== undefined ? data : null;
+  };
+
+  // Smart ingredient parsing to extract base ingredient and quantity
+  const parseIngredientName = (ingredient: string): { 
+    baseIngredient: string; 
+    fullName: string; 
+    quantity?: number; 
+    unit?: string;
+    description?: string;
+  } => {
+    const cleaned = ingredient.toLowerCase().trim();
+    
+    // Extract quantity, unit, ingredient name, and description
+    const fullPattern = /^(?:(\d+(?:\.\d+)?(?:\/\d+)?)\s+)?(cloves?|cups?|tbsp|tsp|lbs?|oz|pieces?|heads?|cans?|packages?|medium|large|small)?\s*(.+?)(?:,\s*(.+))?$/;
+    const match = cleaned.match(fullPattern);
+    
+    if (match) {
+      const [, quantityStr, unit, ingredientPart, description] = match;
+      
+      let baseIngredient = ingredientPart?.trim() || cleaned;
+      
+      // Clean up the base ingredient name
+      baseIngredient = baseIngredient
+        .replace(/\s*(fresh|frozen|dried|chopped|minced|sliced|diced|grated|crushed|cut\s+into.*?)\s*/g, ' ')
+        .replace(/\s*(any\s+color|no\s+salt\s+added|optional)\s*.*$/g, '')
+        .replace(/\([^)]*\)/g, '') // Remove parentheses content
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Handle plurals and common variations
+      if (baseIngredient.endsWith('es') && !baseIngredient.endsWith('ses')) {
+        baseIngredient = baseIngredient.slice(0, -2);
+      } else if (baseIngredient.endsWith('s') && !baseIngredient.endsWith('ss') && !baseIngredient.endsWith('us')) {
+        baseIngredient = baseIngredient.slice(0, -1);
+      }
+      
+      // Parse quantity
+      let quantity: number | undefined;
+      if (quantityStr) {
+        if (quantityStr.includes('/')) {
+          const [num, den] = quantityStr.split('/').map(Number);
+          quantity = num / den;
+        } else {
+          quantity = parseFloat(quantityStr);
+        }
+      }
+      
+      return {
+        baseIngredient,
+        fullName: ingredient.trim(),
+        quantity,
+        unit,
+        description
+      };
+    }
+    
+    // Fallback - return the original
+    return {
+      baseIngredient: cleaned.replace(/\([^)]*\)/g, '').trim(),
+      fullName: ingredient.trim()
+    };
+  };
+
+  // Intelligent quantity consolidation
+  const consolidateQuantities = (quantities: Array<{ quantity?: number; unit?: string; description?: string }>): string => {
+    // Group by unit
+    const byUnit = quantities.reduce((acc, q) => {
+      const unit = q.unit || 'unit';
+      if (!acc[unit]) acc[unit] = [];
+      acc[unit].push(q.quantity || 1);
+      return acc;
+    }, {} as Record<string, number[]>);
+    
+    // Sum quantities for each unit
+    const consolidated = Object.entries(byUnit).map(([unit, qtys]) => {
+      const total = qtys.reduce((sum, qty) => sum + qty, 0);
+      const formattedTotal = total % 1 === 0 ? total.toString() : total.toFixed(1);
+      return unit === 'unit' ? formattedTotal : `${formattedTotal} ${unit}`;
+    });
+    
+    return consolidated.length > 1 
+      ? `Multiple preparations needed`
+      : consolidated[0] || 'As needed';
+  };
+
+  // Intelligent ingredient consolidation with smart parsing and quantity combining
+  const consolidateIngredients = (processedIngredients: ProcessedIngredient[]): GroceryItem[] => {
+    const consolidatedMap = new Map<string, {
+      item: GroceryItem;
+      parsedIngredients: Array<{ parsed: ReturnType<typeof parseIngredientName>; fromRecipes: string[] }>;
+    }>();
+    let itemIndex = 0;
+
+    // Filter out invalid ingredients
+    const validIngredients = processedIngredients.filter(ingredient => {
+      if (!ingredient || !ingredient.name || typeof ingredient.name !== 'string') {
+        console.warn('Filtering out invalid ingredient:', ingredient);
+        return false;
+      }
+      return true;
+    });
+
+    validIngredients.forEach((ingredient) => {
+      // Parse the ingredient to get base name and quantity
+      const parsed = parseIngredientName(ingredient.name);
+      const baseKey = parsed.baseIngredient.toLowerCase().trim();
+      
+      // Skip empty keys
+      if (!baseKey) {
+        console.warn('Skipping ingredient with empty base name:', ingredient);
+        return;
+      }
+      
+      // Check if we already have this base ingredient
+      const existingKey = Array.from(consolidatedMap.keys()).find(key => {
+        // More intelligent matching for similar ingredients
+        return key === baseKey || 
+               key.includes(baseKey) || 
+               baseKey.includes(key) ||
+               // Handle common variations
+               (key.includes('garlic') && baseKey.includes('garlic')) ||
+               (key.includes('onion') && baseKey.includes('onion')) ||
+               (key.includes('tomato') && baseKey.includes('tomato')) ||
+               (key.includes('pepper') && baseKey.includes('pepper'));
+      });
+      
+      if (existingKey && consolidatedMap.has(existingKey)) {
+        const existing = consolidatedMap.get(existingKey)!;
+        
+        // Add this parsed ingredient to the collection
+        existing.parsedIngredients.push({ parsed, fromRecipes: ingredient.fromRecipes });
+        
+        // Merge recipes safely
+        if (Array.isArray(ingredient.fromRecipes)) {
+          ingredient.fromRecipes.forEach(recipe => {
+            if (recipe && typeof recipe === 'string' && !existing.item.fromRecipes.includes(recipe)) {
+              existing.item.fromRecipes.push(recipe);
+            }
+          });
+        }
+        
+        // Create consolidated quantity and name
+        const allQuantities = existing.parsedIngredients.map(pi => ({
+          quantity: pi.parsed.quantity,
+          unit: pi.parsed.unit,
+          description: pi.parsed.description
+        }));
+        
+        const totalRecipes = existing.item.fromRecipes.length;
+        const consolidatedQuantity = consolidateQuantities(allQuantities);
+        
+        // Use the cleanest ingredient name (capitalize first letter)
+        const baseName = parsed.baseIngredient;
+        const capitalizedName = baseName.charAt(0).toUpperCase() + baseName.slice(1);
+        
+        existing.item.name = capitalizedName;
+        existing.item.quantity = totalRecipes > 1 
+          ? `${consolidatedQuantity} total (${totalRecipes} recipes)`
+          : consolidatedQuantity;
+        existing.item.priority = totalRecipes > 1 ? 'high' : 'medium';
+        
+      } else {
+        // Create new grocery item with validation
+        const groceryItem: GroceryItem = {
+          id: `item_${itemIndex++}`,
+          name: parsed.baseIngredient.charAt(0).toUpperCase() + parsed.baseIngredient.slice(1),
+          quantity: parsed.quantity && parsed.unit 
+            ? `${parsed.quantity} ${parsed.unit}`
+            : ingredient.quantity || '1 serving',
+          category: ingredient.category || 'General',
+          fromRecipes: Array.isArray(ingredient.fromRecipes) ? [...ingredient.fromRecipes.filter(r => r && typeof r === 'string')] : [],
+          isChecked: false,
+          storeSection: ingredient.category || 'General',
+          priority: (ingredient.fromRecipes?.length || 0) > 1 ? 'high' : 'medium'
+        };
+        
+        consolidatedMap.set(baseKey, {
+          item: groceryItem,
+          parsedIngredients: [{ parsed, fromRecipes: ingredient.fromRecipes }]
+        });
+      }
+    });
+    
+    return Array.from(consolidatedMap.values()).map(entry => entry.item);
+  };
+
+  // Enhanced ingredient categorization with null safety
+  const categorizeIngredient = (ingredient: string | null | undefined): string => {
+    // Safety check for null/undefined ingredients
+    if (!ingredient || typeof ingredient !== 'string') {
+      console.warn('Invalid ingredient passed to categorizeIngredient:', ingredient);
+      return 'General';
+    }
+    
+    const lower = ingredient.toLowerCase().trim();
+    
+    // Handle empty strings
+    if (!lower) {
+      return 'General';
+    }
+    
+    const categories = {
+      'Meat & Seafood': ['chicken', 'beef', 'pork', 'fish', 'salmon', 'turkey', 'shrimp', 'tuna', 'bacon', 'sausage'],
+      'Dairy & Eggs': ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'eggs', 'sour cream', 'cottage cheese'],
+      'Produce': ['tomato', 'onion', 'carrot', 'pepper', 'lettuce', 'spinach', 'broccoli', 'cucumber', 'apple', 'banana', 'lemon', 'garlic', 'ginger'],
+      'Grains & Bread': ['rice', 'pasta', 'bread', 'quinoa', 'oats', 'flour', 'noodles', 'cereal', 'crackers'],
+      'Pantry & Condiments': ['oil', 'vinegar', 'salt', 'pepper', 'sauce', 'honey', 'sugar', 'spice', 'herb', 'stock', 'broth'],
+      'Frozen': ['frozen', 'ice cream'],
+      'Canned Goods': ['canned', 'beans', 'corn', 'soup']
+    };
+    
+    for (const [category, keywords] of Object.entries(categories)) {
+      if (keywords.some(keyword => lower.includes(keyword))) {
+        return category;
+      }
+    }
+    
+    return 'General';
   };
 
   const generateGroceryList = async () => {
     setIsGenerating(true);
+    setError(null);
+    
     try {
-      // Get all planned meals
-      const allMeals = Object.values(weeklyPlan.meals).flat();
+      setGenerationStep('Analyzing meal plan...');
+      
+      // Get all planned meals with validation
+      const allMeals = Object.values(weeklyPlan.meals || {})
+        .flat()
+        .filter(meal => meal && typeof meal === 'object' && meal.recipeName);
+      
+      console.log('Found meals for grocery list:', allMeals.length);
       
       if (allMeals.length === 0) {
-        toast.error('No meals planned for this week');
+        toast.error('No valid meals planned for this week');
         return;
       }
 
-      // Extract ingredients from meals that have recipe details
-      const groceryItems: GroceryItem[] = [];
-      let itemIndex = 0;
+      setGenerationStep('Processing ingredients...');
+      
+      // Process ingredients from meals
+      const processedIngredients: ProcessedIngredient[] = [];
 
       allMeals.forEach((meal) => {
-        if (meal.recipeDetails && meal.recipeDetails.ingredients) {
-          // Scale ingredients based on serving size difference
-          // Extract original servings from recipe name or default to 1
-          const originalServings = extractServingsFromRecipe(meal.recipeDetails) || 1;
-          const scalingFactor = meal.servings / originalServings;
-          
-          // Add each ingredient from the recipe
-          meal.recipeDetails.ingredients.forEach((ingredient) => {
-            // Scale ingredient quantities
-            const scaledIngredient = scaleIngredient(ingredient, scalingFactor);
-            
-            // Check if this ingredient already exists in the list
-            const existingItem = groceryItems.find(item => 
-              item.name.toLowerCase().includes(scaledIngredient.toLowerCase()) ||
-              scaledIngredient.toLowerCase().includes(item.name.toLowerCase())
-            );
+        // Validate meal object
+        if (!meal || !meal.recipeName) {
+          console.warn('Invalid meal object:', meal);
+          return;
+        }
 
-            if (existingItem) {
-              // Add this recipe to the existing item's fromRecipes
-              if (!existingItem.fromRecipes.includes(meal.recipeName)) {
-                existingItem.fromRecipes.push(meal.recipeName);
-              }
-            } else {
-              // Create new grocery item
-              const storeLocation = getStoreLocationForIngredient(scaledIngredient);
-              groceryItems.push({
-                id: `item_${itemIndex++}`,
-                name: scaledIngredient,
-                quantity: `${meal.servings} servings`,
-                category: storeLocation.category,
-                fromRecipes: [meal.recipeName],
-                isChecked: false,
-                storeSection: storeLocation.storeSection,
-                ...(storeLocation.aisle && { aisle: storeLocation.aisle })
-              });
+        if (meal.recipeDetails?.ingredients && Array.isArray(meal.recipeDetails.ingredients) && meal.recipeDetails.ingredients.length > 0) {
+          // Process recipe ingredients with validation
+          meal.recipeDetails.ingredients.forEach((ingredient) => {
+            // Filter out null/undefined/empty ingredients
+            if (!ingredient || typeof ingredient !== 'string' || !ingredient.trim()) {
+              console.warn('Skipping invalid ingredient:', ingredient, 'from meal:', meal.recipeName);
+              return;
             }
+
+            const category = categorizeIngredient(ingredient);
+            
+            processedIngredients.push({
+              name: ingredient.trim(),
+              quantity: `${meal.servings || 1} servings`,
+              fromRecipes: [meal.recipeName],
+              category
+            });
           });
         } else {
-          // Fallback for meals without recipe details
-          groceryItems.push({
-            id: `item_${itemIndex++}`,
+          // Fallback for meals without detailed ingredients
+          const category = categorizeIngredient(meal.recipeName);
+          processedIngredients.push({
             name: `Ingredients for ${meal.recipeName}`,
-            quantity: `${meal.servings} servings`,
-            category: 'General',
+            quantity: `${meal.servings || 1} servings`,
             fromRecipes: [meal.recipeName],
-            isChecked: false,
-            storeSection: 'General'
+            category
+          });
+        }
+
+        // Add carb bases separately with validation
+        if (meal.carbBase && typeof meal.carbBase === 'string' && meal.carbBase.trim()) {
+          const category = categorizeIngredient(meal.carbBase);
+          processedIngredients.push({
+            name: meal.carbBase.trim(),
+            quantity: `${meal.servings || 1} servings`,
+            fromRecipes: [meal.recipeName],
+            category
           });
         }
       });
 
-      // Add carb bases as separate items
-      const carbBases = allMeals
-        .filter(meal => meal.carbBase)
-        .map(meal => meal.carbBase!)
-        .filter((base, index, array) => array.indexOf(base) === index);
+      setGenerationStep('Consolidating similar ingredients...');
       
-      carbBases.forEach((base) => {
-        const relatedMeals = allMeals.filter(meal => meal.carbBase === base);
-        const storeLocation = getStoreLocationForIngredient(base);
-        groceryItems.push({
-          id: `carb_${itemIndex++}`,
-          name: base,
-          quantity: `${relatedMeals.reduce((sum, meal) => sum + meal.servings, 0)} servings`,
-          category: 'Grains & Starches',
-          fromRecipes: relatedMeals.map(meal => meal.recipeName),
-          isChecked: false,
-          storeSection: storeLocation.storeSection,
-          ...(storeLocation.aisle && { aisle: storeLocation.aisle })
-        });
-      });
+      console.log('Processed ingredients before consolidation:', processedIngredients.length);
+      console.log('Sample processed ingredients:', processedIngredients.slice(0, 3));
+      
+      // Consolidate ingredients intelligently
+      const groceryItems = consolidateIngredients(processedIngredients);
+      
+      console.log('Consolidated grocery items:', groceryItems.length);
 
-      // Preserve checked status from existing list
-      if (groceryList) {
+      setGenerationStep('Preserving your progress...');
+      
+      // Preserve checked status from existing list with improved matching
+      if (groceryList && groceryList.items.length > 0) {
+        console.log('Preserving checked status from existing grocery list');
+        console.log('Existing items:', groceryList.items.length);
+        console.log('New items:', groceryItems.length);
+        
         groceryItems.forEach(newItem => {
-          const existingItem = groceryList.items.find(existing => 
-            existing.name.toLowerCase() === newItem.name.toLowerCase()
-          );
+          // Try multiple matching strategies
+          const existingItem = groceryList.items.find(existing => {
+            const existingName = existing.name.toLowerCase().trim();
+            const newName = newItem.name.toLowerCase().trim();
+            
+            // Exact match
+            if (existingName === newName) return true;
+            
+            // Substring match (either direction)
+            if (existingName.includes(newName) || newName.includes(existingName)) return true;
+            
+            // Match by base ingredient (remove common modifiers)
+            const cleanExisting = existingName.replace(/\b(fresh|frozen|dried|chopped|minced|sliced|diced|grated|crushed|organic|whole|ground)\b/g, '').trim();
+            const cleanNew = newName.replace(/\b(fresh|frozen|dried|chopped|minced|sliced|diced|grated|crushed|organic|whole|ground)\b/g, '').trim();
+            
+            if (cleanExisting === cleanNew) return true;
+            
+            // Match by key words (for complex ingredient names)
+            const existingWords = existingName.split(/\s+/).filter(word => word.length > 2);
+            const newWords = newName.split(/\s+/).filter(word => word.length > 2);
+            const commonWords = existingWords.filter(word => newWords.includes(word));
+            
+            // If they share significant words, consider it a match
+            return commonWords.length >= Math.min(existingWords.length, newWords.length) * 0.6;
+          });
+          
           if (existingItem) {
+            console.log(`Preserving status for "${newItem.name}" (was "${existingItem.name}"):`, existingItem.isChecked);
             newItem.isChecked = existingItem.isChecked;
-            newItem.id = existingItem.id; // Keep the same ID
+            newItem.id = existingItem.id; // Keep the same ID for consistency
           }
         });
+        
+        const preservedCount = groceryItems.filter(item => item.isChecked).length;
+        console.log(`Preserved ${preservedCount} checked items from previous list`);
       }
 
+      setGenerationStep('Saving to database...');
+
+      // Validate and clean all data before saving
+      const cleanedItems = validateAndCleanData(groceryItems);
+      
       if (groceryList) {
         // Update existing grocery list
+        const updateData = {
+          items: cleanedItems,
+          generatedAt: Timestamp.now()
+        };
+        
+        const cleanedUpdateData = validateAndCleanData(updateData);
+        await updateGroceryList(groceryList.id, cleanedUpdateData);
+
         const updatedList = {
           ...groceryList,
           items: groceryItems,
           generatedAt: Timestamp.now()
         };
 
-        await updateGroceryList(groceryList.id, {
-          items: cleanUndefinedValues(groceryItems),
-          generatedAt: Timestamp.now()
-        });
-
         setGroceryList(updatedList);
-        toast.success(`Grocery list updated with ${groceryItems.length} items!`);
+        const checkedItemsCount = groceryItems.filter(item => item.isChecked).length;
+        toast.success(`Grocery list updated with ${groceryItems.length} items! ${checkedItemsCount > 0 ? `${checkedItemsCount} items remain checked.` : ''}`);
       } else {
         // Create new grocery list
-        const newGroceryList: Omit<GroceryListType, 'id'> = {
+        const newGroceryListData = {
           userId,
           weeklyPlanId: weeklyPlan.id,
-          items: groceryItems,
-          userIngredients,
+          items: cleanedItems,
+          userIngredients: [],
           generatedAt: Timestamp.now(),
           isCompleted: false
         };
 
-        const listId = await createGroceryList(cleanUndefinedValues(newGroceryList));
+        const cleanedData = validateAndCleanData(newGroceryListData);
+        const listId = await createGroceryList(cleanedData);
+        
         const createdList: GroceryListType = {
           id: listId,
-          ...newGroceryList
+          ...newGroceryListData,
+          items: groceryItems // Use original items for UI display
         };
 
         setGroceryList(createdList);
         toast.success(`Grocery list generated with ${groceryItems.length} items!`);
       }
-    } catch (error) {
+      
+      setGenerationStep('');
+      
+    } catch (error: any) {
       console.error('Error generating grocery list:', error);
+      setError(`Failed to generate grocery list: ${error.message}`);
       toast.error('Failed to generate grocery list');
+      setGenerationStep('');
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  // Helper function to scale ingredient quantities
-  const scaleIngredient = (ingredient: string, scalingFactor: number): string => {
-    if (scalingFactor === 1) return ingredient;
-    
-    // Pattern to match numbers (including fractions) at the start of ingredients
-    const numberPattern = /^(\d+(?:\.\d+)?(?:\/\d+)?)\s*(.+)/;
-    const match = ingredient.match(numberPattern);
-    
-    if (match) {
-      const originalAmount = parseFloat(match[1]);
-      const restOfIngredient = match[2];
-      const scaledAmount = originalAmount * scalingFactor;
-      
-      // Format the scaled amount nicely
-      let formattedAmount: string;
-      if (scaledAmount % 1 === 0) {
-        formattedAmount = scaledAmount.toString();
-      } else if (scaledAmount < 1) {
-        // Convert to fraction for small amounts
-        if (scaledAmount === 0.5) formattedAmount = '1/2';
-        else if (scaledAmount === 0.25) formattedAmount = '1/4';
-        else if (scaledAmount === 0.75) formattedAmount = '3/4';
-        else formattedAmount = scaledAmount.toFixed(2);
-      } else {
-        formattedAmount = scaledAmount.toFixed(1).replace('.0', '');
-      }
-      
-      return `${formattedAmount} ${restOfIngredient}`;
-    }
-    
-    // If no number found, return original ingredient with scaling note
-    return scalingFactor < 1 ? `${ingredient} (scaled for ${scalingFactor.toFixed(1)}x)` : ingredient;
-  };
-
-  // Helper function to categorize ingredients with store layout
-  const categorizeIngredient = (ingredient: string): string => {
-    const lowerIngredient = ingredient.toLowerCase();
-    
-    if (lowerIngredient.includes('chicken') || lowerIngredient.includes('beef') || 
-        lowerIngredient.includes('pork') || lowerIngredient.includes('fish') ||
-        lowerIngredient.includes('salmon') || lowerIngredient.includes('turkey')) {
-      return 'Meat & Seafood';
-    }
-    
-    if (lowerIngredient.includes('milk') || lowerIngredient.includes('cheese') || 
-        lowerIngredient.includes('yogurt') || lowerIngredient.includes('butter') ||
-        lowerIngredient.includes('cream')) {
-      return 'Dairy';
-    }
-    
-    if (lowerIngredient.includes('tomato') || lowerIngredient.includes('onion') || 
-        lowerIngredient.includes('carrot') || lowerIngredient.includes('pepper') ||
-        lowerIngredient.includes('lettuce') || lowerIngredient.includes('spinach') ||
-        lowerIngredient.includes('broccoli') || lowerIngredient.includes('cucumber')) {
-      return 'Produce';
-    }
-    
-    if (lowerIngredient.includes('rice') || lowerIngredient.includes('pasta') || 
-        lowerIngredient.includes('bread') || lowerIngredient.includes('quinoa') ||
-        lowerIngredient.includes('oats') || lowerIngredient.includes('flour')) {
-      return 'Grains & Starches';
-    }
-    
-    if (lowerIngredient.includes('oil') || lowerIngredient.includes('vinegar') || 
-        lowerIngredient.includes('salt') || lowerIngredient.includes('pepper') ||
-        lowerIngredient.includes('spice') || lowerIngredient.includes('herb')) {
-      return 'Pantry';
-    }
-    
-    return 'General';
-  };
-
-  // Enhanced function to get store section and aisle for an ingredient
-  const getStoreLocationForIngredient = (ingredient: string) => {
-    const category = categorizeIngredient(ingredient);
-    
-    if (!selectedStoreLayout) {
-      return { category, storeSection: category, aisle: undefined };
-    }
-
-    // Find the store section that contains this category
-    const storeSection = selectedStoreLayout.sections.find(section => 
-      section.categories.includes(category)
-    );
-
-    return {
-      category,
-      storeSection: storeSection?.name || category,
-      aisle: storeSection?.aisle
-    };
   };
 
   const toggleItemChecked = async (itemId: string) => {
     if (!groceryList) return;
 
     console.log('Toggling item:', itemId);
-    console.log('Current grocery list:', groceryList.id);
 
     // Optimistically update UI
     const updatedItems = groceryList.items.map(item =>
@@ -349,31 +519,24 @@ export default function GroceryList({
     setGroceryList(updatedList);
 
     try {
-      // Save to database
-      console.log('Saving checked status to database...');
-      await updateGroceryList(groceryList.id, { 
-        items: cleanUndefinedValues(updatedItems),
-        isCompleted: updatedItems.every(item => item.isChecked)
+      // Clean and save to database
+      const cleanedItems = validateAndCleanData(updatedItems);
+      const isCompleted = updatedItems.every(item => item.isChecked);
+      
+      const updateData = validateAndCleanData({ 
+        items: cleanedItems,
+        isCompleted 
       });
+      
+      await updateGroceryList(groceryList.id, updateData);
       console.log('Successfully saved checked status');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating grocery list:', error);
       toast.error('Failed to update item');
       
       // Revert optimistic update on error
       setGroceryList(groceryList);
     }
-  };
-
-  const addUserIngredient = () => {
-    if (newIngredient.trim() && !userIngredients.includes(newIngredient.trim())) {
-      setUserIngredients([...userIngredients, newIngredient.trim()]);
-      setNewIngredient('');
-    }
-  };
-
-  const removeUserIngredient = (ingredient: string) => {
-    setUserIngredients(userIngredients.filter(ing => ing !== ingredient));
   };
 
   const getItemsByCategory = () => {
@@ -388,63 +551,14 @@ export default function GroceryList({
     }, {} as Record<string, GroceryItem[]>);
   };
 
-  const getItemsByStoreLayout = () => {
-    if (!groceryList || !selectedStoreLayout) return {};
-    
-    // Group items by store section and sort by aisle
-    const itemsBySection = groceryList.items.reduce((acc, item) => {
-      const sectionName = item.storeSection || item.category;
-      if (!acc[sectionName]) {
-        acc[sectionName] = [];
-      }
-      acc[sectionName].push(item);
-      return acc;
-    }, {} as Record<string, GroceryItem[]>);
-
-    // Sort sections by their order in the store layout
-    const sortedSections: Record<string, GroceryItem[]> = {};
-    
-    // First add sections from the store layout in order
-    selectedStoreLayout.sections
-      .sort((a, b) => a.order - b.order)
-      .forEach(section => {
-        if (itemsBySection[section.name]) {
-          sortedSections[section.name] = itemsBySection[section.name];
-        }
-      });
-
-    // Then add any remaining sections not in the layout
-    Object.keys(itemsBySection).forEach(sectionName => {
-      if (!sortedSections[sectionName]) {
-        sortedSections[sectionName] = itemsBySection[sectionName];
-      }
-    });
-
-    return sortedSections;
-  };
-
   const getCompletionStats = () => {
-    if (!groceryList) return { total: 0, completed: 0 };
+    if (!groceryList) return { total: 0, completed: 0, percentage: 0 };
     
     const total = groceryList.items.length;
     const completed = groceryList.items.filter(item => item.isChecked).length;
-    return { total, completed };
-  };
-
-  // Helper function to remove undefined values from objects before saving to Firestore
-  const cleanUndefinedValues = (obj: any): any => {
-    if (Array.isArray(obj)) {
-      return obj.map(cleanUndefinedValues);
-    } else if (obj !== null && typeof obj === 'object') {
-      const cleaned: any = {};
-      for (const [key, value] of Object.entries(obj)) {
-        if (value !== undefined) {
-          cleaned[key] = cleanUndefinedValues(value);
-        }
-      }
-      return cleaned;
-    }
-    return obj;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    return { total, completed, percentage };
   };
 
   if (isLoading) {
@@ -457,193 +571,179 @@ export default function GroceryList({
     );
   }
 
-  const { total, completed } = getCompletionStats();
+  const { total, completed, percentage } = getCompletionStats();
   const itemsByCategory = getItemsByCategory();
-  const itemsByStoreLayout = getItemsByStoreLayout();
-  const itemsToDisplay = sortByStore && selectedStoreLayout ? itemsByStoreLayout : itemsByCategory;
 
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
           <ShoppingCart className="h-5 w-5 text-emerald-600" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            Grocery List
-          </h3>
-          {groceryList && (
-            <Badge variant="outline">
-              {completed}/{total} items
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={generateGroceryList}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              Grocery List
+            </h3>
+            {groceryList && (
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {completed} of {total} items completed ({percentage}%)
+              </p>
             )}
-            {groceryList ? 'Regenerate' : 'Generate'}
+          </div>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Generation Progress */}
+      {isGenerating && (
+        <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              {generationStep || 'Generating grocery list...'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        <Button
+          onClick={generateGroceryList}
+          disabled={isGenerating}
+          className="flex-1 sm:flex-none"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
+          {groceryList ? 'Regenerate List' : 'Generate List'}
+        </Button>
+        
+        {groceryList && (
+          <Button variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export
           </Button>
-          
-          {/* Store Layout Controls */}
-          {storeLayouts.length > 0 && (
-            <>
-              <select
-                value={selectedStoreLayout?.id || ''}
-                onChange={(e) => {
-                  const layout = storeLayouts.find(l => l.id === e.target.value);
-                  setSelectedStoreLayout(layout || null);
-                }}
-                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="">No Store Layout</option>
-                {storeLayouts.map(layout => (
-                  <option key={layout.id} value={layout.id}>
-                    {layout.storeName}
-                  </option>
-                ))}
-              </select>
+        )}
+      </div>
+
+      {/* Progress Bar */}
+      {groceryList && (
+        <div className="mb-6">
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div 
+              className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${percentage}%` }}
+            ></div>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Shopping progress: {percentage}% complete
+          </p>
+        </div>
+      )}
+
+      {/* Grocery Items */}
+      {groceryList ? (
+        <div className="space-y-6">
+          {Object.entries(itemsByCategory).map(([category, items]) => (
+            <div key={category}>
+              <h4 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center">
+                <MapPin className="h-4 w-4 mr-2 text-gray-500" />
+                {category}
+                <Badge variant="secondary" className="ml-2">
+                  {items.length}
+                </Badge>
+              </h4>
               
-              {selectedStoreLayout && (
-                <Button
-                  variant={sortByStore ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSortByStore(!sortByStore)}
-                >
-                  <MapPin className="h-4 w-4 mr-1" />
-                  Store Layout
-                </Button>
-              )}
-            </>
-          )}
-          
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* User Ingredients Section */}
-      <div className="mb-6">
-        <h4 className="font-medium mb-3">Ingredients I Already Have</h4>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {userIngredients.map(ingredient => (
-            <Badge
-              key={ingredient}
-              variant="secondary"
-              className="cursor-pointer"
-              onClick={() => removeUserIngredient(ingredient)}
-            >
-              {ingredient}
-              <X className="h-3 w-3 ml-1" />
-            </Badge>
+              <div className="space-y-2">
+                {items.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`
+                      flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer
+                      ${item.isChecked 
+                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' 
+                        : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }
+                    `}
+                    onClick={() => toggleItemChecked(item.id)}
+                  >
+                    <div className="flex items-center space-x-3 flex-1">
+                      <div className={`
+                        flex items-center justify-center w-5 h-5 rounded border-2 transition-colors
+                        ${item.isChecked 
+                          ? 'bg-emerald-600 border-emerald-600' 
+                          : 'border-gray-300 dark:border-gray-600'
+                        }
+                      `}>
+                        {item.isChecked && (
+                          <Check className="h-3 w-3 text-white" />
+                        )}
+                      </div>
+                      
+                      <div className="flex-1">
+                        <p className={`
+                          text-sm font-medium transition-colors
+                          ${item.isChecked 
+                            ? 'text-emerald-700 dark:text-emerald-300 line-through' 
+                            : 'text-gray-900 dark:text-white'
+                          }
+                        `}>
+                          {item.name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {item.quantity} • From: {item.fromRecipes.join(', ')}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {item.priority === 'high' && (
+                      <Badge variant="default" className="text-xs">
+                        Multiple recipes
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           ))}
+          
+          {/* Completion Status */}
+          {percentage === 100 && (
+            <div className="text-center py-4">
+              <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto mb-2" />
+              <h4 className="text-lg font-medium text-emerald-600 mb-1">
+                Shopping Complete!
+              </h4>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                You've checked off all items on your grocery list.
+              </p>
+            </div>
+          )}
         </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newIngredient}
-            onChange={(e) => setNewIngredient(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && addUserIngredient()}
-            placeholder="Add ingredient you have..."
-            className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          />
-          <Button size="sm" onClick={addUserIngredient}>
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Grocery List Content */}
-      {!groceryList ? (
-        <div className="text-center py-8">
+      ) : (
+        <div className="text-center py-12">
           <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
             No grocery list yet
           </h4>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Generate a grocery list based on your planned meals
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Generate a grocery list from your weekly meal plan
           </p>
           <Button onClick={generateGroceryList} disabled={isGenerating}>
-            {isGenerating ? 'Generating...' : 'Generate Grocery List'}
+            <Plus className="h-4 w-4 mr-2" />
+            Generate Grocery List
           </Button>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {Object.entries(itemsToDisplay).map(([sectionName, items]) => {
-            const sectionInfo = sortByStore && selectedStoreLayout 
-              ? selectedStoreLayout.sections.find(s => s.name === sectionName)
-              : null;
-            
-            return (
-              <div key={sectionName}>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium text-gray-900 dark:text-white">
-                    {sectionName}
-                  </h4>
-                  {sectionInfo?.aisle && (
-                    <Badge variant="outline" className="text-xs">
-                      Aisle {sectionInfo.aisle}
-                    </Badge>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  {items.map(item => (
-                    <div
-                      key={item.id}
-                      className={`flex items-center space-x-3 p-3 rounded-lg border ${
-                        item.isChecked
-                          ? 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                          : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700'
-                      }`}
-                    >
-                      <button
-                        onClick={() => toggleItemChecked(item.id)}
-                        className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center ${
-                          item.isChecked
-                            ? 'bg-emerald-600 border-emerald-600 text-white'
-                            : 'border-gray-300 dark:border-gray-600'
-                        }`}
-                      >
-                        {item.isChecked && <Check className="h-3 w-3" />}
-                      </button>
-                      
-                      <div className="flex-1">
-                        <div className={`font-medium ${
-                          item.isChecked ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
-                        }`}>
-                          {item.name}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {item.quantity}
-                        </div>
-                        {item.fromRecipes.length > 0 && (
-                          <div className="text-xs text-gray-400 dark:text-gray-500">
-                            For: {item.fromRecipes.join(', ')}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-          
-          {/* Export Button */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <Button variant="outline" className="w-full">
-              <Download className="h-4 w-4 mr-2" />
-              Export Grocery List
-            </Button>
-          </div>
         </div>
       )}
     </div>

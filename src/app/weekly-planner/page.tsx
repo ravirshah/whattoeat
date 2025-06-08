@@ -8,7 +8,6 @@ import MainLayout from '@/components/layout/MainLayout';
 import PlannerView from '@/components/weekly-planner/PlannerView';
 import GoalSetter from '@/components/weekly-planner/GoalSetter';
 import GroceryList from '@/components/weekly-planner/GroceryList';
-import RecipeHistory from '@/components/weekly-planner/RecipeHistory';
 import Favorites from '@/components/weekly-planner/Favorites';
 import NutritionTracker from '@/components/weekly-planner/NutritionTracker';
 import MealPrepPlanner from '@/components/weekly-planner/MealPrepPlanner';
@@ -22,7 +21,6 @@ import {
   Download,
   User,
   X,
-  History,
   Heart,
   BarChart3,
   ChefHat
@@ -31,11 +29,52 @@ import {
   getCurrentWeeklyPlan, 
   createWeeklyPlan, 
   getActiveUserGoal,
-  getCurrentWeekDates 
+  getCurrentWeekDates,
+  getWeekStartAndEnd,
+  getWeeklyPlan,
+  updateWeeklyPlan,
+  getWeeklyPlanByDateRange
 } from '@/lib/weekly-planner-db';
 import { WeeklyPlan, UserGoal, DayOfWeek, PlannerViewState } from '@/types/weekly-planner';
 import { Timestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
+
+// Helper function to clean undefined values from objects before saving to Firestore
+const cleanUndefinedValues = (obj: any): any => {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj
+      .filter(item => item !== undefined && item !== null)
+      .map(cleanUndefinedValues);
+  }
+  
+  if (obj instanceof Date || obj instanceof Object && obj.constructor === Date) {
+    return obj;
+  }
+  
+  // Handle Firestore Timestamp objects
+  if (obj && typeof obj === 'object' && obj.toDate) {
+    return obj;
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        const cleanedValue = cleanUndefinedValues(value);
+        if (cleanedValue !== null && cleanedValue !== undefined) {
+          cleaned[key] = cleanedValue;
+        }
+      }
+    }
+    return cleaned;
+  }
+  
+  return obj;
+};
 
 export default function WeeklyMealPlannerPage() {
   const { currentUser, loading } = useAuth();
@@ -62,6 +101,8 @@ export default function WeeklyMealPlannerPage() {
   const [isLoading, setIsLoading] = useState(true);
   // Keep test user option for development, but don't default to it
   const [useTestUser, setUseTestUser] = useState(false);
+  // State for weekly navigation
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getCurrentWeekDates().start);
 
   // Test user for development purposes
   const testUser = {
@@ -90,49 +131,134 @@ export default function WeeklyMealPlannerPage() {
 
   const loadInitialData = async () => {
     try {
-      setIsLoading(true);
       console.log("Loading initial data for user:", effectiveUser?.uid);
+      
+      // Load the current week initially using the robust weekly plan system
+      const currentWeekDates = getCurrentWeekDates();
+      setCurrentWeekStart(currentWeekDates.start);
+      await loadWeeklyPlan(currentWeekDates.start);
+      
+      // Load active goal (only once during initial load)
+      if (!activeGoal && !useTestUser) {
+        console.log("Loading active goal...");
+        const goal = await getActiveUserGoal(effectiveUser!.uid);
+        if (goal) {
+          console.log("Found active goal:", goal.id, goal.name);
+          setActiveGoal(goal);
+        } else {
+          console.log("No active goal found");
+        }
+      }
+      
+      console.log("Initial data loaded successfully");
+    } catch (error: any) {
+      console.error('Error loading initial data:', error);
+      
+      // More specific error messaging
+      let errorMessage = 'Failed to load meal planner data';
+      if (error instanceof Error) {
+        if (error.message.includes('permission')) {
+          errorMessage = 'Permission denied. Please check your authentication.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error. Please check your connection.';
+        } else {
+          errorMessage = `Error loading data: ${error.message}`;
+        }
+      }
+      
+      toast.error(errorMessage);
+    }
+  };
+
+  const handleStateUpdate = (updates: Partial<PlannerViewState>) => {
+    setPlannerState(prev => ({ ...prev, ...updates }));
+  };
+
+  const handlePlanUpdate = async (updatedPlan: WeeklyPlan) => {
+    try {
+      console.log("Updating plan in database:", updatedPlan.id);
+      
+      // Update local state immediately for responsive UI
+      setCurrentPlan(updatedPlan);
+      
+      // Save to database if not using test user
+      if (!useTestUser) {
+        await updateWeeklyPlan(updatedPlan.id, {
+          meals: updatedPlan.meals,
+          updatedAt: Timestamp.now()
+        });
+        console.log("Plan successfully saved to database");
+      }
+    } catch (error: any) {
+      console.error("Error saving plan update:", error);
+      toast.error("Failed to save changes. Please try again.");
+    }
+  };
+
+  const handleGoalUpdate = (updatedGoal: UserGoal | null) => {
+    setActiveGoal(updatedGoal);
+  };
+
+  const handleWeekNavigation = async (direction: 'previous' | 'next') => {
+    try {
+      // CRITICAL: Ensure current plan is saved before navigating
+      if (currentPlan && !useTestUser) {
+        console.log("Ensuring current plan is saved before navigation");
+        
+        // Clean the meals data to remove undefined values
+        const cleanedMeals = cleanUndefinedValues(currentPlan.meals);
+        
+        // Only update if we have valid data
+        if (cleanedMeals && Object.keys(cleanedMeals).length > 0) {
+          await updateWeeklyPlan(currentPlan.id, {
+            meals: cleanedMeals,
+            updatedAt: Timestamp.now()
+          });
+        }
+      }
+      
+      const weekOffset = direction === 'next' ? 7 : -7;
+      const newWeekStart = new Date(currentWeekStart);
+      newWeekStart.setDate(newWeekStart.getDate() + weekOffset);
+      
+      console.log(`Navigating ${direction} from ${currentWeekStart.toLocaleDateString()} to ${newWeekStart.toLocaleDateString()}`);
+      
+      setCurrentWeekStart(newWeekStart);
+      
+      // Close grocery list when navigating to avoid confusion
+      if (plannerState.showGroceryList) {
+        handleStateUpdate({ showGroceryList: false });
+      }
+      
+      await loadWeeklyPlan(newWeekStart);
+    } catch (error: any) {
+      console.error("Error during week navigation:", error);
+      
+      // More specific error handling
+      let errorMessage = "Failed to navigate weeks. Please try again.";
+      if (error?.message?.includes("permission")) {
+        errorMessage = "Permission error. Please refresh the page and try again.";
+      } else if (error?.message?.includes("undefined")) {
+        errorMessage = "Data error during navigation. Refreshing page...";
+        setTimeout(() => window.location.reload(), 2000);
+      }
+      
+      toast.error(errorMessage);
+    }
+  };
+
+  const loadWeeklyPlan = async (weekStartDate: Date) => {
+    try {
+      setIsLoading(true);
+      console.log("Loading weekly plan for week starting:", weekStartDate.toLocaleDateString());
       
       if (useTestUser) {
         // For test user, create mock data without database operations
         console.log("Using test user - creating mock data");
         
+        const { start, end } = getWeekStartAndEnd(weekStartDate);
         const mockPlan: WeeklyPlan = {
-          id: 'test-plan-123',
-          userId: effectiveUser!.uid,
-          weekStartDate: new Date(),
-          weekEndDate: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000),
-          meals: {
-            Monday: [],
-            Tuesday: [],
-            Wednesday: [],
-            Thursday: [],
-            Friday: [],
-            Saturday: [],
-            Sunday: []
-          },
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-          isActive: true
-        };
-        
-        setCurrentPlan(mockPlan);
-        setActiveGoal(null);
-        
-        console.log("Mock data loaded successfully");
-        toast.success("Weekly meal planner loaded successfully! (Demo Mode)");
-        return;
-      }
-      
-      // Real user data loading
-      let plan = await getCurrentWeeklyPlan(effectiveUser!.uid);
-      
-      if (!plan) {
-        console.log("No existing plan found, creating new one...");
-        const { start, end } = getCurrentWeekDates();
-        console.log("Week dates:", { start, end });
-        
-        const newPlanData = {
+          id: `test-plan-${start.getTime()}`,
           userId: effectiveUser!.uid,
           weekStartDate: start,
           weekEndDate: end,
@@ -150,60 +276,83 @@ export default function WeeklyMealPlannerPage() {
           isActive: true
         };
         
-        console.log("Creating plan with data:", newPlanData);
-        const planId = await createWeeklyPlan(newPlanData);
-        console.log("Plan created with ID:", planId);
+        setCurrentPlan(mockPlan);
+        console.log("Mock data loaded successfully");
+        toast.success(`Loaded week of ${start.toLocaleDateString()}`);
+        return;
+      }
+      
+      // Real user data loading - ROBUST PERSISTENCE LOGIC
+      const { start, end } = getWeekStartAndEnd(weekStartDate);
+      const isCurrentWeek = start.getTime() === getCurrentWeekDates().start.getTime();
+      
+      console.log("Week details:", {
+        start: start.toLocaleDateString(),
+        end: end.toLocaleDateString(),
+        isCurrentWeek
+      });
+      
+      // STEP 1: Always check for existing plan for this specific week first
+      let plan = await getWeeklyPlanByDateRange(effectiveUser!.uid, weekStartDate);
+      
+      if (plan) {
+        console.log("Found existing plan for this week:", plan.id, "with", Object.values(plan.meals).flat().length, "meals");
         
-        plan = { id: planId, ...newPlanData };
-      } else {
-        console.log("Found existing plan:", plan.id);
+        // If this is the current week and the plan isn't marked as active, activate it
+        if (isCurrentWeek && !plan.isActive) {
+          console.log("Activating plan for current week");
+          await updateWeeklyPlan(plan.id, { isActive: true });
+          plan.isActive = true;
+        }
+        
+        setCurrentPlan(plan);
+        toast.success(`Loaded week of ${start.toLocaleDateString()} (${Object.values(plan.meals).flat().length} meals)`);
+        return;
       }
       
-      setCurrentPlan(plan);
+      // STEP 2: No existing plan found - create a new one
+      console.log("No existing plan found for this week, creating new one");
       
-      // Load active goal
-      console.log("Loading active goal...");
-      const goal = await getActiveUserGoal(effectiveUser!.uid);
-      if (goal) {
-        console.log("Found active goal:", goal.id, goal.name);
-      } else {
-        console.log("No active goal found");
-      }
-      setActiveGoal(goal);
-      
-      console.log("Initial data loaded successfully");
-      toast.success("Weekly meal planner loaded successfully!");
-    } catch (error) {
-      console.error('Error loading initial data:', error);
-      
-      // More specific error messaging
-      let errorMessage = 'Failed to load meal planner data';
-      if (error instanceof Error) {
-        if (error.message.includes('permission')) {
-          errorMessage = 'Permission denied. Please check your authentication.';
-        } else if (error.message.includes('network')) {
-          errorMessage = 'Network error. Please check your connection.';
-        } else {
-          errorMessage = `Error loading data: ${error.message}`;
+      // If this is current week, deactivate any other active plans first
+      if (isCurrentWeek) {
+        const currentActivePlan = await getCurrentWeeklyPlan(effectiveUser!.uid);
+        if (currentActivePlan && new Date(currentActivePlan.weekStartDate).getTime() !== start.getTime()) {
+          console.log("Deactivating old current week plan:", currentActivePlan.id);
+          await updateWeeklyPlan(currentActivePlan.id, { isActive: false });
         }
       }
       
-      toast.error(errorMessage);
+      const newPlanData = {
+        userId: effectiveUser!.uid,
+        weekStartDate: start,
+        weekEndDate: end,
+        meals: {
+          Monday: [],
+          Tuesday: [],
+          Wednesday: [],
+          Thursday: [],
+          Friday: [],
+          Saturday: [],
+          Sunday: []
+        },
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+        isActive: isCurrentWeek // Only mark as active if this is current week
+      };
+      
+      const planId = await createWeeklyPlan(newPlanData);
+      plan = { id: planId, ...newPlanData };
+      
+      console.log("Created new plan:", planId, "for week", start.toLocaleDateString());
+      setCurrentPlan(plan);
+      toast.success(`Created new plan for week of ${start.toLocaleDateString()}`);
+      
+    } catch (error: any) {
+      console.error("Error loading weekly plan:", error);
+      toast.error(`Failed to load week: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleStateUpdate = (updates: Partial<PlannerViewState>) => {
-    setPlannerState(prev => ({ ...prev, ...updates }));
-  };
-
-  const handlePlanUpdate = (updatedPlan: WeeklyPlan) => {
-    setCurrentPlan(updatedPlan);
-  };
-
-  const handleGoalUpdate = (updatedGoal: UserGoal | null) => {
-    setActiveGoal(updatedGoal);
   };
 
   const handleUseTestUser = () => {
@@ -330,15 +479,6 @@ export default function WeeklyMealPlannerPage() {
 
               {/* Phase 1 Features */}
               <Button
-                variant={plannerState.showRecipeHistory ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleStateUpdate({ showRecipeHistory: !plannerState.showRecipeHistory })}
-              >
-                <History className="h-4 w-4 mr-2" />
-                History
-              </Button>
-
-              <Button
                 variant={plannerState.showFavorites ? "default" : "outline"}
                 size="sm"
                 onClick={() => handleStateUpdate({ showFavorites: !plannerState.showFavorites })}
@@ -426,20 +566,7 @@ export default function WeeklyMealPlannerPage() {
           </div>
         )}
 
-        {/* Recipe History Panel */}
-        {plannerState.showRecipeHistory && (
-          <div className="mb-6">
-            <RecipeHistory
-              userId={effectiveUser.uid}
-              onClose={() => handleStateUpdate({ showRecipeHistory: false })}
-              onSelectRecipe={(recipeName) => {
-                // TODO: Implement adding recipe from history to current plan
-                toast.info(`Adding "${recipeName}" to plan - feature coming soon!`);
-                handleStateUpdate({ showRecipeHistory: false });
-              }}
-            />
-          </div>
-        )}
+
 
         {/* Favorites Panel */}
         {plannerState.showFavorites && (
@@ -487,6 +614,7 @@ export default function WeeklyMealPlannerPage() {
             plannerState={plannerState}
             onStateUpdate={handleStateUpdate}
             onPlanUpdate={handlePlanUpdate}
+            onNavigateWeek={handleWeekNavigation}
           />
         )}
 

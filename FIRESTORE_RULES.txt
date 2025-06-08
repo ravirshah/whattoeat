@@ -1,140 +1,328 @@
-// Firestore Security Rules for WhatToEat App
-// Includes rules for existing features + Weekly Meal Planner
-// Apply these rules in Firebase Console -> Firestore Database -> Rules
+// ============================================
+// FIRESTORE SECURITY RULES
+// Copy ONLY the rules section (lines 6-157) to Firebase Console → Firestore → Rules → Publish
+// ============================================
 
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // ============================================
-    // EXISTING APP COLLECTIONS (preserve functionality)
-    // ============================================
-    
-    // Users collection - users can read/write their own data
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
     }
     
-    // Recipes collection - authenticated users can read all, write their own
+    function isOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+    
+    function isCreatingOwn() {
+      return isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+    
+    function canAccessOwn() {
+      return isAuthenticated() && 
+        (request.auth.uid == resource.data.userId || 
+         request.auth.uid == request.resource.data.userId);
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Recipes collection
     match /recipes/{recipeId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
         (request.auth.uid == resource.data.userId || request.auth.uid == request.resource.data.userId);
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
     }
     
     // User preferences/profiles
     match /userProfiles/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
     
     // Saved recipes for users
     match /savedRecipes/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
     
     // User ingredients
     match /userIngredients/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
     
-    // ============================================
-    // WEEKLY MEAL PLANNER COLLECTIONS (new feature)
-    // ============================================
-    
-    // Weekly Plans - users can only access their own plans
+    // Weekly Plans
     match /weeklyPlans/{planId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow write: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow create: if isCreatingOwn();
+      allow delete: if isOwner();
     }
     
-    // User Goals - users can only access their own goals
+    // User Goals
     match /userGoals/{goalId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow write: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow create: if isCreatingOwn();
+      allow delete: if isOwner();
     }
     
-    // Grocery Lists - users can only access their own grocery lists
+    // Grocery Lists
     match /groceryLists/{listId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow write: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow create: if isCreatingOwn();
+      allow delete: if isOwner();
     }
     
-    // Meal Plan Settings - users can only access their own settings
+    // Meal Plan Settings
     match /mealPlanSettings/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
     
-    // Favorite Recipes - users can only access their own favorites
+    // Favorite Recipes
     match /favoriteRecipes/{favoriteId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow write: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow create: if isCreatingOwn();
+      allow delete: if isOwner();
     }
     
-    // Recipe History - users can only access their own recipe history
+    // Recipe History
     match /recipeHistory/{historyId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow write: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow create: if isCreatingOwn();
+      allow delete: if isOwner();
     }
     
-    // ============================================
-    // FALLBACK RULES FOR ANY OTHER COLLECTIONS
-    // ============================================
+    // Health Documents - CRITICAL PRIVACY
+    match /healthDocuments/{documentId} {
+      allow read: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow write: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow create: if isCreatingOwn();
+      allow delete: if isOwner();
+    }
     
-    // Allow authenticated users to read/write their own data in any other collection
+    // Meal Prep Plans
+    match /mealPrepPlans/{planId} {
+      allow read: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow write: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow create: if isCreatingOwn();
+      allow delete: if isOwner();
+    }
+    
+    // Nutrition Entries
+    match /nutritionEntries/{entryId} {
+      allow read: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow write: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow create: if isCreatingOwn();
+      allow delete: if isOwner();
+    }
+    
+    // Store Layouts
+    match /storeLayouts/{layoutId} {
+      allow read: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow write: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow create: if isCreatingOwn();
+      allow delete: if isOwner();
+    }
+    
+    // Chat Input Results
+    match /chatInputResults/{resultId} {
+      allow read: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow write: if isAuthenticated() && 
+        (resource == null || request.auth.uid == resource.data.userId);
+      allow create: if isCreatingOwn();
+      allow delete: if isOwner();
+    }
+    
+    // Fallback rules for any other collections
     match /{collection}/{documentId} {
-      allow read, write: if request.auth != null && 
-        (resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid);
+      allow read: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid);
+      allow write: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
     }
   }
 }
 
 // ============================================
-// DEPLOYMENT INSTRUCTIONS
+// FIRESTORE INDEXES JSON
+// Copy ONLY the JSON below (lines 161-240) to your firestore.indexes.json file
+// DO NOT copy this to Firebase Console Rules - it will cause errors!
 // ============================================
-
-// METHOD 1: Firebase Console (Recommended)
-// 1. Go to https://console.firebase.google.com/
-// 2. Select your project
-// 3. Go to Firestore Database
-// 4. Click on "Rules" tab
-// 5. Replace the existing rules with the above rules
-// 6. Click "Publish"
-
-// METHOD 2: Firebase CLI (if you have it installed)
-// 1. Save this content to firestore.rules in your project root
-// 2. Run: firebase deploy --only firestore:rules
-
-// ============================================
-// TESTING RULES (DEVELOPMENT ONLY)
-// ============================================
-
-// If you need to test quickly, you can temporarily use these permissive rules:
-// WARNING: NEVER use these in production!
 
 /*
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+{
+  "indexes": [
+    {
+      "collectionGroup": "healthDocuments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "uploadedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "healthDocuments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isActive",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "uploadedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "weeklyPlans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "weekStartDate",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "userGoals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "mealPrepPlans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "weeklyPlanId",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "favoriteRecipes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "addedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "recipeHistory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "cookedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "chatInputResults",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "nutritionEntries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
     }
-  }
+  ],
+  "fieldOverrides": []
 }
 */
 
 // ============================================
-// SECURITY NOTES
+// DEPLOYMENT INSTRUCTIONS - CRITICAL
 // ============================================
 
-// These rules ensure:
-// ✅ Users can only access their own weekly plans, goals, and grocery lists
-// ✅ Existing app functionality is preserved
-// ✅ All operations require authentication
-// ✅ Users cannot access other users' private data
-// ✅ Write operations validate user ownership 
+// 1. DEPLOY RULES: Copy lines 6-157 to Firebase Console → Firestore → Rules
+// 2. DEPLOY INDEXES: Copy lines 163-239 to firestore.indexes.json file
+// 3. RUN: firebase deploy --only firestore:indexes
+
+// CLI Commands:
+// firebase deploy --only firestore:rules
+// firebase deploy --only firestore:indexes
+// firebase deploy --only firestore

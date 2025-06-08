@@ -24,6 +24,8 @@ import {
     cuisinePrefs: string[];
     cookTimePreference?: string;
     difficultyPreference?: string;
+    healthDataConsent?: boolean;
+    lastHealthDataSync?: Timestamp;
   }
   
   interface Recipe {

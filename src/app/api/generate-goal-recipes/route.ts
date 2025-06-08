@@ -210,7 +210,7 @@ const SAMPLE_GOAL_RECIPES = {
 
 // Build goal-specific prompt
 const buildGoalBasedPrompt = (goalData: any, mealType?: string, servings: number = 1, carbBase?: string) => {
-  const { goalType, macroTargets, dietaryRestrictions = [] } = goalData;
+  const { goalType, macroTargets, dietaryRestrictions = [], healthBasedAdjustments } = goalData;
   
   let goalDescription = "";
   let macroGuidelines = "";
@@ -252,11 +252,25 @@ This recipe is for ${mealType}. Adjust the recipe characteristics accordingly:
 Include ${carbBase} as the primary carbohydrate source in the recipe.
 ` : '';
 
+  // NEW: Health-based guidance from health documents
+  const healthGuidance = healthBasedAdjustments ? `
+### HEALTH-BASED DIETARY REQUIREMENTS (CRITICAL - MUST FOLLOW):
+Based on health document analysis, apply these specific dietary modifications:
+
+**AVOID these ingredients**: ${healthBasedAdjustments.avoidIngredients?.length ? healthBasedAdjustments.avoidIngredients.join(', ') : 'None specified'}
+
+**PRIORITIZE these ingredients**: ${healthBasedAdjustments.recommendIngredients?.length ? healthBasedAdjustments.recommendIngredients.join(', ') : 'None specified'}
+
+**Macro modifications**: ${healthBasedAdjustments.macroModifications?.length ? healthBasedAdjustments.macroModifications.join('; ') : 'None specified'}
+
+**Health considerations**: Focus on ingredients that support the user's specific health profile and avoid anything that could negatively impact their health markers.
+` : '';
+
   const proteinTarget = macroTargets.perMeal?.protein || macroTargets.daily?.protein ? 
     `Protein target: ${macroTargets.perMeal?.protein || Math.round((macroTargets.daily?.protein || 100) / 3)}g per serving` : 
     "Aim for 20-35g protein per serving";
 
-  return `You are a nutrition-focused AI chef specializing in goal-based meal planning. Generate exactly 3 recipes that STRICTLY align with the user's specific fitness and nutritional goals.
+  return `You are a nutrition-focused AI chef specializing in goal-based meal planning with health document integration. Generate exactly 3 recipes that STRICTLY align with the user's specific fitness, nutritional goals, AND health requirements.
 
 ## PRIMARY GOAL: ${goalDescription.toUpperCase()}
 
@@ -268,9 +282,22 @@ Include ${carbBase} as the primary carbohydrate source in the recipe.
 
 ${mealTypeGuidance}
 ${carbBaseGuidance}
+${healthGuidance}
 
-### DIETARY RESTRICTIONS (MUST RESPECT):
-${dietaryRestrictions.length > 0 ? dietaryRestrictions.join(', ') : 'No specific restrictions'}
+### DIETARY RESTRICTIONS (ABSOLUTELY CRITICAL - STRICTLY ENFORCE):
+${dietaryRestrictions.length > 0 ? 
+  `REQUIRED DIETARY COMPLIANCE: ${dietaryRestrictions.join(', ')}
+
+**IMPORTANT DIETARY DEFINITIONS:**
+${dietaryRestrictions.includes('vegetarian') ? '- VEGETARIAN: NO meat, poultry, fish, seafood, or any animal flesh. Eggs and dairy are allowed.' : ''}
+${dietaryRestrictions.includes('vegan') ? '- VEGAN: NO animal products whatsoever - no meat, fish, dairy, eggs, honey, or any animal-derived ingredients.' : ''}
+${dietaryRestrictions.includes('pescatarian') ? '- PESCATARIAN: NO meat or poultry, but fish and seafood are allowed. Eggs and dairy are allowed.' : ''}
+${dietaryRestrictions.includes('gluten_free') ? '- GLUTEN-FREE: NO wheat, barley, rye, or any gluten-containing ingredients.' : ''}
+${dietaryRestrictions.includes('dairy_free') ? '- DAIRY-FREE: NO milk, cheese, butter, cream, yogurt, or any dairy products.' : ''}
+${dietaryRestrictions.includes('nut_free') ? '- NUT-FREE: NO tree nuts, peanuts, or any nut-derived ingredients.' : ''}
+
+**RESTRICTION COMPLIANCE CHECK**: Before including ANY ingredient, verify it complies with ALL dietary restrictions listed above. If unsure about an ingredient, DO NOT include it.` 
+  : 'No specific dietary restrictions'}
 
 ### DETAILED MACRO TARGETS:
 ${macroTargets.daily ? `
@@ -294,7 +321,7 @@ Return ONLY a valid JSON array with this exact structure:
 
 [
   {
-    "name": "Goal-Aligned Recipe Name",
+    "name": "Health-Optimized Recipe Name",
     "ingredients": [
       "Precise measurement + ingredient name with nutritional purpose"
     ],
@@ -315,12 +342,21 @@ Return ONLY a valid JSON array with this exact structure:
     "goalAlignment": {
       "macroFit": "Explanation of how macros align with goal",
       "calorieTarget": "How calories fit the goal",
-      "nutritionalBenefits": "Key nutrients that support the goal"
+      "nutritionalBenefits": "Key nutrients that support the goal and health profile",
+      "healthOptimization": "How this recipe specifically addresses health document findings"
     }
   }
 ]
 
-Generate recipes that not only meet nutritional targets but also taste delicious and are practical to prepare.`;
+## CRITICAL FINAL CHECKS BEFORE GENERATING:
+1. **DIETARY RESTRICTION VERIFICATION**: For each ingredient in every recipe, confirm it meets ALL dietary restrictions
+2. **VEGETARIAN CHECK**: If vegetarian is required, ensure NO meat, poultry, fish, or seafood appears anywhere
+3. **HEALTH ALIGNMENT**: Verify ingredients support health goals and avoid contraindicated foods
+4. **MACRO ACCURACY**: Double-check nutritional calculations align with targets
+
+Generate recipes that not only meet nutritional targets but also optimize for the user's specific health profile, taste delicious, and are practical to prepare.
+
+**REMEMBER: A single non-compliant ingredient makes the entire recipe unusable for the user. When in doubt, choose plant-based alternatives.**`;
 };
 
 export async function POST(request: NextRequest) {
@@ -348,6 +384,8 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`Generating recipes for goal: ${goalData.goalType}, meal type: ${mealType || 'any'}, servings: ${servings}`);
+    console.log('Goal dietary restrictions:', goalData.dietaryRestrictions);
+    console.log('Goal health adjustments:', goalData.healthBasedAdjustments);
 
     // Try to generate recipes with Gemini API
     try {
@@ -429,9 +467,88 @@ export async function POST(request: NextRequest) {
       console.error("Gemini API error:", geminiError);
       console.log("Using fallback goal-based recipes");
       
-      // Return goal-appropriate sample recipes
+      // Return goal-appropriate sample recipes with dietary filtering
       const goalType = goalData.goalType || 'maintenance';
-      const fallbackRecipes = SAMPLE_GOAL_RECIPES[goalType as keyof typeof SAMPLE_GOAL_RECIPES] || SAMPLE_GOAL_RECIPES.weight_loss;
+      let fallbackRecipes = SAMPLE_GOAL_RECIPES[goalType as keyof typeof SAMPLE_GOAL_RECIPES] || SAMPLE_GOAL_RECIPES.weight_loss;
+      
+      // Filter recipes based on dietary restrictions
+      const dietaryRestrictions = goalData.dietaryRestrictions || [];
+      if (dietaryRestrictions.length > 0) {
+        fallbackRecipes = fallbackRecipes.filter(recipe => {
+          const recipeName = recipe.name.toLowerCase();
+          const ingredientsList = recipe.ingredients.join(' ').toLowerCase();
+          
+          // Check vegetarian compliance
+          if (dietaryRestrictions.includes('vegetarian')) {
+            const nonVegItems = ['salmon', 'chicken', 'beef', 'pork', 'turkey', 'fish', 'seafood', 'meat', 'shrimp'];
+            if (nonVegItems.some(item => recipeName.includes(item) || ingredientsList.includes(item))) {
+              return false;
+            }
+          }
+          
+          // Check vegan compliance  
+          if (dietaryRestrictions.includes('vegan')) {
+            const nonVeganItems = ['salmon', 'chicken', 'beef', 'pork', 'turkey', 'fish', 'seafood', 'meat', 'shrimp', 'egg', 'milk', 'cheese', 'yogurt', 'butter', 'cream'];
+            if (nonVeganItems.some(item => recipeName.includes(item) || ingredientsList.includes(item))) {
+              return false;
+            }
+          }
+          
+          // Check dairy-free compliance
+          if (dietaryRestrictions.includes('dairy_free')) {
+            const dairyItems = ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'dairy'];
+            if (dairyItems.some(item => recipeName.includes(item) || ingredientsList.includes(item))) {
+              return false;
+            }
+          }
+          
+          return true;
+        });
+        
+        // If no recipes remain after filtering, use vegetarian fallbacks
+        if (fallbackRecipes.length === 0) {
+          fallbackRecipes = [{
+            name: "Mediterranean Quinoa Power Bowl",
+            ingredients: [
+              "3/4 cup cooked quinoa",
+              "1/2 cup chickpeas, rinsed and drained",
+              "1/4 cup cherry tomatoes, halved",
+              "1/4 cucumber, diced",
+              "2 tbsp red onion, finely chopped",
+              "2 tbsp kalamata olives, pitted",
+              "2 tbsp feta cheese, crumbled",
+              "1 tbsp extra virgin olive oil",
+              "1 tbsp lemon juice",
+              "1 tsp dried oregano",
+              "Fresh parsley for garnish"
+            ],
+            instructions: [
+              "Cook quinoa according to package directions and let cool slightly.",
+              "In a large bowl, combine quinoa, chickpeas, tomatoes, cucumber, and red onion.",
+              "Add olives and feta cheese.",
+              "Whisk together olive oil, lemon juice, and oregano.",
+              "Drizzle dressing over bowl and toss gently.",
+              "Garnish with fresh parsley and serve."
+            ],
+            nutritionalFacts: {
+              calories: 385,
+              protein: 16,
+              carbs: 48,
+              fat: 14,
+              fiber: 9,
+              sugar: 6,
+              sodium: 420
+            },
+            servings: "Serves 1",
+            times: "Prep: 10 min | Cook: 15 min | Total: 25 min",
+            goalAlignment: {
+              macroFit: "Balanced plant-based protein and complex carbs",
+              calorieTarget: "Moderate calories suitable for most goals",
+              nutritionalBenefits: "Complete protein from quinoa, fiber from chickpeas, healthy fats from olive oil"
+            }
+          }];
+        }
+      }
       
       return NextResponse.json({ 
         recipes: fallbackRecipes,

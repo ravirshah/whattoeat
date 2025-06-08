@@ -113,8 +113,19 @@ export default function NutritionTracker({
   };
 
   const formatWeekRange = () => {
-    const start = new Date(weeklyPlan.weekStartDate);
-    const end = new Date(weeklyPlan.weekEndDate);
+    // Handle both Date objects and Firestore Timestamps
+    const getDateFromValue = (dateValue: any): Date => {
+      if (dateValue && typeof dateValue === 'object' && dateValue.toDate) {
+        return dateValue.toDate();
+      } else if (dateValue instanceof Date) {
+        return dateValue;
+      } else {
+        return new Date(dateValue);
+      }
+    };
+    
+    const start = getDateFromValue(weeklyPlan.weekStartDate);
+    const end = getDateFromValue(weeklyPlan.weekEndDate);
     return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
   };
 
