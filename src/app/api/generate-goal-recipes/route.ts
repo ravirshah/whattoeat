@@ -177,7 +177,7 @@ const SAMPLE_GOAL_RECIPES = {
 };
 
 // Build goal-specific prompt
-const buildGoalBasedPrompt = (goalData: any, mealType?: string, servings: number = 1, carbBase?: string) => {
+const buildGoalBasedPrompt = (goalData: any, mealType?: string, servings: number = 1, carbBase?: string, customPreferences?: string) => {
   const { goalType, macroTargets, dietaryRestrictions = [], healthBasedAdjustments } = goalData;
   
   let goalDescription = "";
@@ -220,6 +220,18 @@ This recipe is for ${mealType}. Adjust the recipe characteristics accordingly:
 Include ${carbBase} as the primary carbohydrate source in the recipe.
 ` : '';
 
+  const customPreferencesGuidance = customPreferences ? `
+### CUSTOM USER PREFERENCES (HIGH PRIORITY - INCORPORATE INTO RECIPES):
+The user has specified these additional preferences that should be integrated into the recipes:
+**Custom Requirements**: ${customPreferences}
+
+**Integration Instructions**: 
+- Prioritize these preferences while maintaining nutritional targets
+- If preferences conflict with goals, find creative ways to balance both
+- Consider these preferences for cuisine type, cooking methods, ingredient choices, spice levels, and special requirements
+- Adapt cooking techniques and flavor profiles to match these preferences
+` : '';
+
   // NEW: Health-based guidance from health documents
   const healthGuidance = healthBasedAdjustments ? `
 ### HEALTH-BASED DIETARY REQUIREMENTS (CRITICAL - MUST FOLLOW):
@@ -250,6 +262,7 @@ Based on health document analysis, apply these specific dietary modifications:
 
 ${mealTypeGuidance}
 ${carbBaseGuidance}
+${customPreferencesGuidance}
 ${healthGuidance}
 
 ### DIETARY RESTRICTIONS (ABSOLUTELY CRITICAL - STRICTLY ENFORCE):
@@ -345,7 +358,7 @@ export async function POST(request: NextRequest) {
     console.log(`Token verified for user: ${userId}`);
 
     // Get input data from request
-    const { goalData, mealType, servings = 1, carbBase } = await request.json();
+    const { goalData, mealType, servings = 1, carbBase, customPreferences } = await request.json();
     
     if (!goalData) {
       return NextResponse.json({ error: 'Goal data is required' }, { status: 400 });
@@ -354,6 +367,7 @@ export async function POST(request: NextRequest) {
     console.log(`Generating recipes for goal: ${goalData.goalType}, meal type: ${mealType || 'any'}, servings: ${servings}`);
     console.log('Goal dietary restrictions:', goalData.dietaryRestrictions);
     console.log('Goal health adjustments:', goalData.healthBasedAdjustments);
+    console.log('Custom preferences:', customPreferences);
 
     // Try to generate recipes with Gemini API
     try {
@@ -367,7 +381,7 @@ export async function POST(request: NextRequest) {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-      const prompt = buildGoalBasedPrompt(goalData, mealType, servings, carbBase);
+      const prompt = buildGoalBasedPrompt(goalData, mealType, servings, carbBase, customPreferences);
       
       console.log("Sending goal-based request to Gemini API...");
       

@@ -11,6 +11,7 @@ import GroceryList from '@/components/weekly-planner/GroceryList';
 import Favorites from '@/components/weekly-planner/Favorites';
 import NutritionTracker from '@/components/weekly-planner/NutritionTracker';
 import MealPrepPlanner from '@/components/weekly-planner/MealPrepPlanner';
+import NutritionDashboard from '@/components/weekly-planner/NutritionDashboard';
 import { Button } from '@/components/ui';
 import { 
   Calendar, 
@@ -23,7 +24,8 @@ import {
   X,
   Heart,
   BarChart3,
-  ChefHat
+  ChefHat,
+  Activity
 } from 'lucide-react';
 import { 
   getCurrentWeeklyPlan, 
@@ -96,7 +98,8 @@ export default function WeeklyMealPlannerPage() {
     showFavorites: false,
     showMealPrepPlanner: false,
     showStoreLayoutEditor: false,
-    selectedNutritionDate: undefined
+    selectedNutritionDate: undefined,
+    showNutritionDashboard: false
   });
   const [isLoading, setIsLoading] = useState(true);
   // Keep test user option for development, but don't default to it
@@ -493,7 +496,16 @@ export default function WeeklyMealPlannerPage() {
                 onClick={() => handleStateUpdate({ showNutritionTracker: !plannerState.showNutritionTracker })}
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
-                Nutrition
+                Weekly Nutrition Info
+              </Button>
+
+              <Button
+                variant={plannerState.showNutritionDashboard ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleStateUpdate({ showNutritionDashboard: !plannerState.showNutritionDashboard })}
+              >
+                <Activity className="h-4 w-4 mr-2" />
+                Analytics Dashboard
               </Button>
 
               <Button
@@ -604,6 +616,16 @@ export default function WeeklyMealPlannerPage() {
               onClose={() => handleStateUpdate({ showNutritionTracker: false })}
             />
           </div>
+        )}
+
+        {/* Nutrition Dashboard Modal */}
+        {plannerState.showNutritionDashboard && currentPlan && (
+          <NutritionDashboard
+            userId={effectiveUser.uid}
+            activeGoal={activeGoal}
+            weeklyPlan={currentPlan}
+            onClose={() => handleStateUpdate({ showNutritionDashboard: false })}
+          />
         )}
 
         {/* Main Planner View */}

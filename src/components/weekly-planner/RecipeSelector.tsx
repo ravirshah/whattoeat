@@ -67,6 +67,7 @@ export default function RecipeSelector({
   const [selectedMealType, setSelectedMealType] = useState<MealType>('Lunch');
   const [selectedServings, setSelectedServings] = useState(1);
   const [selectedCarbBase, setSelectedCarbBase] = useState<string>('');
+  const [customPreferences, setCustomPreferences] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedRecipes, setGeneratedRecipes] = useState<GoalRecipe[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<GoalRecipe | null>(null);
@@ -85,6 +86,7 @@ export default function RecipeSelector({
       setSelectedMealType(existingMeal.mealType);
       setSelectedServings(existingMeal.servings);
       setSelectedCarbBase(existingMeal.carbBase || '');
+      setCustomPreferences(existingMeal.notes || ''); // Use notes field for custom preferences
       
       // If we have recipe details, show them
       if (existingMeal.recipeDetails) {
@@ -107,6 +109,7 @@ export default function RecipeSelector({
       // Reset for add mode
       setGeneratedRecipes([]);
       setSelectedRecipe(null);
+      setCustomPreferences('');
     }
       }, [existingMeal, typedMode, isOpen]);
 
@@ -493,7 +496,8 @@ export default function RecipeSelector({
           goalData: activeGoal,
           mealType: selectedMealType,
           servings: selectedServings,
-          carbBase: selectedCarbBase || undefined
+          carbBase: selectedCarbBase || undefined,
+          customPreferences: customPreferences.trim() || undefined
         })
       });
 
@@ -528,6 +532,7 @@ export default function RecipeSelector({
       mealType: selectedMealType,
       servings: selectedServings,
       carbBase: selectedCarbBase || undefined,
+      notes: customPreferences.trim() || undefined,
       plannedAt: Timestamp.now(),
       recipeDetails: {
         ingredients: recipe.ingredients,
@@ -695,17 +700,45 @@ export default function RecipeSelector({
 
                 {/* Carb Base (Optional) */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Carb Base (Optional)</label>
-                  <select
-                    value={selectedCarbBase}
-                    onChange={(e) => setSelectedCarbBase(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  >
-                    <option value="">No preference</option>
-                    {CARB_BASE_OPTIONS.map(base => (
-                      <option key={base} value={base}>{base}</option>
-                    ))}
-                  </select>
+                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    Carb Base (Optional)
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedCarbBase}
+                      onChange={(e) => setSelectedCarbBase(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors duration-200 appearance-none cursor-pointer shadow-sm hover:border-gray-400 dark:hover:border-gray-500"
+                    >
+                      <option value="" className="text-gray-500">Select a carb base...</option>
+                      {CARB_BASE_OPTIONS.map(base => (
+                        <option key={base} value={base} className="text-gray-900 dark:text-white">
+                          {base}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Custom Preferences */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                    Custom Preferences
+                  </label>
+                  <textarea
+                    value={customPreferences}
+                    onChange={(e) => setCustomPreferences(e.target.value)}
+                    placeholder="e.g., Mediterranean cuisine, extra spicy, high protein (>50g), vegetarian, low sodium, etc."
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors duration-200 resize-none shadow-sm hover:border-gray-400 dark:hover:border-gray-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Specify cuisine type, spice level, protein goals, dietary preferences, or any other requirements
+                  </p>
                 </div>
 
                 {/* Goal Info */}

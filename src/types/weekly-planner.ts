@@ -97,12 +97,26 @@ export interface GroceryItem {
   fromRecipes: string[]; // Array of recipe names that require this ingredient
   isChecked: boolean;
   estimatedCost?: number;
-  // New fields for store layout
+  // Enhanced fields for smart grocery system
   storeSection?: string; // More specific than category
   aisle?: number;
   priority?: 'high' | 'medium' | 'low'; // For meal prep planning
   shelfLife?: number; // days until expiration
   storageInstructions?: string;
+  // New intelligent features
+  baseIngredient?: string; // Normalized ingredient name for matching
+  unit?: string; // Standardized unit
+  totalQuantityNeeded?: number; // Consolidated quantity across recipes
+  nutritionalValue?: {
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+  };
+  seasonality?: 'year-round' | 'spring' | 'summer' | 'fall' | 'winter';
+  organic?: boolean;
+  localAvailable?: boolean;
+  alternatives?: string[]; // Alternative ingredients/brands
 }
 
 export interface GroceryList {
@@ -113,6 +127,15 @@ export interface GroceryList {
   userIngredients: string[]; // Ingredients user already has
   generatedAt: Timestamp;
   isCompleted: boolean;
+  // Enhanced grocery list features
+  totalEstimatedCost?: number;
+  estimatedShoppingTime?: number; // minutes
+  preferredStore?: string;
+  optimizedForStore?: boolean;
+  sustainabilityScore?: number; // 0-100 score based on local/organic choices
+  dietaryFilters?: string[]; // Applied dietary restrictions
+  generationMethod?: 'basic' | 'smart' | 'ai-optimized';
+  lastOptimized?: Timestamp;
 }
 
 export interface MealPlanSettings {
@@ -140,6 +163,7 @@ export interface PlannerViewState {
   showMealPrepPlanner: boolean;
   showStoreLayoutEditor: boolean;
   selectedNutritionDate?: Date;
+  showNutritionDashboard: boolean;
 }
 
 // For recipe selection modal
@@ -332,4 +356,100 @@ export interface UserPreferences {
   healthDocuments?: HealthDocument[];
   healthDataConsent: boolean; // User consent for health data usage
   lastHealthDataSync?: Timestamp;
+}
+
+// New interface for ingredient intelligence
+export interface IngredientIntelligence {
+  baseIngredient: string;
+  aliases: string[]; // Common variations and names
+  category: string;
+  subCategory?: string;
+  standardUnit: string;
+  conversionRates: Record<string, number>; // unit conversions
+  averageCost: number; // per standard unit
+  seasonality: {
+    peak: string[]; // months when best/cheapest
+    available: string[]; // months when available
+  };
+  shelfLife: number; // days
+  storageType: 'pantry' | 'fridge' | 'freezer' | 'room-temp';
+  nutritionalProfile: {
+    calories: number; // per 100g
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber?: number;
+  };
+  commonPreparations: string[]; // diced, chopped, etc.
+  substitutes: string[]; // alternative ingredients
+  pairings: string[]; // commonly used with
+}
+
+// Enhanced store layout with more intelligence
+export interface SmartStoreLayout {
+  id: string;
+  userId: string;
+  storeName: string;
+  storeChain?: string;
+  location?: string;
+  isDefault: boolean;
+  sections: SmartStoreSection[];
+  averageShoppingTime: number; // minutes
+  efficiency: number; // 0-100 score
+  lastOptimized: Timestamp;
+  crowdedTimes?: string[]; // peak hours to avoid
+  bestTimes?: string[]; // optimal shopping times
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface SmartStoreSection {
+  id: string;
+  name: string;
+  displayName: string; // User-friendly name
+  aisle?: number;
+  order: number; // for optimal shopping flow
+  categories: string[]; // which grocery categories belong here
+  estimatedTime?: number; // average time spent in section (minutes)
+  tipForShopping?: string; // helpful shopping tip
+  alternativeNames?: string[]; // how different stores might name this section
+}
+
+// Shopping optimization features
+export interface ShoppingOptimization {
+  routeOptimization: boolean; // optimize path through store
+  timeOptimization: boolean; // suggest best shopping times
+  budgetOptimization: boolean; // suggest cheaper alternatives
+  nutritionOptimization: boolean; // prefer healthier options
+  sustainabilityOptimization: boolean; // prefer local/organic
+  bulkBuyingOptimization: boolean; // suggest bulk purchases
+}
+
+// Shopping list generation preferences
+export interface GroceryPreferences {
+  preferredStores: string[];
+  dietaryRestrictions: string[];
+  budgetLimit?: number;
+  preferOrganic: boolean;
+  preferLocal: boolean;
+  avoidBrands?: string[];
+  preferredBrands?: string[];
+  shoppingStyle: 'quick' | 'thorough' | 'budget-conscious' | 'health-focused';
+  consolidationLevel: 'minimal' | 'moderate' | 'aggressive'; // how much to consolidate similar items
+}
+
+// Analytics for grocery shopping
+export interface GroceryAnalytics {
+  weeklySpend: number[];
+  categoryBreakdown: Record<string, number>;
+  shoppingFrequency: number; // times per week
+  averageShoppingTime: number; // minutes
+  wasteEstimate: number; // percentage of food wasted
+  sustainabilityMetrics: {
+    organicPercentage: number;
+    localPercentage: number;
+    packagingScore: number;
+  };
+  efficiencyScore: number; // 0-100
+  budgetAdherence: number; // percentage of budget used
 } 
