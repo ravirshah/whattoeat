@@ -361,30 +361,30 @@ export default function NutritionDashboard({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-6 rounded-t-2xl">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header - Mobile Optimized */}
+        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-3 sm:p-6 rounded-t-2xl flex-shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-xl">
-                <Activity className="h-6 w-6 text-white" />
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+              <div className="p-1.5 sm:p-2 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-xl flex-shrink-0">
+                <Activity className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white truncate">
                   Nutrition Analytics
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 hidden sm:block">
                   Comprehensive insights into your nutrition patterns
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
-              {/* Time Range Selector */}
-              <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+              {/* Time Range Selector - Mobile Optimized */}
+              <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 sm:p-1">
                 <button
                   onClick={() => setTimeRange('week')}
-                  className={`px-3 py-1 text-sm rounded-md transition-all ${
+                  className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-md transition-all ${
                     timeRange === 'week'
                       ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -394,7 +394,7 @@ export default function NutritionDashboard({
                 </button>
                 <button
                   onClick={() => setTimeRange('month')}
-                  className={`px-3 py-1 text-sm rounded-md transition-all ${
+                  className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-md transition-all ${
                     timeRange === 'month'
                       ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -403,54 +403,55 @@ export default function NutritionDashboard({
                   Month
                 </button>
               </div>
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                <X className="h-5 w-5" />
+              <Button variant="ghost" size="sm" onClick={onClose} className="p-1 sm:p-2">
+                <X className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
             </div>
           </div>
         </div>
 
-        <div className="p-6 space-y-8">
-          {/* Key Metrics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-8">
+          {/* Key Metrics Cards - Mobile Optimized */}
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             {goalAchievement && Object.entries(goalAchievement).map(([key, data]) => {
               const isOnTrack = data.percentage >= 90 && data.percentage <= 110;
               const isOver = data.percentage > 110;
               
               return (
-                <div key={key} className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 capitalize">
+                <div key={key} className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-xl p-3 sm:p-6 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between mb-2 sm:mb-4">
+                    <h3 className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 capitalize">
                       {key}
                     </h3>
-                    <div className={`p-2 rounded-lg ${
+                    <div className={`p-1 sm:p-2 rounded-lg ${
                       isOnTrack ? 'bg-emerald-100 dark:bg-emerald-900/30' :
                       isOver ? 'bg-amber-100 dark:bg-amber-900/30' :
                       'bg-red-100 dark:bg-red-900/30'
                     }`}>
                       {isOnTrack ? (
-                        <Target className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        <Target className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
                       ) : isOver ? (
-                        <TrendingUp className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400" />
                       ) : (
-                        <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-red-600 dark:text-red-400" />
                       )}
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
-                    <div className="flex items-end space-x-2">
-                      <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <div className="space-y-1 sm:space-y-2">
+                    <div className="flex items-end space-x-1 sm:space-x-2">
+                      <span className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
                         {Math.round(data.current)}
                       </span>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                      <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                         / {data.target} {key === 'calories' ? 'cal' : 'g'}
                       </span>
                     </div>
                     
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 sm:h-2">
                       <div
-                        className={`h-2 rounded-full transition-all duration-500 ${
+                        className={`h-1.5 sm:h-2 rounded-full transition-all duration-500 ${
                           isOnTrack ? 'bg-emerald-500' :
                           isOver ? 'bg-amber-500' :
                           'bg-red-500'
@@ -468,33 +469,33 @@ export default function NutritionDashboard({
             })}
           </div>
 
-          {/* Trends and Insights */}
+          {/* Trends and Insights - Mobile Optimized */}
           {trends.length > 0 && (
-            <div className="bg-gradient-to-r from-blue-50 to-emerald-50 dark:from-blue-900/20 dark:to-emerald-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                <Zap className="h-5 w-5 mr-2 text-blue-600" />
+            <div className="bg-gradient-to-r from-blue-50 to-emerald-50 dark:from-blue-900/20 dark:to-emerald-900/20 rounded-xl p-3 sm:p-6 border border-blue-200 dark:border-blue-800">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 flex items-center">
+                <Zap className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-blue-600" />
                 Nutrition Trends
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                 {trends.map((trend, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
+                  <div key={index} className="flex items-center justify-between p-3 sm:p-4 bg-white dark:bg-gray-800 rounded-lg">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 dark:text-white text-sm sm:text-base truncate">
                         {trend.metric}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         {trend.period}
                       </p>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
                       {trend.trend === 'up' ? (
-                        <TrendingUp className="h-4 w-4 text-emerald-600" />
+                        <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600" />
                       ) : trend.trend === 'down' ? (
-                        <TrendingDown className="h-4 w-4 text-red-600" />
+                        <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
                       ) : (
-                        <Target className="h-4 w-4 text-gray-400" />
+                        <Target className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
                       )}
-                      <span className={`text-sm font-medium ${
+                      <span className={`text-xs sm:text-sm font-medium ${
                         trend.trend === 'up' ? 'text-emerald-600' :
                         trend.trend === 'down' ? 'text-red-600' :
                         'text-gray-500'
@@ -508,15 +509,17 @@ export default function NutritionDashboard({
             </div>
           )}
 
-          {/* Charts Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Nutrition Trends Chart */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Nutrition Trends
-                </h3>
-                <div className="flex flex-wrap gap-2">
+          {/* Charts Section - Mobile Optimized */}
+          <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+            {/* Mobile: Stack charts vertically, Desktop: Keep side by side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+              {/* Nutrition Trends Chart */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-3 sm:p-6 border border-gray-200 dark:border-gray-700">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 space-y-2 sm:space-y-0">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+                    Nutrition Trends
+                  </h3>
+                  <div className="flex flex-wrap gap-1 sm:gap-2">
                   {['calories', 'protein', 'carbs', 'fat'].map((metric) => (
                     <button
                       key={metric}
@@ -527,7 +530,7 @@ export default function NutritionDashboard({
                           setSelectedMetrics([...selectedMetrics, metric]);
                         }
                       }}
-                      className={`px-3 py-1 text-xs rounded-full transition-all ${
+                      className={`px-2 sm:px-3 py-1 text-xs rounded-full transition-all ${
                         selectedMetrics.includes(metric)
                           ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -536,11 +539,11 @@ export default function NutritionDashboard({
                       {metric}
                     </button>
                   ))}
+                  </div>
                 </div>
-              </div>
-              
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
+                
+                <div className="h-64 sm:h-80">
+                  <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={historicalData}>
                     <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                     <XAxis 
@@ -646,20 +649,20 @@ export default function NutritionDashboard({
               </div>
             </div>
 
-            {/* Macro Distribution */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-                Macro Distribution
-              </h3>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Current Distribution */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-4">
-                    Current Average
-                  </h4>
-                  <div className="h-48">
-                    <ResponsiveContainer width="100%" height="100%">
+              {/* Macro Distribution */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-3 sm:p-6 border border-gray-200 dark:border-gray-700">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4 sm:mb-6">
+                  Macro Distribution
+                </h3>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  {/* Current Distribution */}
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 mb-3 sm:mb-4">
+                      Current Average
+                    </h4>
+                    <div className="h-40 sm:h-48">
+                      <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={macroDistribution}
@@ -729,14 +732,14 @@ export default function NutritionDashboard({
             </div>
           </div>
 
-          {/* Goal Progress Radial Chart */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-              Goal Achievement Overview
-            </h3>
-            
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
+            {/* Goal Progress Radial Chart - Mobile Optimized */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-3 sm:p-6 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4 sm:mb-6">
+                Goal Achievement Overview
+              </h3>
+              
+              <div className="h-64 sm:h-80">
+                <ResponsiveContainer width="100%" height="100%">
                 <RadialBarChart 
                   cx="50%" 
                   cy="50%" 
@@ -768,63 +771,261 @@ export default function NutritionDashboard({
             </div>
           </div>
 
-          {/* Insights and Recommendations */}
-          <div className="bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 rounded-xl p-6 border border-emerald-200 dark:border-emerald-800">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-              <Award className="h-5 w-5 mr-2 text-emerald-600" />
-              Nutrition Insights & Recommendations
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Dynamic insights based on data */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                <div className="flex items-start space-x-3">
-                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                    <TrendingUp className="h-4 w-4 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-1">
-                      Protein Excellence
-                    </h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      You're consistently hitting your protein targets. Great for muscle maintenance!
-                    </p>
-                  </div>
-                </div>
-              </div>
+            {/* Insights and Recommendations - Enhanced with Smart Intelligence */}
+            <div className="bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 rounded-xl p-3 sm:p-6 border border-emerald-200 dark:border-emerald-800">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 flex items-center">
+                <Award className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-emerald-600" />
+                Smart Nutrition Insights
+              </h3>
+              
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                {/* Smart Dynamic Insights */}
+                {goalAchievement && (
+                  <>
+                    {/* Protein Insight */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
+                      <div className="flex items-start space-x-2 sm:space-x-3">
+                        <div className={`p-1.5 sm:p-2 rounded-lg ${
+                          goalAchievement.protein.percentage >= 90 
+                            ? 'bg-emerald-100 dark:bg-emerald-900/30' 
+                            : 'bg-amber-100 dark:bg-amber-900/30'
+                        }`}>
+                          {goalAchievement.protein.percentage >= 90 ? (
+                            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600" />
+                          ) : (
+                            <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm mb-1">
+                            {goalAchievement.protein.percentage >= 90 ? 'Protein Excellence' : 'Protein Opportunity'}
+                          </h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            {goalAchievement.protein.percentage >= 90 
+                              ? "You're hitting your protein targets! Great for muscle maintenance." 
+                              : `You're at ${Math.round(goalAchievement.protein.percentage)}% of protein goal. Consider adding lean meats or protein shakes.`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                <div className="flex items-start space-x-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                    <Calendar className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-1">
-                      Consistency Streak
-                    </h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      You've planned {Object.values(weeklyPlan.meals).flat().length} meals this week. Keep it up!
-                    </p>
-                  </div>
-                </div>
-              </div>
+                    {/* Calorie Balance Insight */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
+                      <div className="flex items-start space-x-2 sm:space-x-3">
+                        <div className={`p-1.5 sm:p-2 rounded-lg ${
+                          Math.abs(goalAchievement.calories.percentage - 100) <= 10
+                            ? 'bg-emerald-100 dark:bg-emerald-900/30'
+                            : goalAchievement.calories.percentage > 110
+                            ? 'bg-red-100 dark:bg-red-900/30'
+                            : 'bg-amber-100 dark:bg-amber-900/30'
+                        }`}>
+                          {Math.abs(goalAchievement.calories.percentage - 100) <= 10 ? (
+                            <Target className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600" />
+                          ) : goalAchievement.calories.percentage > 110 ? (
+                            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm mb-1">
+                            Calorie Balance
+                          </h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            {Math.abs(goalAchievement.calories.percentage - 100) <= 10
+                              ? 'Perfect calorie balance for your goals!'
+                              : goalAchievement.calories.percentage > 110
+                              ? 'Calories are above target. Consider smaller portions or lighter recipes.'
+                              : 'Calories below target. Add healthy snacks or increase portion sizes.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                <div className="flex items-start space-x-3">
-                  <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-                    <AlertCircle className="h-4 w-4 text-amber-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-1">
-                      Fiber Focus
-                    </h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      Consider adding more fiber-rich foods like beans and vegetables.
-                    </p>
-                  </div>
-                </div>
-              </div>
+                    {/* Meal Planning Consistency */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
+                      <div className="flex items-start space-x-2 sm:space-x-3">
+                        <div className="p-1.5 sm:p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm mb-1">
+                            Planning Streak
+                          </h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            {Object.values(weeklyPlan.meals).flat().length} meals planned this week. 
+                            {Object.values(weeklyPlan.meals).flat().length >= 15 
+                              ? ' Excellent consistency!' 
+                              : ' Try planning more meals for better nutrition tracking.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Macro Balance Insight */}
+                    {macroDistribution.length > 0 && (
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
+                        <div className="flex items-start space-x-2 sm:space-x-3">
+                          <div className="p-1.5 sm:p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                            <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm mb-1">
+                              Macro Balance
+                            </h4>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              {(() => {
+                                const proteinPct = macroDistribution.find(m => m.name === 'Protein')?.percentage || 0;
+                                if (proteinPct > 35) return 'High protein intake - great for muscle building!';
+                                if (proteinPct < 15) return 'Consider increasing protein for better satiety.';
+                                return 'Well-balanced macro distribution across your meals.';
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Weekly Progress Insight */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
+                      <div className="flex items-start space-x-2 sm:space-x-3">
+                        <div className="p-1.5 sm:p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+                          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-600" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm mb-1">
+                            Weekly Outlook
+                          </h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            Based on your current plan, you're on track to {
+                              currentWeekStats && activeGoal 
+                                ? currentWeekStats.average.calories > (activeGoal.macroTargets.daily?.calories || 2000)
+                                  ? 'exceed your calorie goals.'
+                                  : 'meet your nutrition targets.'
+                                : 'achieve your nutrition goals.'
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Hydration Reminder */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
+                      <div className="flex items-start space-x-2 sm:space-x-3">
+                        <div className="p-1.5 sm:p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
+                          <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-cyan-600" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm mb-1">
+                            Hydration Focus
+                          </h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            Don't forget to drink 8-10 glasses of water daily to support your nutrition goals and metabolism.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+                            </div>
             </div>
+
+            {/* Weekly Nutrition Summary - New Intelligent Feature */}
+            {currentWeekStats && activeGoal && (
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-3 sm:p-6 border border-gray-200 dark:border-gray-600">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 flex items-center">
+                  <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-gray-600" />
+                  Weekly Nutrition Summary
+                </h3>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg">
+                    <div className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
+                      {Math.round(currentWeekStats.total.calories)}
+                    </div>
+                    <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total Calories</div>
+                    <div className="text-xs text-gray-500">
+                      vs {Math.round((activeGoal.macroTargets.daily?.calories || 2000) * 7)} goal
+                    </div>
+                  </div>
+                  
+                  <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg">
+                    <div className="text-lg sm:text-2xl font-bold text-emerald-600">
+                      {Math.round(currentWeekStats.total.protein)}g
+                    </div>
+                    <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total Protein</div>
+                    <div className="text-xs text-gray-500">
+                      vs {Math.round((activeGoal.macroTargets.daily?.protein || 150) * 7)}g goal
+                    </div>
+                  </div>
+                  
+                  <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg">
+                    <div className="text-lg sm:text-2xl font-bold text-amber-600">
+                      {Math.round(currentWeekStats.total.carbs)}g
+                    </div>
+                    <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total Carbs</div>
+                    <div className="text-xs text-gray-500">
+                      vs {Math.round((activeGoal.macroTargets.daily?.carbs || 200) * 7)}g goal
+                    </div>
+                  </div>
+                  
+                  <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg">
+                    <div className="text-lg sm:text-2xl font-bold text-purple-600">
+                      {Math.round(currentWeekStats.total.fat)}g
+                    </div>
+                    <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total Fat</div>
+                    <div className="text-xs text-gray-500">
+                      vs {Math.round((activeGoal.macroTargets.daily?.fat || 65) * 7)}g goal
+                    </div>
+                  </div>
+                </div>
+
+                {/* Smart Weekly Recommendations */}
+                <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2 flex items-center">
+                    <Zap className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5" />
+                    Smart Weekly Recommendations
+                  </h4>
+                  <div className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                    {(() => {
+                      const weeklyCalories = currentWeekStats.total.calories;
+                      const goalCalories = (activeGoal.macroTargets.daily?.calories || 2000) * 7;
+                      const calorieVariance = ((weeklyCalories - goalCalories) / goalCalories) * 100;
+                      
+                      const recommendations = [];
+                      
+                      if (Math.abs(calorieVariance) <= 5) {
+                        recommendations.push("✅ Your weekly calorie intake is perfectly balanced with your goals!");
+                      } else if (calorieVariance > 15) {
+                        recommendations.push("⚠️ You're significantly over your calorie targets. Consider lighter meal options or smaller portions.");
+                      } else if (calorieVariance < -15) {
+                        recommendations.push("📈 You're under your calorie targets. Add healthy snacks or increase meal portions to meet your goals.");
+                      }
+                      
+                      const proteinPct = (currentWeekStats.total.protein / ((activeGoal.macroTargets.daily?.protein || 150) * 7)) * 100;
+                      if (proteinPct >= 90) {
+                        recommendations.push("💪 Excellent protein intake! This supports muscle maintenance and growth.");
+                      } else {
+                        recommendations.push("🥩 Consider adding more protein-rich foods like lean meats, eggs, or protein shakes.");
+                      }
+                      
+                      const plannedMeals = Object.values(weeklyPlan.meals).flat().length;
+                      if (plannedMeals >= 21) {
+                        recommendations.push("🎯 Complete meal planning! You've planned 3+ meals per day on average.");
+                      } else if (plannedMeals >= 14) {
+                        recommendations.push("📅 Good meal planning consistency. Consider adding more meals for better tracking.");
+                      } else {
+                        recommendations.push("📋 Try planning more meals throughout the week for better nutrition control.");
+                      }
+                      
+                      return recommendations;
+                    })().map((rec, idx) => (
+                      <div key={idx}>{rec}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
