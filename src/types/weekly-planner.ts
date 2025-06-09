@@ -356,6 +356,8 @@ export interface UserPreferences {
   healthDocuments?: HealthDocument[];
   healthDataConsent: boolean; // User consent for health data usage
   lastHealthDataSync?: Timestamp;
+  // Onboarding tracking
+  hasSeenOnboarding?: boolean;
 }
 
 // New interface for ingredient intelligence

@@ -30,12 +30,16 @@ import {
   AlertCircle,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Download,
+  FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { WeeklyPlan, UserGoal, MacroTarget } from '@/types/weekly-planner';
 import { getUserNutritionHistory } from '@/lib/weekly-planner-db';
 import { toast } from 'sonner';
+import { calculateWeeklyNutrition, calculateMacroDistribution, generateNutritionInsights } from '@/lib/nutrition-calculations';
+import { exportToPDF, downloadHTMLReport } from '@/lib/pdf-export';
 
 interface NutritionDashboardProps {
   userId: string;
@@ -164,95 +168,82 @@ export default function NutritionDashboard({
     }
   };
 
-  // Calculate current week's totals and averages
-  const currentWeekStats = useMemo(() => {
+  // Calculate current week's nutrition using unified system
+  const nutritionData = useMemo(() => {
     if (!activeGoal || !weeklyPlan) return null;
-
-    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    let totalNutrition = {
-      calories: 0,
-      protein: 0,
-      carbs: 0,
-      fat: 0,
-      fiber: 0
-    };
-
-    daysOfWeek.forEach(day => {
-      const dayMeals = weeklyPlan.meals[day as keyof typeof weeklyPlan.meals] || [];
-      dayMeals.forEach(meal => {
-        if (meal.recipeDetails?.nutritionalFacts) {
-          const nutrition = meal.recipeDetails.nutritionalFacts;
-          const servingMultiplier = meal.servings || 1;
-          
-          totalNutrition.calories += nutrition.calories * servingMultiplier;
-          totalNutrition.protein += nutrition.protein * servingMultiplier;
-          totalNutrition.carbs += nutrition.carbs * servingMultiplier;
-          totalNutrition.fat += nutrition.fat * servingMultiplier;
-          totalNutrition.fiber += nutrition.fiber * servingMultiplier;
-        }
-      });
-    });
-
-    const avgNutrition = {
-      calories: totalNutrition.calories / 7,
-      protein: totalNutrition.protein / 7,
-      carbs: totalNutrition.carbs / 7,
-      fat: totalNutrition.fat / 7,
-      fiber: totalNutrition.fiber / 7
-    };
-
-    return { total: totalNutrition, average: avgNutrition };
+    return calculateWeeklyNutrition(weeklyPlan, activeGoal);
   }, [weeklyPlan, activeGoal]);
 
-  // Calculate macro distribution
-  const macroDistribution = useMemo((): MacroDistribution[] => {
-    if (!currentWeekStats || !activeGoal) return [];
+  // For backwards compatibility with existing charts
+  const currentWeekStats = useMemo(() => {
+    if (!nutritionData) return null;
+    
+    return {
+      total: nutritionData.weeklyTotals,
+      average: nutritionData.dailyAverages
+    };
+  }, [nutritionData]);
 
-    const { average } = currentWeekStats;
-    const totalCals = average.calories;
-    
-    // Calculate calories from each macro
-    const proteinCals = average.protein * 4;
-    const carbsCals = average.carbs * 4;
-    const fatCals = average.fat * 9;
-    
-    // Calculate target distribution
-    const goalCalories = activeGoal.macroTargets.daily?.calories || 2000;
-    const goalProtein = activeGoal.macroTargets.daily?.protein || 150;
-    const goalCarbs = activeGoal.macroTargets.daily?.carbs || 200;
-    const goalFat = activeGoal.macroTargets.daily?.fat || 65;
-    
-    const goalProteinCals = goalProtein * 4;
-    const goalCarbsCals = goalCarbs * 4;
-    const goalFatCals = goalFat * 9;
+  // Calculate macro distribution using unified system
+  const macroDistribution = useMemo(() => {
+    if (!nutritionData || !activeGoal) return [];
+    return calculateMacroDistribution(nutritionData.dailyAverages, activeGoal.macroTargets.daily);
+  }, [nutritionData, activeGoal]);
 
-    return [
-      {
-        name: 'Protein',
-        value: proteinCals,
-        percentage: (proteinCals / totalCals) * 100,
-        color: '#10b981', // emerald-500
-        target: goalProteinCals,
-        targetPercentage: (goalProteinCals / goalCalories) * 100
-      },
-      {
-        name: 'Carbs',
-        value: carbsCals,
-        percentage: (carbsCals / totalCals) * 100,
-        color: '#f59e0b', // amber-500
-        target: goalCarbsCals,
-        targetPercentage: (goalCarbsCals / goalCalories) * 100
-      },
-      {
-        name: 'Fat',
-        value: fatCals,
-        percentage: (fatCals / totalCals) * 100,
-        color: '#8b5cf6', // violet-500
-        target: goalFatCals,
-        targetPercentage: (goalFatCals / goalCalories) * 100
-      }
-    ];
-  }, [currentWeekStats, activeGoal]);
+  // Generate smart insights
+  const insights = useMemo(() => {
+    if (!nutritionData) return [];
+    return generateNutritionInsights(nutritionData, weeklyPlan);
+  }, [nutritionData, weeklyPlan]);
+
+  // Export functions
+  const handleExportPDF = async () => {
+    if (!nutritionData || !activeGoal) {
+      toast.error('No nutrition data available to export');
+      return;
+    }
+
+    try {
+      exportToPDF({
+        weeklyPlan,
+        activeGoal,
+        nutritionData,
+        userInfo: {
+          name: activeGoal.name
+        },
+        includeRecipes: true,
+        includeGroceryList: false
+      });
+      toast.success('PDF export initiated - check your browser for download');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export PDF');
+    }
+  };
+
+  const handleExportHTML = async () => {
+    if (!nutritionData || !activeGoal) {
+      toast.error('No nutrition data available to export');
+      return;
+    }
+
+    try {
+      downloadHTMLReport({
+        weeklyPlan,
+        activeGoal,
+        nutritionData,
+        userInfo: {
+          name: activeGoal.name
+        },
+        includeRecipes: true,
+        includeGroceryList: false
+      });
+      toast.success('HTML report downloaded');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export HTML report');
+    }
+  };
 
   // Calculate trends
   const trends = useMemo((): TrendData[] => {
@@ -403,6 +394,15 @@ export default function NutritionDashboard({
                   Month
                 </button>
               </div>
+              
+              {/* Export buttons */}
+              <Button variant="ghost" size="sm" onClick={handleExportHTML} className="hidden sm:flex p-1 sm:p-2">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleExportPDF} className="p-1 sm:p-2">
+                <Download className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+              
               <Button variant="ghost" size="sm" onClick={onClose} className="p-1 sm:p-2">
                 <X className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
@@ -771,163 +771,43 @@ export default function NutritionDashboard({
             </div>
           </div>
 
-            {/* Insights and Recommendations - Enhanced with Smart Intelligence */}
+            {/* Unified Smart Insights */}
             <div className="bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 rounded-xl p-3 sm:p-6 border border-emerald-200 dark:border-emerald-800">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4 flex items-center">
                 <Award className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-emerald-600" />
                 Smart Nutrition Insights
               </h3>
               
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {/* Smart Dynamic Insights */}
-                {goalAchievement && (
-                  <>
-                    {/* Protein Insight */}
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
-                      <div className="flex items-start space-x-2 sm:space-x-3">
-                        <div className={`p-1.5 sm:p-2 rounded-lg ${
-                          goalAchievement.protein.percentage >= 90 
-                            ? 'bg-emerald-100 dark:bg-emerald-900/30' 
-                            : 'bg-amber-100 dark:bg-amber-900/30'
-                        }`}>
-                          {goalAchievement.protein.percentage >= 90 ? (
-                            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600" />
-                          ) : (
-                            <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm mb-1">
-                            {goalAchievement.protein.percentage >= 90 ? 'Protein Excellence' : 'Protein Opportunity'}
-                          </h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            {goalAchievement.protein.percentage >= 90 
-                              ? "You're hitting your protein targets! Great for muscle maintenance." 
-                              : `You're at ${Math.round(goalAchievement.protein.percentage)}% of protein goal. Consider adding lean meats or protein shakes.`}
-                          </p>
-                        </div>
+              <div className="space-y-3">
+                {insights.map((insight, index) => (
+                  <div key={index} className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4 border-l-4 border-emerald-500">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">{insight}</p>
+                  </div>
+                ))}
+                
+                {nutritionData && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
+                      <div className="text-lg font-bold text-emerald-600">
+                        {nutritionData.mealSources.aiGenerated}
                       </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">AI Generated</div>
                     </div>
-
-                    {/* Calorie Balance Insight */}
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
-                      <div className="flex items-start space-x-2 sm:space-x-3">
-                        <div className={`p-1.5 sm:p-2 rounded-lg ${
-                          Math.abs(goalAchievement.calories.percentage - 100) <= 10
-                            ? 'bg-emerald-100 dark:bg-emerald-900/30'
-                            : goalAchievement.calories.percentage > 110
-                            ? 'bg-red-100 dark:bg-red-900/30'
-                            : 'bg-amber-100 dark:bg-amber-900/30'
-                        }`}>
-                          {Math.abs(goalAchievement.calories.percentage - 100) <= 10 ? (
-                            <Target className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600" />
-                          ) : goalAchievement.calories.percentage > 110 ? (
-                            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
-                          ) : (
-                            <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm mb-1">
-                            Calorie Balance
-                          </h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            {Math.abs(goalAchievement.calories.percentage - 100) <= 10
-                              ? 'Perfect calorie balance for your goals!'
-                              : goalAchievement.calories.percentage > 110
-                              ? 'Calories are above target. Consider smaller portions or lighter recipes.'
-                              : 'Calories below target. Add healthy snacks or increase portion sizes.'}
-                          </p>
-                        </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
+                      <div className="text-lg font-bold text-blue-600">
+                        {nutritionData.mealSources.favorites}
                       </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">Favorites</div>
                     </div>
-
-                    {/* Meal Planning Consistency */}
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
-                      <div className="flex items-start space-x-2 sm:space-x-3">
-                        <div className="p-1.5 sm:p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm mb-1">
-                            Planning Streak
-                          </h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            {Object.values(weeklyPlan.meals).flat().length} meals planned this week. 
-                            {Object.values(weeklyPlan.meals).flat().length >= 15 
-                              ? ' Excellent consistency!' 
-                              : ' Try planning more meals for better nutrition tracking.'}
-                          </p>
-                        </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
+                      <div className="text-lg font-bold text-purple-600">
+                        {nutritionData.mealSources.chatInput}
                       </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">Chat Input</div>
                     </div>
-
-                    {/* Macro Balance Insight */}
-                    {macroDistribution.length > 0 && (
-                      <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
-                        <div className="flex items-start space-x-2 sm:space-x-3">
-                          <div className="p-1.5 sm:p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                            <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm mb-1">
-                              Macro Balance
-                            </h4>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                              {(() => {
-                                const proteinPct = macroDistribution.find(m => m.name === 'Protein')?.percentage || 0;
-                                if (proteinPct > 35) return 'High protein intake - great for muscle building!';
-                                if (proteinPct < 15) return 'Consider increasing protein for better satiety.';
-                                return 'Well-balanced macro distribution across your meals.';
-                              })()}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Weekly Progress Insight */}
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
-                      <div className="flex items-start space-x-2 sm:space-x-3">
-                        <div className="p-1.5 sm:p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
-                          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-600" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm mb-1">
-                            Weekly Outlook
-                          </h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            Based on your current plan, you're on track to {
-                              currentWeekStats && activeGoal 
-                                ? currentWeekStats.average.calories > (activeGoal.macroTargets.daily?.calories || 2000)
-                                  ? 'exceed your calorie goals.'
-                                  : 'meet your nutrition targets.'
-                                : 'achieve your nutrition goals.'
-                            }
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Hydration Reminder */}
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 sm:p-4">
-                      <div className="flex items-start space-x-2 sm:space-x-3">
-                        <div className="p-1.5 sm:p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
-                          <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-cyan-600" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-medium text-gray-900 dark:text-white text-xs sm:text-sm mb-1">
-                            Hydration Focus
-                          </h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            Don't forget to drink 8-10 glasses of water daily to support your nutrition goals and metabolism.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </>
+                  </div>
                 )}
-                            </div>
+              </div>
             </div>
 
             {/* Weekly Nutrition Summary - New Intelligent Feature */}

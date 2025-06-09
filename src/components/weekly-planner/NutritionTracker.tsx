@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import { NutritionEntry, UserGoal, MacroTarget, WeeklyPlan } from '@/types/weekly-planner';
 import { Button } from '@/components/ui';
-import { BarChart3, X, Calendar, Target, TrendingUp, ChevronLeft, ChevronRight, Plus, Edit2 } from 'lucide-react';
+import { BarChart3, X, Calendar, Target, TrendingUp, ChevronLeft, ChevronRight, Plus, Edit2, Download } from 'lucide-react';
 import { getNutritionEntry, saveNutritionEntry, updateNutritionEntry, getUserNutritionHistory } from '@/lib/weekly-planner-db';
 import { toast } from 'sonner';
+import { calculateWeeklyNutrition, WeeklyNutritionSummary } from '@/lib/nutrition-calculations';
+import { exportToPDF, downloadHTMLReport } from '@/lib/pdf-export';
 
 interface NutritionTrackerProps {
   userId: string;
@@ -14,29 +16,20 @@ interface NutritionTrackerProps {
   onClose: () => void;
 }
 
-interface DailyMacroSummary {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  fiber: number;
-}
-
 export default function NutritionTracker({
   userId,
   activeGoal,
   weeklyPlan,
   onClose
 }: NutritionTrackerProps) {
-  const [weeklyNutrition, setWeeklyNutrition] = useState<DailyMacroSummary | null>(null);
+  const [nutritionData, setNutritionData] = useState<WeeklyNutritionSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [dailyBreakdown, setDailyBreakdown] = useState<Record<string, DailyMacroSummary>>({});
 
   useEffect(() => {
-    calculateWeeklyNutrition();
+    calculateWeeklyNutritionData();
   }, [weeklyPlan, activeGoal]);
 
-  const calculateWeeklyNutrition = async () => {
+  const calculateWeeklyNutritionData = async () => {
     try {
       setIsLoading(true);
       
@@ -45,53 +38,9 @@ export default function NutritionTracker({
         return;
       }
 
-      const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      const dailyData: Record<string, DailyMacroSummary> = {};
-      let weeklyTotals = {
-        calories: 0,
-        protein: 0,
-        carbs: 0,
-        fat: 0,
-        fiber: 0
-      };
-
-      // Calculate nutrition for each day
-      daysOfWeek.forEach(day => {
-        const dayMeals = weeklyPlan.meals[day as keyof typeof weeklyPlan.meals] || [];
-        let dayTotals = {
-          calories: 0,
-          protein: 0,
-          carbs: 0,
-          fat: 0,
-          fiber: 0
-        };
-
-        // Sum up nutrition from all meals for the day
-        dayMeals.forEach(meal => {
-          if (meal.recipeDetails?.nutritionalFacts) {
-            const nutrition = meal.recipeDetails.nutritionalFacts;
-            const servingMultiplier = meal.servings || 1;
-            
-            dayTotals.calories += nutrition.calories * servingMultiplier;
-            dayTotals.protein += nutrition.protein * servingMultiplier;
-            dayTotals.carbs += nutrition.carbs * servingMultiplier;
-            dayTotals.fat += nutrition.fat * servingMultiplier;
-            dayTotals.fiber += nutrition.fiber * servingMultiplier;
-          }
-        });
-
-        dailyData[day] = dayTotals;
-        
-        // Add to weekly totals
-        weeklyTotals.calories += dayTotals.calories;
-        weeklyTotals.protein += dayTotals.protein;
-        weeklyTotals.carbs += dayTotals.carbs;
-        weeklyTotals.fat += dayTotals.fat;
-        weeklyTotals.fiber += dayTotals.fiber;
-      });
-
-      setDailyBreakdown(dailyData);
-      setWeeklyNutrition(weeklyTotals);
+      // Use the unified calculation system
+      const data = calculateWeeklyNutrition(weeklyPlan, activeGoal);
+      setNutritionData(data);
       
     } catch (error) {
       console.error('Error calculating weekly nutrition:', error);
@@ -110,6 +59,30 @@ export default function NutritionTracker({
     if (progress >= 70) return 'bg-yellow-500';
     if (progress >= 50) return 'bg-orange-500';
     return 'bg-red-500';
+  };
+
+  const handleExportPDF = async () => {
+    if (!nutritionData || !activeGoal) {
+      toast.error('No nutrition data available to export');
+      return;
+    }
+
+    try {
+      exportToPDF({
+        weeklyPlan,
+        activeGoal,
+        nutritionData,
+        userInfo: {
+          name: activeGoal.name
+        },
+        includeRecipes: true,
+        includeGroceryList: false
+      });
+      toast.success('PDF export initiated');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export PDF');
+    }
   };
 
   const formatWeekRange = () => {
@@ -160,7 +133,7 @@ export default function NutritionTracker({
       </div>
 
       {/* Weekly Summary Cards */}
-      {activeGoal && weeklyNutrition && (
+      {activeGoal && nutritionData && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
             { key: 'calories', label: 'Calories', unit: 'cal', color: 'bg-blue-500', target: activeGoal.macroTargets.daily?.calories },
@@ -168,7 +141,7 @@ export default function NutritionTracker({
             { key: 'carbs', label: 'Carbs', unit: 'g', color: 'bg-orange-500', target: activeGoal.macroTargets.daily?.carbs },
             { key: 'fat', label: 'Fat', unit: 'g', color: 'bg-purple-500', target: activeGoal.macroTargets.daily?.fat }
           ].map((macro) => {
-            const current = weeklyNutrition[macro.key as keyof DailyMacroSummary] || 0;
+            const current = nutritionData.weeklyTotals[macro.key as keyof typeof nutritionData.weeklyTotals] || 0;
             const weeklyTarget = (macro.target || 0) * 7;
             const progress = calculateProgress(current, macro.target || 1);
             const dailyAverage = current / 7;
@@ -221,7 +194,7 @@ export default function NutritionTracker({
         </h4>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">
-          {Object.entries(dailyBreakdown).map(([day, nutrition]) => {
+          {Object.entries(nutritionData?.daily || {}).map(([day, nutrition]) => {
             const totalMeals = weeklyPlan.meals[day as keyof typeof weeklyPlan.meals]?.length || 0;
             
             return (
@@ -260,22 +233,31 @@ export default function NutritionTracker({
       </div>
 
       {/* Weekly Goals Summary */}
-      {activeGoal && weeklyNutrition && (
+      {activeGoal && nutritionData && (
         <div className="mt-6 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
           <h4 className="font-medium text-emerald-900 dark:text-emerald-100 mb-3 flex items-center">
             <Target className="h-4 w-4 mr-2" />
             Weekly Goal Progress
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleExportPDF}
+              className="ml-auto"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export PDF
+            </Button>
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             <div>
               <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-                {Object.values(weeklyPlan.meals).flat().length}
+                {nutritionData.mealSources.total}
               </div>
               <div className="text-sm text-emerald-600 dark:text-emerald-400">Total Meals</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-                {Object.keys(dailyBreakdown).filter(day => 
+                {Object.keys(nutritionData.daily).filter(day => 
                   weeklyPlan.meals[day as keyof typeof weeklyPlan.meals]?.length > 0
                 ).length}/7
               </div>
@@ -283,7 +265,7 @@ export default function NutritionTracker({
             </div>
             <div>
               <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-                {Math.round(weeklyNutrition.calories / 7)}
+                {Math.round(nutritionData.dailyAverages.calories)}
               </div>
               <div className="text-sm text-emerald-600 dark:text-emerald-400">Avg Daily Cal</div>
             </div>
@@ -298,7 +280,7 @@ export default function NutritionTracker({
       )}
 
       {/* Empty State */}
-      {(!weeklyNutrition || Object.values(weeklyPlan.meals).flat().length === 0) && (
+      {(!nutritionData || Object.values(weeklyPlan.meals).flat().length === 0) && (
         <div className="text-center py-12">
           <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">

@@ -26,6 +26,7 @@ import {
     difficultyPreference?: string;
     healthDataConsent?: boolean;
     lastHealthDataSync?: Timestamp;
+    hasSeenOnboarding?: boolean;
   }
   
   interface Recipe {

@@ -12,6 +12,7 @@ import Favorites from '@/components/weekly-planner/Favorites';
 import NutritionTracker from '@/components/weekly-planner/NutritionTracker';
 import MealPrepPlanner from '@/components/weekly-planner/MealPrepPlanner';
 import NutritionDashboard from '@/components/weekly-planner/NutritionDashboard';
+import OnboardingFlow from '@/components/weekly-planner/OnboardingFlow';
 import { Button } from '@/components/ui';
 import { 
   Calendar, 
@@ -37,6 +38,7 @@ import {
   updateWeeklyPlan,
   getWeeklyPlanByDateRange
 } from '@/lib/weekly-planner-db';
+import { getUserPreferences } from '@/lib/db';
 import { WeeklyPlan, UserGoal, DayOfWeek, PlannerViewState } from '@/types/weekly-planner';
 import { Timestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
@@ -106,6 +108,9 @@ export default function WeeklyMealPlannerPage() {
   const [useTestUser, setUseTestUser] = useState(false);
   // State for weekly navigation
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getCurrentWeekDates().start);
+  // Onboarding state
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [forceShowOnboarding, setForceShowOnboarding] = useState(false);
 
   // Test user for development purposes
   const testUser = {
@@ -150,6 +155,20 @@ export default function WeeklyMealPlannerPage() {
           setActiveGoal(goal);
         } else {
           console.log("No active goal found");
+        }
+      }
+
+      // Check if user should see onboarding (only for real users, not test users)
+      if (!useTestUser) {
+        try {
+          const prefs = await getUserPreferences(effectiveUser!.uid);
+          const hasSeenOnboarding = prefs?.hasSeenOnboarding || false;
+          if (!hasSeenOnboarding) {
+            setShowOnboarding(true);
+          }
+        } catch (error) {
+          console.error('Error checking onboarding status:', error);
+          // If we can't check, don't show onboarding to avoid interrupting the user
         }
       }
       
@@ -528,6 +547,17 @@ export default function WeeklyMealPlannerPage() {
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
+
+              {/* Testing/Demo Button for Onboarding */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowOnboarding(true)}
+                className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Tour
+              </Button>
             </div>
           </div>
           
@@ -656,6 +686,16 @@ export default function WeeklyMealPlannerPage() {
             </Button>
           </div>
         )}
+
+        {/* Onboarding Flow */}
+        <OnboardingFlow
+          isOpen={showOnboarding}
+          onClose={() => setShowOnboarding(false)}
+          onComplete={() => {
+            setShowOnboarding(false);
+            toast.success('Welcome to WhatToEat! Start planning your perfect week.');
+          }}
+        />
       </div>
     </MainLayout>
   );
