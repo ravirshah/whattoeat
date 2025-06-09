@@ -163,8 +163,20 @@ export default function WeeklyMealPlannerPage() {
         try {
           const prefs = await getUserPreferences(effectiveUser!.uid);
           const hasSeenOnboarding = prefs?.hasSeenOnboarding || false;
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Onboarding check - User preferences:', prefs);
+            console.log('Onboarding check - hasSeenOnboarding:', hasSeenOnboarding);
+          }
+          
           if (!hasSeenOnboarding) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Showing onboarding for first-time user');
+            }
             setShowOnboarding(true);
+          } else {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('User has already seen onboarding, skipping');
+            }
           }
         } catch (error) {
           console.error('Error checking onboarding status:', error);

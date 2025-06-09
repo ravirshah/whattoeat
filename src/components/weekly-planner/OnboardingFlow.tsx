@@ -79,11 +79,18 @@ const OnboardingFlow = ({ isOpen, onClose, onComplete }: OnboardingFlowProps) =>
   const handleComplete = async () => {
     if (currentUser) {
       try {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Completing onboarding for user:', currentUser.uid);
+        }
+        
         // Get current preferences
         const currentPrefs = await getUserPreferences(currentUser.uid);
         
-        // Update to mark onboarding as seen
-        await updateUserPreferences(currentUser.uid, {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Current user preferences before update:', currentPrefs);
+        }
+        
+        const updatedPrefs = {
           ingredients: currentPrefs?.ingredients || [],
           equipment: currentPrefs?.equipment || [],
           staples: currentPrefs?.staples || [],
@@ -94,13 +101,25 @@ const OnboardingFlow = ({ isOpen, onClose, onComplete }: OnboardingFlowProps) =>
           healthDataConsent: currentPrefs?.healthDataConsent || false,
           lastHealthDataSync: currentPrefs?.lastHealthDataSync,
           hasSeenOnboarding: true
-        });
+        };
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Updating preferences with:', updatedPrefs);
+        }
+        
+        // Update to mark onboarding as seen
+        await updateUserPreferences(currentUser.uid, updatedPrefs);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Onboarding completion saved successfully');
+        }
 
         toast.success('Welcome to WhatToEat!', {
           description: 'You\'re all set to start planning amazing meals.'
         });
       } catch (error) {
         console.error('Error completing onboarding:', error);
+        toast.error('Failed to save onboarding completion. Please try again.');
       }
     }
 

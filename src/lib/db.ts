@@ -65,9 +65,10 @@ import {
     try {
       const userDocRef = doc(db, "users", userId);
       
-      await updateDoc(userDocRef, {
+      // Use setDoc with merge to handle cases where user document might not exist or be incomplete
+      await setDoc(userDocRef, {
         preferences: preferences
-      });
+      }, { merge: true });
     } catch (error) {
       console.error("Error updating user preferences:", error);
       throw error;
