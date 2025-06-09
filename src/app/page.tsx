@@ -339,7 +339,7 @@ export default function Home() {
                 <Calendar className="ml-2 h-5 w-5" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-emerald-600" asChild>
+            <Button size="lg" variant="outline" className="!border-white !text-white !bg-transparent hover:!bg-white hover:!text-emerald-600" asChild>
               <Link href="/generate" className="inline-flex items-center">
                 Generate Recipes
                 <ChevronRight className="ml-2 h-5 w-5" />
