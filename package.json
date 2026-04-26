@@ -20,12 +20,11 @@
     "kanban:seed": "bun scripts/seed-kanban.ts",
     "prepare": "husky",
     "engine:eval": "bun scripts/run-eval.ts",
-    "engine:eval:ci": "bun scripts/run-eval.ts --ci"
+    "engine:eval:ci": "bun scripts/run-eval.ts --ci",
+    "icons:generate": "bun run scripts/generate-icons.ts",
+    "pwa:assert": "bun run scripts/assert-pwa-build.ts"
   },
   "dependencies": {
-    "@sentry/nextjs": "^8.0.0",
-    "@upstash/redis": "^1.34.0",
-    "@upstash/ratelimit": "^2.0.0",
     "@fontsource/geist-mono": "^5.2.7",
     "@fontsource/geist-sans": "^5.2.5",
     "@google/generative-ai": "^0.21.0",
@@ -38,8 +37,11 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@sentry/nextjs": "^8.0.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.0",
+    "@upstash/ratelimit": "^2.0.0",
+    "@upstash/redis": "^1.34.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -52,6 +54,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "vaul": "^1.1.2",
+    "workbox-window": "^7.4.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

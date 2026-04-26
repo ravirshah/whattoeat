@@ -1,0 +1,37 @@
+{
+  "name": "WhatToEat",
+  "short_name": "WhatToEat",
+  "description": "Personal meal-decision engine. Pantry + goals + daily check-in -> recommended meals.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#D97706",
+  "theme_color": "#D97706",
+  "prefer_related_applications": false,
+  "categories": ["food", "health", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Pantry",
+      "short_name": "Pantry",
+      "description": "View and edit your pantry",
+      "url": "/pantry?source=pwa-shortcut",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Feed Me",
+      "short_name": "Feed Me",
+      "description": "Get a meal recommendation",
+      "url": "/feed-me?source=pwa-shortcut",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}
