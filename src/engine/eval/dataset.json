@@ -1,11 +1,11 @@
 [
   {
     "id": "cut-01",
-    "label": "Cutting day — dinner, stocked pantry",
+    "label": "Cutting day \u2014 dinner, stocked pantry",
     "ctx": {
       "pantry": [
         {
-          "id": "p1",
+          "id": "00000000-0000-0001-0000-000000000001",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "chicken breast",
           "display_name": "Chicken Breast",
@@ -14,7 +14,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p2",
+          "id": "00000000-0000-0001-0000-000000000002",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "white rice",
           "display_name": "White Rice",
@@ -23,7 +23,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p3",
+          "id": "00000000-0000-0001-0000-000000000003",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "broccoli",
           "display_name": "Broccoli",
@@ -36,7 +36,12 @@
         "user_id": "00000000-0000-0000-0000-000000000001",
         "display_name": "Eval User",
         "goal": "cut",
-        "targets": { "kcal": 1600, "protein_g": 150, "carbs_g": 130, "fat_g": 50 },
+        "targets": {
+          "kcal": 1600,
+          "protein_g": 150,
+          "carbs_g": 130,
+          "fat_g": 50
+        },
         "height_cm": 175,
         "weight_kg": 80,
         "birthdate": "1990-01-01",
@@ -50,7 +55,7 @@
         "updated_at": "2026-04-26T00:00:00.000Z"
       },
       "checkin": {
-        "id": "c1",
+        "id": "00000000-0000-0002-0000-000000000001",
         "user_id": "00000000-0000-0000-0000-000000000001",
         "date": "2026-04-26",
         "energy": 3,
@@ -59,22 +64,24 @@
         "note": null,
         "created_at": "2026-04-26T00:00:00.000Z"
       },
-      "request": { "mealType": "dinner", "candidateCount": 3 }
+      "request": {
+        "mealType": "dinner",
+        "candidateCount": 3
+      }
     },
     "rubric": {
       "minCandidates": 1,
       "expectError": false,
-      "forbiddenIngredients": [],
-      "maxMinutes": null
+      "forbiddenIngredients": []
     }
   },
   {
     "id": "bulk-01",
-    "label": "Bulk training day — hard session, high protein",
+    "label": "Bulk training day \u2014 hard session, high protein",
     "ctx": {
       "pantry": [
         {
-          "id": "p1",
+          "id": "00000000-0000-0001-0000-000000000001",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "ground beef",
           "display_name": "Ground Beef",
@@ -83,7 +90,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p2",
+          "id": "00000000-0000-0001-0000-000000000002",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "pasta",
           "display_name": "Pasta",
@@ -92,7 +99,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p3",
+          "id": "00000000-0000-0001-0000-000000000003",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "eggs",
           "display_name": "Eggs",
@@ -105,7 +112,12 @@
         "user_id": "00000000-0000-0000-0000-000000000001",
         "display_name": "Eval User",
         "goal": "bulk",
-        "targets": { "kcal": 3000, "protein_g": 220, "carbs_g": 350, "fat_g": 90 },
+        "targets": {
+          "kcal": 3000,
+          "protein_g": 220,
+          "carbs_g": 350,
+          "fat_g": 90
+        },
         "height_cm": 180,
         "weight_kg": 85,
         "birthdate": "1992-06-15",
@@ -119,7 +131,7 @@
         "updated_at": "2026-04-26T00:00:00.000Z"
       },
       "checkin": {
-        "id": "c2",
+        "id": "00000000-0000-0002-0000-000000000002",
         "user_id": "00000000-0000-0000-0000-000000000001",
         "date": "2026-04-26",
         "energy": 5,
@@ -128,22 +140,24 @@
         "note": null,
         "created_at": "2026-04-26T00:00:00.000Z"
       },
-      "request": { "mealType": "any", "candidateCount": 3 }
+      "request": {
+        "mealType": "any",
+        "candidateCount": 3
+      }
     },
     "rubric": {
       "minCandidates": 1,
       "expectError": false,
-      "forbiddenIngredients": [],
-      "maxMinutes": null
+      "forbiddenIngredients": []
     }
   },
   {
     "id": "allergy-peanut-01",
-    "label": "Peanut allergy — no peanut in any candidate",
+    "label": "Peanut allergy \u2014 no peanut in any candidate",
     "ctx": {
       "pantry": [
         {
-          "id": "p1",
+          "id": "00000000-0000-0001-0000-000000000001",
           "user_id": "00000000-0000-0000-0000-000000000002",
           "name": "chicken breast",
           "display_name": "Chicken Breast",
@@ -152,7 +166,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p2",
+          "id": "00000000-0000-0001-0000-000000000002",
           "user_id": "00000000-0000-0000-0000-000000000002",
           "name": "white rice",
           "display_name": "White Rice",
@@ -165,7 +179,12 @@
         "user_id": "00000000-0000-0000-0000-000000000002",
         "display_name": "Allergy User",
         "goal": "maintain",
-        "targets": { "kcal": 2000, "protein_g": 150, "carbs_g": 200, "fat_g": 65 },
+        "targets": {
+          "kcal": 2000,
+          "protein_g": 150,
+          "carbs_g": 200,
+          "fat_g": 65
+        },
         "height_cm": 165,
         "weight_kg": 60,
         "birthdate": "1995-03-20",
@@ -178,22 +197,24 @@
         "created_at": "2026-04-26T00:00:00.000Z",
         "updated_at": "2026-04-26T00:00:00.000Z"
       },
-      "request": { "mealType": "lunch", "candidateCount": 2 }
+      "request": {
+        "mealType": "lunch",
+        "candidateCount": 2
+      }
     },
     "rubric": {
       "minCandidates": 1,
       "expectError": false,
-      "forbiddenIngredients": ["peanut"],
-      "maxMinutes": null
+      "forbiddenIngredients": ["peanut"]
     }
   },
   {
     "id": "allergy-shellfish-01",
-    "label": "Shellfish allergy — no shellfish in any candidate",
+    "label": "Shellfish allergy \u2014 no shellfish in any candidate",
     "ctx": {
       "pantry": [
         {
-          "id": "p1",
+          "id": "00000000-0000-0001-0000-000000000001",
           "user_id": "00000000-0000-0000-0000-000000000003",
           "name": "salmon",
           "display_name": "Salmon",
@@ -202,7 +223,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p2",
+          "id": "00000000-0000-0001-0000-000000000002",
           "user_id": "00000000-0000-0000-0000-000000000003",
           "name": "quinoa",
           "display_name": "Quinoa",
@@ -215,7 +236,12 @@
         "user_id": "00000000-0000-0000-0000-000000000003",
         "display_name": "Shellfish Allergy User",
         "goal": "maintain",
-        "targets": { "kcal": 1900, "protein_g": 140, "carbs_g": 190, "fat_g": 60 },
+        "targets": {
+          "kcal": 1900,
+          "protein_g": 140,
+          "carbs_g": 190,
+          "fat_g": 60
+        },
         "height_cm": 170,
         "weight_kg": 68,
         "birthdate": "1988-11-01",
@@ -228,22 +254,24 @@
         "created_at": "2026-04-26T00:00:00.000Z",
         "updated_at": "2026-04-26T00:00:00.000Z"
       },
-      "request": { "mealType": "dinner", "candidateCount": 3 }
+      "request": {
+        "mealType": "dinner",
+        "candidateCount": 3
+      }
     },
     "rubric": {
       "minCandidates": 1,
       "expectError": false,
-      "forbiddenIngredients": ["shellfish", "shrimp", "crab", "lobster"],
-      "maxMinutes": null
+      "forbiddenIngredients": ["shellfish", "shrimp", "crab", "lobster"]
     }
   },
   {
     "id": "low-sleep-quick-01",
-    "label": "Low sleep — quick meal under 15 min",
+    "label": "Low sleep \u2014 quick meal under 15 min",
     "ctx": {
       "pantry": [
         {
-          "id": "p1",
+          "id": "00000000-0000-0001-0000-000000000001",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "greek yogurt",
           "display_name": "Greek Yogurt",
@@ -252,7 +280,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p2",
+          "id": "00000000-0000-0001-0000-000000000002",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "banana",
           "display_name": "Banana",
@@ -265,7 +293,12 @@
         "user_id": "00000000-0000-0000-0000-000000000001",
         "display_name": "Eval User",
         "goal": "maintain",
-        "targets": { "kcal": 2000, "protein_g": 150, "carbs_g": 200, "fat_g": 65 },
+        "targets": {
+          "kcal": 2000,
+          "protein_g": 150,
+          "carbs_g": 200,
+          "fat_g": 65
+        },
         "height_cm": 175,
         "weight_kg": 75,
         "birthdate": "1990-01-01",
@@ -279,7 +312,7 @@
         "updated_at": "2026-04-26T00:00:00.000Z"
       },
       "checkin": {
-        "id": "c5",
+        "id": "00000000-0000-0002-0000-000000000005",
         "user_id": "00000000-0000-0000-0000-000000000001",
         "date": "2026-04-26",
         "energy": 1,
@@ -288,8 +321,17 @@
         "note": null,
         "created_at": "2026-04-26T00:00:00.000Z"
       },
-      "signals": { "sleep": { "lastNightHours": 4, "quality": "poor" } },
-      "request": { "mealType": "breakfast", "timeBudgetMin": 15, "candidateCount": 2 }
+      "signals": {
+        "sleep": {
+          "lastNightHours": 4,
+          "quality": "poor"
+        }
+      },
+      "request": {
+        "mealType": "breakfast",
+        "timeBudgetMin": 15,
+        "candidateCount": 2
+      }
     },
     "rubric": {
       "minCandidates": 1,
@@ -300,11 +342,11 @@
   },
   {
     "id": "bulk-training-day-02",
-    "label": "Bulk — post-workout lunch, need calorie surplus",
+    "label": "Bulk \u2014 post-workout lunch, need calorie surplus",
     "ctx": {
       "pantry": [
         {
-          "id": "p1",
+          "id": "00000000-0000-0001-0000-000000000001",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "eggs",
           "display_name": "Eggs",
@@ -313,7 +355,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p2",
+          "id": "00000000-0000-0001-0000-000000000002",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "oats",
           "display_name": "Oats",
@@ -322,7 +364,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p3",
+          "id": "00000000-0000-0001-0000-000000000003",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "almond butter",
           "display_name": "Almond Butter",
@@ -335,7 +377,12 @@
         "user_id": "00000000-0000-0000-0000-000000000001",
         "display_name": "Eval User",
         "goal": "bulk",
-        "targets": { "kcal": 3200, "protein_g": 230, "carbs_g": 370, "fat_g": 100 },
+        "targets": {
+          "kcal": 3200,
+          "protein_g": 230,
+          "carbs_g": 370,
+          "fat_g": 100
+        },
         "height_cm": 182,
         "weight_kg": 88,
         "birthdate": "1993-07-22",
@@ -349,7 +396,7 @@
         "updated_at": "2026-04-26T00:00:00.000Z"
       },
       "checkin": {
-        "id": "c6",
+        "id": "00000000-0000-0002-0000-000000000006",
         "user_id": "00000000-0000-0000-0000-000000000001",
         "date": "2026-04-26",
         "energy": 4,
@@ -358,22 +405,24 @@
         "note": null,
         "created_at": "2026-04-26T00:00:00.000Z"
       },
-      "request": { "mealType": "lunch", "candidateCount": 3 }
+      "request": {
+        "mealType": "lunch",
+        "candidateCount": 3
+      }
     },
     "rubric": {
       "minCandidates": 1,
       "expectError": false,
-      "forbiddenIngredients": [],
-      "maxMinutes": null
+      "forbiddenIngredients": []
     }
   },
   {
     "id": "bare-pantry-01",
-    "label": "Bare pantry — only eggs + salt available",
+    "label": "Bare pantry \u2014 only eggs + salt available",
     "ctx": {
       "pantry": [
         {
-          "id": "p1",
+          "id": "00000000-0000-0001-0000-000000000001",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "eggs",
           "display_name": "Eggs",
@@ -382,7 +431,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p2",
+          "id": "00000000-0000-0001-0000-000000000002",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "salt",
           "display_name": "Salt",
@@ -395,7 +444,12 @@
         "user_id": "00000000-0000-0000-0000-000000000001",
         "display_name": "Eval User",
         "goal": "maintain",
-        "targets": { "kcal": 2000, "protein_g": 150, "carbs_g": 200, "fat_g": 65 },
+        "targets": {
+          "kcal": 2000,
+          "protein_g": 150,
+          "carbs_g": 200,
+          "fat_g": 65
+        },
         "height_cm": 175,
         "weight_kg": 75,
         "birthdate": "1990-01-01",
@@ -408,22 +462,24 @@
         "created_at": "2026-04-26T00:00:00.000Z",
         "updated_at": "2026-04-26T00:00:00.000Z"
       },
-      "request": { "mealType": "any", "candidateCount": 2 }
+      "request": {
+        "mealType": "any",
+        "candidateCount": 2
+      }
     },
     "rubric": {
       "minCandidates": 1,
       "expectError": false,
-      "forbiddenIngredients": [],
-      "maxMinutes": null
+      "forbiddenIngredients": []
     }
   },
   {
     "id": "multi-allergy-01",
-    "label": "Multiple allergies — peanut + tree nuts + shellfish",
+    "label": "Multiple allergies \u2014 peanut + tree nuts + shellfish",
     "ctx": {
       "pantry": [
         {
-          "id": "p1",
+          "id": "00000000-0000-0001-0000-000000000001",
           "user_id": "00000000-0000-0000-0000-000000000004",
           "name": "chicken breast",
           "display_name": "Chicken Breast",
@@ -432,7 +488,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p2",
+          "id": "00000000-0000-0001-0000-000000000002",
           "user_id": "00000000-0000-0000-0000-000000000004",
           "name": "sweet potato",
           "display_name": "Sweet Potato",
@@ -445,7 +501,12 @@
         "user_id": "00000000-0000-0000-0000-000000000004",
         "display_name": "Multi-Allergy User",
         "goal": "maintain",
-        "targets": { "kcal": 1800, "protein_g": 130, "carbs_g": 180, "fat_g": 58 },
+        "targets": {
+          "kcal": 1800,
+          "protein_g": 130,
+          "carbs_g": 180,
+          "fat_g": 58
+        },
         "height_cm": 162,
         "weight_kg": 55,
         "birthdate": "1997-09-14",
@@ -458,22 +519,24 @@
         "created_at": "2026-04-26T00:00:00.000Z",
         "updated_at": "2026-04-26T00:00:00.000Z"
       },
-      "request": { "mealType": "dinner", "candidateCount": 2 }
+      "request": {
+        "mealType": "dinner",
+        "candidateCount": 2
+      }
     },
     "rubric": {
       "minCandidates": 1,
       "expectError": false,
-      "forbiddenIngredients": ["peanut", "almond", "cashew", "walnut", "shrimp", "crab"],
-      "maxMinutes": null
+      "forbiddenIngredients": ["peanut", "almond", "cashew", "walnut", "shrimp", "crab"]
     }
   },
   {
     "id": "time-budget-20-01",
-    "label": "Time budget 20 min — fast meal required",
+    "label": "Time budget 20 min \u2014 fast meal required",
     "ctx": {
       "pantry": [
         {
-          "id": "p1",
+          "id": "00000000-0000-0001-0000-000000000001",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "canned tuna",
           "display_name": "Canned Tuna",
@@ -482,7 +545,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p2",
+          "id": "00000000-0000-0001-0000-000000000002",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "whole wheat bread",
           "display_name": "Whole Wheat Bread",
@@ -491,7 +554,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p3",
+          "id": "00000000-0000-0001-0000-000000000003",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "lettuce",
           "display_name": "Lettuce",
@@ -504,7 +567,12 @@
         "user_id": "00000000-0000-0000-0000-000000000001",
         "display_name": "Eval User",
         "goal": "cut",
-        "targets": { "kcal": 1600, "protein_g": 140, "carbs_g": 130, "fat_g": 50 },
+        "targets": {
+          "kcal": 1600,
+          "protein_g": 140,
+          "carbs_g": 130,
+          "fat_g": 50
+        },
         "height_cm": 175,
         "weight_kg": 78,
         "birthdate": "1991-04-05",
@@ -517,7 +585,11 @@
         "created_at": "2026-04-26T00:00:00.000Z",
         "updated_at": "2026-04-26T00:00:00.000Z"
       },
-      "request": { "mealType": "lunch", "timeBudgetMin": 20, "candidateCount": 2 }
+      "request": {
+        "mealType": "lunch",
+        "timeBudgetMin": 20,
+        "candidateCount": 2
+      }
     },
     "rubric": {
       "minCandidates": 1,
@@ -528,11 +600,11 @@
   },
   {
     "id": "snack-01",
-    "label": "Snack request — mealType snack, small calorie target",
+    "label": "Snack request \u2014 mealType snack, small calorie target",
     "ctx": {
       "pantry": [
         {
-          "id": "p1",
+          "id": "00000000-0000-0001-0000-000000000001",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "greek yogurt",
           "display_name": "Greek Yogurt",
@@ -541,7 +613,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p2",
+          "id": "00000000-0000-0001-0000-000000000002",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "blueberries",
           "display_name": "Blueberries",
@@ -550,7 +622,7 @@
           "added_at": "2026-04-26T00:00:00.000Z"
         },
         {
-          "id": "p3",
+          "id": "00000000-0000-0001-0000-000000000003",
           "user_id": "00000000-0000-0000-0000-000000000001",
           "name": "almonds",
           "display_name": "Almonds",
@@ -563,7 +635,12 @@
         "user_id": "00000000-0000-0000-0000-000000000001",
         "display_name": "Eval User",
         "goal": "maintain",
-        "targets": { "kcal": 2000, "protein_g": 150, "carbs_g": 200, "fat_g": 65 },
+        "targets": {
+          "kcal": 2000,
+          "protein_g": 150,
+          "carbs_g": 200,
+          "fat_g": 65
+        },
         "height_cm": 168,
         "weight_kg": 62,
         "birthdate": "1994-02-28",
@@ -576,7 +653,11 @@
         "created_at": "2026-04-26T00:00:00.000Z",
         "updated_at": "2026-04-26T00:00:00.000Z"
       },
-      "request": { "mealType": "snack", "timeBudgetMin": 5, "candidateCount": 1 }
+      "request": {
+        "mealType": "snack",
+        "timeBudgetMin": 5,
+        "candidateCount": 1
+      }
     },
     "rubric": {
       "minCandidates": 1,
