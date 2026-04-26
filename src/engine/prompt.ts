@@ -87,7 +87,14 @@ export type RationaleResponse = z.infer<typeof RationaleResponseSchema>;
 
 /** Serialise context deterministically (sorted keys) for cache-eligibility. */
 function stableJson(value: unknown): string {
-  return JSON.stringify(value, Object.keys(value as object).sort() as never);
+  return JSON.stringify(value, (_key, val) => {
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      return Object.fromEntries(
+        Object.entries(val as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)),
+      );
+    }
+    return val;
+  });
 }
 
 export const SYSTEM_PROMPT_BASE = `You are a personal meal-recommendation engine.
