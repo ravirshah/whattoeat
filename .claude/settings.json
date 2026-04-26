@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun run typecheck)",
+      "Bash(bun run lint)",
+      "Bash(bun run test *)",
+      "Bash(bun run test)",
+      "Bash(bun --version)",
+      "Bash(bun install)",
+      "Bash(bun install *)",
+      "Bash(mkdir -p *)",
+      "Bash(mkdir *)",
+      "Write(**)",
+      "Edit(**)",
+      "Read(**)"
+    ]
+  }
+}

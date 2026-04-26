@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import type { Profile } from '@/contracts/zod/profile';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useActionState } from 'react';
 
 type FormState = { ok: true; value: undefined } | { ok: false; error: string };
@@ -27,20 +27,47 @@ const SEX_OPTIONS = [
 type ActivityLevelValue = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
 type SexValue = 'male' | 'female';
 
-interface BodyDataStepProps {
-  profile: Partial<Profile> | null;
-}
-
 async function bodyDataStepAdapter(_prev: FormState, formData: FormData): Promise<FormState> {
   const result = await submitBodyDataStep({ ok: true, value: undefined }, formData);
   if (!result.ok) return { ok: false, error: result.error.message };
   return { ok: true, value: undefined };
 }
 
+interface BodyDataStepProps {
+  profile: Partial<Profile> | null;
+}
+
+// cm → ft/in for prefilling existing profiles.
+function cmToFtIn(cm: number | null | undefined): { ft: string; inch: string } {
+  if (!cm || cm <= 0) return { ft: '', inch: '' };
+  const totalInches = cm / 2.54;
+  const ft = Math.floor(totalInches / 12);
+  const inch = Math.round(totalInches - ft * 12);
+  // Carry 12 in -> +1 ft.
+  if (inch === 12) return { ft: String(ft + 1), inch: '0' };
+  return { ft: String(ft), inch: String(inch) };
+}
+
+function kgToLb(kg: number | null | undefined): string {
+  if (!kg || kg <= 0) return '';
+  return (kg * 2.2046226218).toFixed(1).replace(/\.0$/, '');
+}
+
 export function BodyDataStep({ profile }: BodyDataStepProps) {
   const initialState: FormState = { ok: true, value: undefined };
   const [state, formAction, pending] = useActionState(bodyDataStepAdapter, initialState);
 
+  const initial = useMemo(
+    () => ({
+      ...cmToFtIn(profile?.height_cm),
+      lb: kgToLb(profile?.weight_kg),
+    }),
+    [profile?.height_cm, profile?.weight_kg],
+  );
+
+  const [ft, setFt] = useState<string>(initial.ft);
+  const [inch, setInch] = useState<string>(initial.inch);
+  const [lb, setLb] = useState<string>(initial.lb);
   const [sex, setSex] = useState<SexValue>(
     (profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : 'male') as SexValue,
   );
@@ -48,52 +75,115 @@ export function BodyDataStep({ profile }: BodyDataStepProps) {
     (profile?.activity_level as ActivityLevelValue) ?? 'moderate',
   );
 
+  // Convert UI-units to server-units. The server contract still expects
+  // height_cm and weight_kg, so we compute and ship those via hidden inputs.
+  const height_cm = useMemo(() => {
+    const f = Number.parseFloat(ft || '0');
+    const i = Number.parseFloat(inch || '0');
+    if (Number.isNaN(f) || Number.isNaN(i)) return '';
+    const cm = (f * 12 + i) * 2.54;
+    return cm > 0 ? cm.toFixed(1) : '';
+  }, [ft, inch]);
+
+  const weight_kg = useMemo(() => {
+    const lbs = Number.parseFloat(lb || '0');
+    if (Number.isNaN(lbs)) return '';
+    const kg = lbs / 2.2046226218;
+    return kg > 0 ? kg.toFixed(2) : '';
+  }, [lb]);
+
+  // Sensible default DOB anchor: 30 years ago — keeps the native picker
+  // from opening on the current month and forcing 30+ taps back.
+  const dobDefault = useMemo(() => {
+    if (profile?.birthdate) return profile.birthdate;
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 30);
+    return d.toISOString().slice(0, 10);
+  }, [profile?.birthdate]);
+
   return (
-    <form action={formAction} className="space-y-5">
-      {/* Hidden inputs for controlled fields */}
+    <form action={formAction} className="space-y-6">
+      {/* Hidden inputs for server contract */}
+      <input type="hidden" name="height_cm" value={height_cm} />
+      <input type="hidden" name="weight_kg" value={weight_kg} />
       <input type="hidden" name="sex" value={sex} />
       <input type="hidden" name="activity_level" value={activityLevel} />
 
-      {/* Height */}
+      {/* Height — ft / in */}
       <div className="space-y-1.5">
-        <Label htmlFor="height_cm">Height (cm)</Label>
-        <Input
-          id="height_cm"
-          name="height_cm"
-          type="number"
-          min={100}
-          max={250}
-          step={1}
-          placeholder="e.g. 175"
-          defaultValue={profile?.height_cm ?? ''}
-          required
-        />
+        <Label htmlFor="height_ft">Height</Label>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="relative">
+            <Input
+              id="height_ft"
+              type="number"
+              inputMode="numeric"
+              min={3}
+              max={8}
+              step={1}
+              placeholder="5"
+              value={ft}
+              onChange={(e) => setFt(e.target.value)}
+              required
+              className="pr-10"
+            />
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
+              ft
+            </span>
+          </div>
+          <div className="relative">
+            <Input
+              id="height_in"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={11}
+              step={1}
+              placeholder="10"
+              value={inch}
+              onChange={(e) => setInch(e.target.value)}
+              required
+              className="pr-10"
+            />
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
+              in
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Weight */}
+      {/* Weight — lbs */}
       <div className="space-y-1.5">
-        <Label htmlFor="weight_kg">Weight (kg)</Label>
-        <Input
-          id="weight_kg"
-          name="weight_kg"
-          type="number"
-          min={30}
-          max={300}
-          step={0.1}
-          placeholder="e.g. 72.5"
-          defaultValue={profile?.weight_kg ?? ''}
-          required
-        />
+        <Label htmlFor="weight_lb">Weight</Label>
+        <div className="relative">
+          <Input
+            id="weight_lb"
+            type="number"
+            inputMode="decimal"
+            min={60}
+            max={660}
+            step={0.1}
+            placeholder="160"
+            value={lb}
+            onChange={(e) => setLb(e.target.value)}
+            required
+            className="pr-12"
+          />
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
+            lbs
+          </span>
+        </div>
       </div>
 
-      {/* Birthdate */}
+      {/* Birthdate — native picker */}
       <div className="space-y-1.5">
         <Label htmlFor="birthdate">Date of birth</Label>
         <Input
           id="birthdate"
           name="birthdate"
           type="date"
-          defaultValue={profile?.birthdate ?? ''}
+          defaultValue={dobDefault}
+          max={new Date().toISOString().slice(0, 10)}
           required
         />
       </div>

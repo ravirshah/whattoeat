@@ -4,4 +4,4 @@
 // Manifest spec requires literal hex colors.
 
 export const THEME_COLOR_LIGHT = '#D97706';
-export const THEME_COLOR_DARK = '#FBBF24';
+export const THEME_COLOR_DARK = '#FCD34D';

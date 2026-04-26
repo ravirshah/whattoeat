@@ -78,42 +78,44 @@
    Both modes hit WCAG AA contrast.
 ──────────────────────────────────────────────────────────────── */
 .dark {
-  /* Surfaces */
-  --surface: 10 10 10;
-  --surface-elevated: 20 20 20;
-  --surface-overlay: 28 28 28;
+  /* Surfaces — warm near-black inspired by Apple HIG.
+     Slight warmth (R=G+1, G=B-2) keeps OLED from feeling clinical;
+     each step adds ~10 units of luminance for clear elevation. */
+  --surface: 14 14 16;
+  --surface-elevated: 24 24 28;
+  --surface-overlay: 36 36 40;
 
-  /* Text */
-  --text: 242 242 242;
-  --text-muted: 163 163 163;
-  --text-placeholder: 82 82 82;
+  /* Text — system gray scale, warmer than pure white. */
+  --text: 245 245 247;
+  --text-muted: 161 161 170; /* slate-400 — readable but recessive */
+  --text-placeholder: 113 113 122;
 
-  /* Accent */
-  --accent: 251 191 36; /* amber-400 — brighter in dark */
-  --accent-fg: 15 15 15;
-  --accent-hover: 253 211 77;
+  /* Accent — amber-300 (less saturated than 400) reads softer on dark. */
+  --accent: 252 211 77;
+  --accent-fg: 24 24 28;
+  --accent-hover: 253 224 121;
 
   /* Warm */
-  --warm: 67 20 7; /* dark amber bg */
-  --warm-fg: 253 186 116; /* orange-300 text */
+  --warm: 67 20 7;
+  --warm-fg: 253 186 116;
   --warm-subtle: 55 16 5;
 
   /* Cool */
-  --cool: 7 37 61; /* dark sky bg */
-  --cool-fg: 125 211 252; /* sky-300 text */
+  --cool: 7 37 61;
+  --cool-fg: 125 211 252;
   --cool-subtle: 5 28 49;
 
   /* Status */
-  --ok: 22 163 74;
-  --ok-fg: 255 255 255;
-  --warn: 202 138 4;
-  --warn-fg: 255 255 255;
-  --err: 220 38 38;
-  --err-fg: 255 255 255;
+  --ok: 34 197 94;
+  --ok-fg: 14 14 16;
+  --warn: 234 179 8;
+  --warn-fg: 14 14 16;
+  --err: 248 113 113; /* red-400 — softer in dark */
+  --err-fg: 24 24 28;
 
-  /* Border & Ring */
-  --border: 38 38 38;
-  --ring: 251 191 36;
+  /* Border & Ring — visible but quiet against elevated surfaces. */
+  --border: 44 44 50;
+  --ring: 252 211 77;
 
   /* Category palette (slightly desaturated for dark mode harmony) */
   --cat-protein: 234 88 12;

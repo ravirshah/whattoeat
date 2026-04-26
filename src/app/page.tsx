@@ -3,6 +3,7 @@
 // Server Component. Responsive: mobile (stacked), desktop (multi-column).
 
 import { Button } from '@/components/ui/button';
+import { getUserId } from '@/server/auth';
 import {
   ArrowRightIcon,
   ChefHatIcon,
@@ -14,8 +15,16 @@ import {
   UtensilsIcon,
 } from 'lucide-react';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // If already signed in, jump straight to the app — keeps the landing page
+  // for visitors only, and avoids a "I just signed in but I'm still here" loop.
+  const userId = await getUserId();
+  if (userId) {
+    redirect('/home');
+  }
+
   return (
     <div className="min-h-dvh bg-background text-foreground">
       <SiteHeader />

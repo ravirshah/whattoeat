@@ -19,7 +19,7 @@ export default async function LoginPage({ searchParams }: Props) {
           <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
           <p className="text-sm text-muted-foreground">Enter your email to receive a magic link.</p>
         </div>
-        <SignInForm next={next ?? '/'} />
+        <SignInForm next={next ?? '/home'} />
       </div>
     </main>
   );

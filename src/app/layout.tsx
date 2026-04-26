@@ -70,7 +70,7 @@ export const viewport: Viewport = {
   minimumScale: 1,
   maximumScale: 5,
   viewportFit: 'cover',
-  // themeColor matches --accent (#D97706 light, #FBBF24 dark).
+  // themeColor matches --accent (#D97706 light, #FCD34D dark).
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: THEME_COLOR_LIGHT },
     { media: '(prefers-color-scheme: dark)', color: THEME_COLOR_DARK },

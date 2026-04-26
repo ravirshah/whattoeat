@@ -4,6 +4,7 @@ import { submitGoalStep } from '@/app/onboarding/step/[step]/actions';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/utils';
 import type { Profile } from '@/contracts/zod/profile';
+import { CheckIcon, FlameIcon, ScaleIcon, TrendingUpIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useActionState } from 'react';
 
@@ -13,20 +14,20 @@ const GOALS = [
   {
     value: 'cut' as const,
     label: 'Lose weight',
-    emoji: '🔥',
-    description: 'Create a calorie deficit to shed fat while preserving muscle.',
+    description: 'Calorie deficit, preserve muscle.',
+    Icon: FlameIcon,
   },
   {
     value: 'maintain' as const,
     label: 'Stay balanced',
-    emoji: '⚖️',
-    description: 'Eat at maintenance and feel consistently energized.',
+    description: 'Eat at maintenance, feel steady.',
+    Icon: ScaleIcon,
   },
   {
     value: 'bulk' as const,
     label: 'Build muscle',
-    emoji: '💪',
-    description: 'Eat at a surplus to fuel strength and muscle growth.',
+    description: 'Slight surplus, fuel strength.',
+    Icon: TrendingUpIcon,
   },
 ] as const;
 
@@ -46,35 +47,66 @@ export function GoalStep({ profile }: GoalStepProps) {
   const [selected, setSelected] = useState<string>(profile?.goal ?? '');
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-6">
       <input type="hidden" name="goal" value={selected} />
 
-      <div className="grid grid-cols-1 gap-3">
-        {GOALS.map((g) => (
-          <button
-            key={g.value}
-            type="button"
-            onClick={() => setSelected(g.value)}
-            className={cn(
-              'w-full text-left rounded-xl border-2 px-4 py-3.5 transition-all duration-150',
-              'flex items-start gap-3 cursor-pointer',
-              selected === g.value
-                ? 'border-accent bg-accent/5'
-                : 'border-border bg-card hover:border-accent/50',
-            )}
-          >
-            <span className="text-2xl leading-none mt-0.5">{g.emoji}</span>
-            <div>
-              <p className="font-semibold text-foreground text-sm">{g.label}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{g.description}</p>
-            </div>
-          </button>
-        ))}
-      </div>
+      <fieldset className="contents">
+        <legend className="sr-only">Goal</legend>
+        <div className="grid grid-cols-1 gap-2.5">
+          {GOALS.map(({ value, label, description, Icon }) => {
+            const active = selected === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setSelected(value)}
+                className={cn(
+                  'group relative w-full text-left rounded-2xl border bg-card px-4 py-4',
+                  'flex items-center gap-4 transition-all duration-150',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  active
+                    ? 'border-accent shadow-[0_0_0_1px_rgb(var(--accent))] bg-accent/[0.04]'
+                    : 'border-border hover:border-accent/40 hover:bg-surface-elevated',
+                )}
+              >
+                <div
+                  className={cn(
+                    'flex-none h-10 w-10 rounded-xl flex items-center justify-center transition-colors',
+                    active
+                      ? 'bg-accent/10 text-accent'
+                      : 'bg-surface-elevated text-muted-foreground group-hover:text-foreground',
+                  )}
+                >
+                  <Icon className="h-5 w-5" strokeWidth={2} />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-foreground text-[15px] leading-tight">{label}</p>
+                  <p className="text-[13px] text-muted-foreground mt-0.5 leading-snug">
+                    {description}
+                  </p>
+                </div>
+
+                <div
+                  className={cn(
+                    'flex-none h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all',
+                    active ? 'border-accent bg-accent' : 'border-border',
+                  )}
+                >
+                  {active && (
+                    <CheckIcon className="h-3 w-3 text-accent-foreground" strokeWidth={3} />
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
 
       {!state.ok && <p className="text-sm text-destructive">{state.error}</p>}
 
-      <Button type="submit" disabled={!selected || pending} className="w-full mt-6">
+      <Button type="submit" disabled={!selected || pending} className="w-full">
         {pending ? 'Saving…' : 'Continue'}
       </Button>
     </form>

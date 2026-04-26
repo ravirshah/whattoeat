@@ -35,6 +35,7 @@ const config: Config = {
         accent: {
           DEFAULT: cssVar('accent'),
           fg: cssVar('accent-fg'),
+          foreground: cssVar('accent-fg'),
           hover: cssVar('accent-hover'),
         },
         warm: { DEFAULT: cssVar('warm'), fg: cssVar('warm-fg'), subtle: cssVar('warm-subtle') },
@@ -44,6 +45,37 @@ const config: Config = {
         err: { DEFAULT: cssVar('err'), fg: cssVar('err-fg') },
         border: cssVar('border'),
         ring: cssVar('ring'),
+
+        /* shadcn-style aliases — keep both naming conventions in lockstep
+           so a class like `bg-card` or `text-muted-foreground` resolves to
+           the same token used by `bg-surface-elevated` / `text-text-muted`. */
+        background: cssVar('surface'),
+        foreground: cssVar('text'),
+        card: {
+          DEFAULT: cssVar('surface-elevated'),
+          foreground: cssVar('text'),
+        },
+        popover: {
+          DEFAULT: cssVar('surface-overlay'),
+          foreground: cssVar('text'),
+        },
+        muted: {
+          DEFAULT: cssVar('surface-elevated'),
+          foreground: cssVar('text-muted'),
+        },
+        primary: {
+          DEFAULT: cssVar('accent'),
+          foreground: cssVar('accent-fg'),
+        },
+        secondary: {
+          DEFAULT: cssVar('surface-elevated'),
+          foreground: cssVar('text'),
+        },
+        destructive: {
+          DEFAULT: cssVar('err'),
+          foreground: cssVar('err-fg'),
+        },
+        input: cssVar('border'),
         cat: {
           protein: cssVar('cat-protein'),
           produce: cssVar('cat-produce'),
