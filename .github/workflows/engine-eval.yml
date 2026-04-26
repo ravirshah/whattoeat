@@ -7,6 +7,13 @@ on:
       - 'src/server/adapters/**'
       - 'src/contracts/zod/recommendation.ts'
 
+# marocchino/sticky-pull-request-comment posts back to the PR; without
+# pull-requests: write the entire job is marked failed even when the eval
+# itself succeeded.
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   eval:
     runs-on: ubuntu-latest
