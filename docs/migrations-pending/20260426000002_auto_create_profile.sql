@@ -14,8 +14,18 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (user_id, goal)
-  values (new.id, 'maintain')
+  -- profiles has NOT NULL macro target columns; supply zero placeholders
+  -- so the trigger insert succeeds.  Real targets are written when the
+  -- user finishes onboarding (see Track 6).
+  insert into public.profiles (
+    user_id,
+    goal,
+    target_kcal,
+    target_protein_g,
+    target_carbs_g,
+    target_fat_g
+  )
+  values (new.id, 'maintain', 0, 0, 0, 0)
   on conflict (user_id) do nothing;
   return new;
 end;

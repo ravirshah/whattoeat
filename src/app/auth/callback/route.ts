@@ -16,11 +16,13 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     const url = new URL('/auth/error', appUrl);
-    url.searchParams.set('reason', error.message);
+    url.searchParams.set('reason', 'exchange_failed');
     return NextResponse.redirect(url);
   }
 
-  // Redirect to the originally requested page or home.
-  const destination = next.startsWith('/') ? next : '/';
+  // Only allow same-origin relative paths. Reject protocol-relative URLs
+  // (e.g. "//evil.com") which would otherwise redirect off-site.
+  const isSafeRelative = next.startsWith('/') && !next.startsWith('//');
+  const destination = isSafeRelative ? next : '/';
   return NextResponse.redirect(new URL(destination, appUrl));
 }

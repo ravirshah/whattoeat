@@ -19,15 +19,17 @@ export async function middleware(request: NextRequest) {
 
   // Protect the authenticated route group.
   // Public routes: /auth/*, /onboarding/*, /, /api/auth/* and static files.
+  // Match exact segments so e.g. /profiles or /savedlist do not accidentally
+  // gate routes that may exist later under different prefixes.
+  const isOnSegment = (segment: string) =>
+    pathname === segment || pathname.startsWith(`${segment}/`);
   const isProtected =
     pathname.startsWith('/(authenticated)') ||
-    // Also protect any direct segment paths the auth group exposes.
-    // Add feature prefixes here as they land: /pantry, /profile, /feed-me, etc.
-    pathname.startsWith('/pantry') ||
-    pathname.startsWith('/profile') ||
-    pathname.startsWith('/feed-me') ||
-    pathname.startsWith('/saved') ||
-    pathname.startsWith('/checkin');
+    isOnSegment('/pantry') ||
+    isOnSegment('/profile') ||
+    isOnSegment('/feed-me') ||
+    isOnSegment('/saved') ||
+    isOnSegment('/checkin');
 
   if (isProtected && !user) {
     const loginUrl = new URL('/auth/login', request.url);
@@ -35,8 +37,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirect authenticated users away from auth pages.
-  if (user && pathname.startsWith('/auth/login')) {
+  // Redirect authenticated users away from auth entry pages.
+  if (user && (isOnSegment('/auth/login') || isOnSegment('/auth/signup'))) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
