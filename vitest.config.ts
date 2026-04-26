@@ -25,6 +25,8 @@ export default defineConfig({
     environmentMatchGlobs: [
       // Use happy-dom for React component tests
       ['src/app/__tests__/**', 'happy-dom'],
+      // Use happy-dom for PWA browser tests (offline badge, navigator.onLine)
+      ['tests/pwa/**', 'happy-dom'],
     ],
   },
 });
