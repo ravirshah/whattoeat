@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
 import { cn } from '@/components/ui/utils';
-import { markCooked } from '@/server/recipes/actions';
+import { markCookedById } from '@/server/recipes/actions';
 import { CheckCircleIcon, ChefHatIcon } from 'lucide-react';
 import { useState, useTransition } from 'react';
 
@@ -25,15 +25,15 @@ export function CookButton({ recipeId, recipeTitle }: CookButtonProps) {
 
   function handleCook() {
     startTransition(async () => {
-      try {
-        await markCooked(recipeId, rating ? { rating } : undefined);
+      const result = await markCookedById(recipeId, rating ? { rating } : undefined);
+      if (result.ok) {
         setCooked(true);
         setShowRating(false);
         toast.success(`${recipeTitle} added to your cooked log.`, {
           description: 'Logged!',
         });
-      } catch {
-        toast.error('Something went wrong. Please try again.');
+      } else {
+        toast.error(`Could not log — ${result.error.message}`);
       }
     });
   }

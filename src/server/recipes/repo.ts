@@ -71,12 +71,17 @@ export async function dbDeleteRecipe(supabase: SupabaseClient, id: string): Prom
 export async function dbInsertCookedLog(
   supabase: SupabaseClient,
   entry: { user_id: string; recipe_id: string; rating?: number | null; note?: string | null },
-): Promise<void> {
-  const { error } = await supabase.from('cooked_log').insert({
-    ...entry,
-    cooked_at: new Date().toISOString(),
-  });
-  if (error) throw new Error(`dbInsertCookedLog failed: ${error.message}`);
+): Promise<string> {
+  const { data, error } = await supabase
+    .from('cooked_log')
+    .insert({
+      ...entry,
+      cooked_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+  if (error || !data) throw new Error(`dbInsertCookedLog failed: ${error?.message}`);
+  return data.id as string;
 }
 
 export async function dbListCookedLog(

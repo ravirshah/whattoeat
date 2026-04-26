@@ -65,8 +65,8 @@ export function IngredientsList({
       <ul className="flex flex-col divide-y divide-border">
         {ingredients.map((ing, i) => {
           const inPantry = pantrySet.has(ing.name.toLowerCase());
-          const qty =
-            ing.qty != null ? (ing.qty * multiplier).toFixed(ing.qty % 1 === 0 ? 0 : 1) : null;
+          const scaled = ing.qty != null ? ing.qty * multiplier : null;
+          const qty = scaled != null ? scaled.toFixed(scaled % 1 === 0 ? 0 : 1) : null;
           const isDone = checked.has(i);
 
           return (

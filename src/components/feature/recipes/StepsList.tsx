@@ -3,7 +3,7 @@
 import { cn } from '@/components/ui/utils';
 import type { Step } from '@/contracts/zod/recipe';
 import { ClockIcon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface StepsListProps {
   steps: Step[];
@@ -18,27 +18,23 @@ interface TimerState {
 export function StepsList({ steps }: StepsListProps) {
   const [activeStep, setActiveStep] = useState(0);
   const [timer, setTimer] = useState<TimerState | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (timer?.running) {
-      intervalRef.current = setInterval(() => {
-        setTimer((prev) => {
-          if (!prev || prev.remainingSeconds <= 1) {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            return null;
-          }
-          return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
-        });
-      }, 1000);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [timer?.running]);
+    if (!timer?.running) return;
+    // Capture stepIdx for the closure so a tick that arrives after the user
+    // restarts the timer on another step doesn't clobber the new state.
+    const stepIdx = timer.stepIdx;
+    const id = setInterval(() => {
+      setTimer((prev) => {
+        if (!prev || prev.stepIdx !== stepIdx) return prev;
+        if (prev.remainingSeconds <= 1) return null;
+        return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [timer?.running, timer?.stepIdx]);
 
   function startTimer(stepIdx: number, durationMin: number) {
-    if (intervalRef.current) clearInterval(intervalRef.current);
     setTimer({ stepIdx, remainingSeconds: durationMin * 60, running: true });
   }
 

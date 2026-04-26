@@ -119,8 +119,8 @@ describe('dbDeleteRecipe', () => {
 });
 
 describe('dbInsertCookedLog', () => {
-  it('resolves without throwing', async () => {
-    const supabase = makeSupabase(null);
+  it('returns the inserted log id', async () => {
+    const supabase = makeSupabase({ id: 'log-uuid-123' });
     await expect(
       dbInsertCookedLog(supabase, {
         user_id: FAKE_RECIPE.user_id,
@@ -128,7 +128,17 @@ describe('dbInsertCookedLog', () => {
         rating: 5,
         note: 'Delicious',
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe('log-uuid-123');
+  });
+
+  it('throws when supabase returns an error', async () => {
+    const supabase = makeSupabase(null, { message: 'fk violation' });
+    await expect(
+      dbInsertCookedLog(supabase, {
+        user_id: FAKE_RECIPE.user_id,
+        recipe_id: FAKE_RECIPE.id,
+      }),
+    ).rejects.toThrow('dbInsertCookedLog failed');
   });
 });
 

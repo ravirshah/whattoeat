@@ -31,6 +31,7 @@ import {
   listCookedLog,
   listSavedRecipes,
   markCooked,
+  markCookedById,
   saveRecipe,
   unsaveRecipe,
 } from '../actions';
@@ -53,17 +54,31 @@ const FAKE_CANDIDATE: MealCandidate = {
   missingItems: ['lemon'],
 };
 
-describe('saveRecipe', () => {
-  it('calls dbInsertRecipe and returns the new id', async () => {
+describe('saveRecipe — T8 contract', () => {
+  it('returns { ok: true, value: { id } } and calls dbInsertRecipe', async () => {
     vi.mocked(repo.dbInsertRecipe).mockResolvedValueOnce('new-uuid');
-    const id = await saveRecipe(FAKE_CANDIDATE, 'recommendation');
+    const result = await saveRecipe(FAKE_CANDIDATE);
     expect(repo.dbInsertRecipe).toHaveBeenCalledOnce();
-    expect(id).toBe('new-uuid');
+    expect(result).toEqual({ ok: true, value: { id: 'new-uuid' } });
+  });
+
+  it('defaults source to "recommendation" when not provided', async () => {
+    vi.mocked(repo.dbInsertRecipe).mockResolvedValueOnce('uuid-2');
+    await saveRecipe(FAKE_CANDIDATE);
+    const inserted = vi.mocked(repo.dbInsertRecipe).mock.calls[0][1];
+    expect(inserted.source).toBe('ai-generated');
+  });
+
+  it('honours explicit source="manual" → recipe.source="user-saved"', async () => {
+    vi.mocked(repo.dbInsertRecipe).mockResolvedValueOnce('uuid-3');
+    await saveRecipe(FAKE_CANDIDATE, 'manual');
+    const inserted = vi.mocked(repo.dbInsertRecipe).mock.calls[0][1];
+    expect(inserted.source).toBe('user-saved');
   });
 
   it('maps MealCandidate.estMacros -> Recipe.macros correctly', async () => {
     vi.mocked(repo.dbInsertRecipe).mockResolvedValueOnce('new-uuid');
-    await saveRecipe(FAKE_CANDIDATE, 'recommendation');
+    await saveRecipe(FAKE_CANDIDATE);
     const inserted = vi.mocked(repo.dbInsertRecipe).mock.calls[0][1];
     expect(inserted.macros).toEqual({
       kcal: 350,
@@ -71,6 +86,15 @@ describe('saveRecipe', () => {
       carbs_g: 5,
       fat_g: 18,
     });
+  });
+
+  it('returns { ok: false, error } when dbInsertRecipe throws', async () => {
+    vi.mocked(repo.dbInsertRecipe).mockRejectedValueOnce(new Error('DB down'));
+    const result = await saveRecipe(FAKE_CANDIDATE);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.message).toContain('DB down');
+    }
   });
 });
 
@@ -114,20 +138,53 @@ describe('listSavedRecipes', () => {
   });
 });
 
-describe('markCooked', () => {
-  it('calls dbInsertCookedLog with rating and note', async () => {
-    vi.mocked(repo.dbInsertCookedLog).mockResolvedValueOnce(undefined);
-    await markCooked('recipe-id', { note: 'Loved it', rating: 5 });
+describe('markCooked — T8 contract', () => {
+  it('persists the candidate then logs it cooked, returning { ok, recipeId, id }', async () => {
+    vi.mocked(repo.dbInsertRecipe).mockResolvedValueOnce('recipe-uuid');
+    vi.mocked(repo.dbInsertCookedLog).mockResolvedValueOnce('log-uuid');
+    const result = await markCooked(FAKE_CANDIDATE);
+    expect(result).toEqual({ ok: true, value: { id: 'log-uuid', recipeId: 'recipe-uuid' } });
+    expect(repo.dbInsertRecipe).toHaveBeenCalledOnce();
     expect(repo.dbInsertCookedLog).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ recipe_id: 'recipe-id', rating: 5, note: 'Loved it' }),
+      expect.objectContaining({ recipe_id: 'recipe-uuid', user_id: 'user-aaa' }),
     );
   });
 
-  it('works without options', async () => {
-    vi.mocked(repo.dbInsertCookedLog).mockResolvedValueOnce(undefined);
-    await markCooked('recipe-id');
-    expect(repo.dbInsertCookedLog).toHaveBeenCalledOnce();
+  it('passes rating + note through to dbInsertCookedLog', async () => {
+    vi.mocked(repo.dbInsertRecipe).mockResolvedValueOnce('recipe-uuid');
+    vi.mocked(repo.dbInsertCookedLog).mockResolvedValueOnce('log-uuid');
+    await markCooked(FAKE_CANDIDATE, { rating: 5, note: 'banger' });
+    expect(repo.dbInsertCookedLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ rating: 5, note: 'banger' }),
+    );
+  });
+
+  it('returns { ok: false } if recipe insert fails (no log row created)', async () => {
+    vi.mocked(repo.dbInsertRecipe).mockRejectedValueOnce(new Error('DB error'));
+    const result = await markCooked(FAKE_CANDIDATE);
+    expect(result.ok).toBe(false);
+    expect(repo.dbInsertCookedLog).not.toHaveBeenCalled();
+  });
+});
+
+describe('markCookedById — recipe-detail contract', () => {
+  it('inserts cooked_log against existing recipeId without re-saving', async () => {
+    vi.mocked(repo.dbInsertCookedLog).mockResolvedValueOnce('log-uuid');
+    const result = await markCookedById('existing-recipe', { rating: 4 });
+    expect(result).toEqual({ ok: true, value: { id: 'log-uuid' } });
+    expect(repo.dbInsertRecipe).not.toHaveBeenCalled();
+    expect(repo.dbInsertCookedLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ recipe_id: 'existing-recipe', rating: 4 }),
+    );
+  });
+
+  it('returns { ok: false } when dbInsertCookedLog throws', async () => {
+    vi.mocked(repo.dbInsertCookedLog).mockRejectedValueOnce(new Error('FK violation'));
+    const result = await markCookedById('bad-id');
+    expect(result.ok).toBe(false);
   });
 });
 
@@ -146,23 +203,19 @@ describe('listCookedLog', () => {
 });
 
 describe('getRecentCookTitles — T8 contract', () => {
-  it('returns lowercased, deduped titles from dbGetRecentCookTitles', async () => {
+  it('passes the ISO `since` argument straight through to the repo', async () => {
+    vi.mocked(repo.dbGetRecentCookTitles).mockResolvedValueOnce([]);
+    const since = '2026-04-19T00:00:00.000Z';
+    await getRecentCookTitles(since);
+    expect(repo.dbGetRecentCookTitles).toHaveBeenCalledWith(expect.anything(), 'user-aaa', since);
+  });
+
+  it('returns the titles produced by the repo', async () => {
     vi.mocked(repo.dbGetRecentCookTitles).mockResolvedValueOnce([
       'salmon teriyaki',
       'chicken stir-fry',
     ]);
-    const titles = await getRecentCookTitles(7);
-    expect(titles).toContain('salmon teriyaki');
-    expect(titles).toContain('chicken stir-fry');
-  });
-
-  it('passes a since timestamp derived from daysWindow', async () => {
-    vi.mocked(repo.dbGetRecentCookTitles).mockResolvedValueOnce([]);
-    await getRecentCookTitles(14);
-    const since = vi.mocked(repo.dbGetRecentCookTitles).mock.calls[0][2];
-    // since should be approximately 14 days ago
-    const sinceDate = new Date(since);
-    const expectedApprox = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-    expect(Math.abs(sinceDate.getTime() - expectedApprox.getTime())).toBeLessThan(5000);
+    const titles = await getRecentCookTitles('2026-04-19T00:00:00.000Z');
+    expect(titles).toEqual(['salmon teriyaki', 'chicken stir-fry']);
   });
 });
