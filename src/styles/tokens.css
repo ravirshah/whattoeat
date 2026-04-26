@@ -1,0 +1,130 @@
+/* src/styles/tokens.css
+   Single source of truth for all design tokens.
+   Values are rgb space-separated triplets so Tailwind can compose
+   rgb(var(--token) / <alpha-value>) for opacity utilities.
+
+   Brand assumption: near-black ink, warm-amber accent.
+   <!-- TODO: confirm with user — swap --accent triplet if palette feels off -->
+*/
+
+:root {
+  /* ── Surfaces ─────────────────────────────────────────────── */
+  --surface: 255 255 255; /* page bg */
+  --surface-elevated: 249 249 249; /* cards, panels */
+  --surface-overlay: 255 255 255; /* dialogs, sheets */
+
+  /* ── Text ─────────────────────────────────────────────────── */
+  --text: 15 15 15; /* primary — near-black, WCAG AA on surface */
+  --text-muted: 107 107 107; /* secondary — 4.6:1 on white */
+  --text-placeholder: 163 163 163; /* inputs */
+
+  /* ── Accent (warm amber) ──────────────────────────────────── */
+  --accent: 217 119 6; /* amber-600 */
+  --accent-fg: 255 255 255; /* text on accent bg */
+  --accent-hover: 180 98 4; /* darker amber for hover */
+
+  /* ── Warm (energy / training-day surfaces) ────────────────── */
+  --warm: 254 215 170; /* orange-200 bg */
+  --warm-fg: 154 52 18; /* orange-800 text */
+  --warm-subtle: 255 237 213; /* orange-100 */
+
+  /* ── Cool (recovery / rest-day surfaces) ─────────────────── */
+  --cool: 186 230 253; /* sky-200 bg */
+  --cool-fg: 12 74 110; /* sky-900 text */
+  --cool-subtle: 224 242 254; /* sky-100 */
+
+  /* ── Status ───────────────────────────────────────────────── */
+  --ok: 34 197 94; /* green-500 */
+  --ok-fg: 255 255 255;
+  --warn: 234 179 8; /* yellow-500 */
+  --warn-fg: 66 32 6; /* readable on warn */
+  --err: 239 68 68; /* red-500 */
+  --err-fg: 255 255 255;
+
+  /* ── Border & Ring ───────────────────────────────────────── */
+  --border: 229 229 229; /* neutral-200 */
+  --ring: 217 119 6; /* accent for focus rings */
+
+  /* ── Category palette (6 colors) ─────────────────────────── */
+  --cat-protein: 251 146 60; /* orange-400 — meat/eggs */
+  --cat-produce: 74 222 128; /* green-400  — veg/fruit */
+  --cat-grain: 251 191 36; /* amber-400  — rice/pasta */
+  --cat-dairy: 147 197 253; /* blue-300   — milk/cheese */
+  --cat-pantry: 216 180 254; /* violet-300 — oils/spices */
+  --cat-other: 156 163 175; /* gray-400   — misc */
+
+  /* ── Radius ───────────────────────────────────────────────── */
+  --r-sm: 0.25rem;
+  --r-md: 0.5rem;
+  --r-lg: 0.75rem;
+  --r-xl: 1rem;
+  --r-2xl: 1.5rem;
+
+  /* ── Shadows (soft, layered) ─────────────────────────────── */
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.06);
+  --shadow-2: 0 2px 8px rgb(0 0 0 / 0.06), 0 4px 12px rgb(0 0 0 / 0.08);
+  --shadow-3: 0 8px 24px rgb(0 0 0 / 0.08), 0 16px 40px rgb(0 0 0 / 0.1);
+
+  /* ── Motion ──────────────────────────────────────────────── */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-snap: 120ms;
+  --dur-base: 240ms;
+  --dur-expand: 360ms;
+}
+
+/* ── Dark mode token swap ─────────────────────────────────────
+   Applied by adding class="dark" to <html>.
+   Both modes hit WCAG AA contrast.
+──────────────────────────────────────────────────────────────── */
+.dark {
+  /* Surfaces */
+  --surface: 10 10 10;
+  --surface-elevated: 20 20 20;
+  --surface-overlay: 28 28 28;
+
+  /* Text */
+  --text: 242 242 242;
+  --text-muted: 163 163 163;
+  --text-placeholder: 82 82 82;
+
+  /* Accent */
+  --accent: 251 191 36; /* amber-400 — brighter in dark */
+  --accent-fg: 15 15 15;
+  --accent-hover: 253 211 77;
+
+  /* Warm */
+  --warm: 67 20 7; /* dark amber bg */
+  --warm-fg: 253 186 116; /* orange-300 text */
+  --warm-subtle: 55 16 5;
+
+  /* Cool */
+  --cool: 7 37 61; /* dark sky bg */
+  --cool-fg: 125 211 252; /* sky-300 text */
+  --cool-subtle: 5 28 49;
+
+  /* Status */
+  --ok: 22 163 74;
+  --ok-fg: 255 255 255;
+  --warn: 202 138 4;
+  --warn-fg: 255 255 255;
+  --err: 220 38 38;
+  --err-fg: 255 255 255;
+
+  /* Border & Ring */
+  --border: 38 38 38;
+  --ring: 251 191 36;
+
+  /* Category palette (slightly desaturated for dark mode harmony) */
+  --cat-protein: 234 88 12;
+  --cat-produce: 22 163 74;
+  --cat-grain: 202 138 4;
+  --cat-dairy: 59 130 246;
+  --cat-pantry: 139 92 246;
+  --cat-other: 107 114 128;
+
+  /* Shadows — more pronounced in dark */
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 2px 8px rgb(0 0 0 / 0.35), 0 4px 12px rgb(0 0 0 / 0.4);
+  --shadow-3: 0 8px 24px rgb(0 0 0 / 0.4), 0 16px 40px rgb(0 0 0 / 0.5);
+}
