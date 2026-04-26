@@ -40,3 +40,13 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env.local
+
+# Worktrees (defensive — they live outside the repo, but if anyone cd's wrong)
+../whattoeat-*
+
+# Supabase local
+supabase/.branches
+supabase/.temp
+
+# Test artifacts
+coverage/

@@ -1,0 +1,30 @@
+name: engine-eval
+
+on:
+  pull_request:
+    paths:
+      - 'src/engine/**'
+      - 'src/server/adapters/**'
+      - 'src/contracts/zod/recommendation.ts'
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: latest }
+      - run: bun install --frozen-lockfile
+      - name: Run eval harness
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -f scripts/run-eval.ts ]; then
+            bun scripts/run-eval.ts > eval-output.md
+          else
+            echo "Eval harness not yet present (Plan 03 lands it). Skipping." > eval-output.md
+          fi
+      - name: Comment eval results on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: eval-output.md
