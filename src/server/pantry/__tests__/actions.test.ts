@@ -2,7 +2,24 @@ import type { PantryItem } from '@/contracts/zod/pantry';
 import { describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
-// Mock requireUser (stub until Track 4 merges)
+// Hoisted constants (available inside vi.mock factory closures)
+// ---------------------------------------------------------------------------
+
+const { SAMPLE_ITEM } = vi.hoisted(() => {
+  const item: PantryItem = {
+    id: '00000000-0000-0000-0000-000000000099',
+    user_id: '00000000-0000-0000-0000-000000000001',
+    name: 'chicken breast',
+    display_name: 'Chicken Breast',
+    category: 'protein',
+    available: true,
+    added_at: new Date().toISOString(),
+  };
+  return { SAMPLE_ITEM: item };
+});
+
+// ---------------------------------------------------------------------------
+// Mock requireUser (Track 4 is merged — but we still stub to avoid cookies())
 // ---------------------------------------------------------------------------
 
 vi.mock('@/server/auth', () => ({
@@ -11,22 +28,6 @@ vi.mock('@/server/auth', () => ({
     email: 'test@example.com',
   }),
 }));
-
-// ---------------------------------------------------------------------------
-// Mock the Supabase server client factory
-// ---------------------------------------------------------------------------
-
-const USER_ID = '00000000-0000-0000-0000-000000000001';
-
-const SAMPLE_ITEM: PantryItem = {
-  id: '00000000-0000-0000-0000-000000000099',
-  user_id: USER_ID,
-  name: 'chicken breast',
-  display_name: 'Chicken Breast',
-  category: 'protein',
-  available: true,
-  added_at: new Date().toISOString(),
-};
 
 // We mock the repo module so actions.test.ts doesn't need a real DB.
 vi.mock('@/server/pantry/repo', () => ({
@@ -42,7 +43,10 @@ vi.mock('@/lib/supabase/server', () => ({
   createServerClient: vi.fn().mockResolvedValue({}),
 }));
 
-// Actions module does not exist yet — imports will fail until Task 5.
+// ---------------------------------------------------------------------------
+// Import actions after mocks are registered
+// ---------------------------------------------------------------------------
+
 import {
   addPantryItem,
   bulkAddPantryItems,
