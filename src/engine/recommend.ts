@@ -5,6 +5,7 @@ import {
   EngineNoCandidatesError,
   EngineTimeoutError,
   LlmInvalidJsonError,
+  LlmRefusalError,
   fail,
   ok,
 } from '@/engine/errors';
@@ -76,6 +77,9 @@ async function _recommend(
   } catch (err) {
     logger?.error('Plan call failed', { err: String(err) });
     if (err instanceof EngineTimeoutError) return fail(err);
+    if (err instanceof LlmRefusalError) return fail(err);
+    if (err instanceof Error && err.message.toLowerCase().includes('refusal'))
+      return fail(new LlmRefusalError(err.message, err));
     if (err instanceof Error) return fail(new LlmInvalidJsonError(err.message, err));
     return fail(new LlmInvalidJsonError('Unknown plan call error', err));
   }

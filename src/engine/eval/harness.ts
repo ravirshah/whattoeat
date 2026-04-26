@@ -27,7 +27,28 @@ export interface EvalReport {
 
 async function runEntry(entry: EvalEntry): Promise<EvalEntryResult> {
   const start = Date.now();
-  const result = await recommend(entry.ctx, { llm: new FakeLlmClient() });
+  // Pass timeBudgetMin so FakeLlmClient caps totalMinutes to within budget.
+  const timeBudget = entry.ctx.request.timeBudgetMin;
+  const llm = new FakeLlmClient(
+    timeBudget != null
+      ? {
+          detail: (title) => ({
+            title,
+            oneLineWhy: `${title} — great choice.`,
+            ingredients: [{ name: 'chicken breast', qty: 200, unit: 'g' as const, note: null }],
+            steps: [{ idx: 1, text: 'Prepare and cook.', durationMin: timeBudget }],
+            estMacros: { kcal: 400, protein_g: 40, carbs_g: 20, fat_g: 10 },
+            servings: 1,
+            totalMinutes: timeBudget,
+            cuisine: 'american' as const,
+            tags: ['quick'],
+            pantryCoverage: 0.8,
+            missingItems: [],
+          }),
+        }
+      : {},
+  );
+  const result = await recommend(entry.ctx, { llm });
   const latencyMs = Date.now() - start;
 
   const failures: string[] = [];
@@ -74,10 +95,9 @@ async function runEntry(entry: EvalEntry): Promise<EvalEntryResult> {
   if (entry.rubric.maxMinutes != null) {
     for (const c of candidates) {
       if (c.totalMinutes > entry.rubric.maxMinutes) {
-        // Soft check in fake mode: log a warning rather than a hard failure
-        // because FakeLlmClient returns canned 25-min meals regardless of time budget.
-        // The real GeminiLlmClient enforces this in Plan 03.
-        // failures.push(`Candidate '${c.title}' took ${c.totalMinutes}min, budget is ${entry.rubric.maxMinutes}min`);
+        failures.push(
+          `Candidate '${c.title}' took ${c.totalMinutes}min, budget is ${entry.rubric.maxMinutes}min`,
+        );
       }
     }
   }

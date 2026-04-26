@@ -132,7 +132,7 @@ export class FakeLlmClient implements LlmClient {
 // AlwaysThrowsLlmClient — every call throws LlmInvalidJsonError
 // ---------------------------------------------------------------------------
 
-import { LlmInvalidJsonError } from '@/engine/errors';
+import { LlmInvalidJsonError, LlmRefusalError } from '@/engine/errors';
 
 export class AlwaysThrowsLlmClient implements LlmClient {
   async generateStructured<T>(_args: LlmGenerateArgs<T>): Promise<LlmGenerateResult<T>> {
@@ -166,5 +166,27 @@ export class AllergenDetailFakeClient extends FakeLlmClient {
     super({
       detail: (title) => makeDetail(title, false),
     });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// NeverResolvesLlmClient — plan call never resolves (used to test timeout)
+// ---------------------------------------------------------------------------
+
+export class NeverResolvesLlmClient implements LlmClient {
+  async generateStructured<T>(_args: LlmGenerateArgs<T>): Promise<LlmGenerateResult<T>> {
+    return new Promise<LlmGenerateResult<T>>(() => {
+      // intentionally never resolves — forces EngineTimeoutError
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// RefusalLlmClient — plan call throws LlmRefusalError (content policy simulation)
+// ---------------------------------------------------------------------------
+
+export class RefusalLlmClient implements LlmClient {
+  async generateStructured<T>(_args: LlmGenerateArgs<T>): Promise<LlmGenerateResult<T>> {
+    throw new LlmRefusalError('Simulated LLM content policy refusal');
   }
 }

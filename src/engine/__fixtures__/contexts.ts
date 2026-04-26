@@ -20,7 +20,7 @@ const BASE_PROFILE = {
 
 const STOCKED_PANTRY = [
   {
-    id: 'p1',
+    id: '00000000-0000-0001-0000-000000000001',
     user_id: BASE_PROFILE.user_id,
     name: 'chicken breast',
     display_name: 'Chicken Breast',
@@ -29,7 +29,7 @@ const STOCKED_PANTRY = [
     added_at: '2026-04-26T00:00:00.000Z',
   },
   {
-    id: 'p2',
+    id: '00000000-0000-0001-0000-000000000002',
     user_id: BASE_PROFILE.user_id,
     name: 'white rice',
     display_name: 'White Rice',
@@ -38,7 +38,7 @@ const STOCKED_PANTRY = [
     added_at: '2026-04-26T00:00:00.000Z',
   },
   {
-    id: 'p3',
+    id: '00000000-0000-0001-0000-000000000003',
     user_id: BASE_PROFILE.user_id,
     name: 'eggs',
     display_name: 'Eggs',
@@ -47,7 +47,7 @@ const STOCKED_PANTRY = [
     added_at: '2026-04-26T00:00:00.000Z',
   },
   {
-    id: 'p4',
+    id: '00000000-0000-0001-0000-000000000004',
     user_id: BASE_PROFILE.user_id,
     name: 'greek yogurt',
     display_name: 'Greek Yogurt',
@@ -56,7 +56,7 @@ const STOCKED_PANTRY = [
     added_at: '2026-04-26T00:00:00.000Z',
   },
   {
-    id: 'p5',
+    id: '00000000-0000-0001-0000-000000000005',
     user_id: BASE_PROFILE.user_id,
     name: 'olive oil',
     display_name: 'Olive Oil',
@@ -75,7 +75,7 @@ export const cuttingDayCtx: RecommendationContext = {
     targets: { kcal: 1600, protein_g: 150, carbs_g: 130, fat_g: 50 },
   },
   checkin: {
-    id: 'c1',
+    id: '00000000-0000-0002-0000-000000000001',
     user_id: BASE_PROFILE.user_id,
     date: '2026-04-26',
     energy: 3,
@@ -96,7 +96,7 @@ export const trainingDayCtx: RecommendationContext = {
     targets: { kcal: 2800, protein_g: 200, carbs_g: 320, fat_g: 90 },
   },
   checkin: {
-    id: 'c2',
+    id: '00000000-0000-0002-0000-000000000002',
     user_id: BASE_PROFILE.user_id,
     date: '2026-04-26',
     energy: 5,
@@ -113,7 +113,7 @@ export const lowSleepCtx: RecommendationContext = {
   pantry: STOCKED_PANTRY,
   profile: BASE_PROFILE,
   checkin: {
-    id: 'c3',
+    id: '00000000-0000-0002-0000-000000000003',
     user_id: BASE_PROFILE.user_id,
     date: '2026-04-26',
     energy: 1,
@@ -130,7 +130,7 @@ export const lowSleepCtx: RecommendationContext = {
 export const barePantryCtx: RecommendationContext = {
   pantry: [
     {
-      id: 'p1',
+      id: '00000000-0000-0001-0000-000000000001',
       user_id: BASE_PROFILE.user_id,
       name: 'eggs',
       display_name: 'Eggs',
@@ -139,7 +139,7 @@ export const barePantryCtx: RecommendationContext = {
       added_at: '2026-04-26T00:00:00.000Z',
     },
     {
-      id: 'p2',
+      id: '00000000-0000-0001-0000-000000000002',
       user_id: BASE_PROFILE.user_id,
       name: 'salt',
       display_name: 'Salt',
