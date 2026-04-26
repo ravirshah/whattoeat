@@ -3,11 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Mock Drizzle and the DB module before importing the repo.
+// Use vi.hoisted so the mock variables are available when vi.mock factories run.
 // ---------------------------------------------------------------------------
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
+const { mockSelect, mockInsert } = vi.hoisted(() => ({
+  mockSelect: vi.fn(),
+  mockInsert: vi.fn(),
+}));
 
-vi.mock('@/db', () => ({
+vi.mock('@/db/client', () => ({
   db: {
     select: mockSelect,
     insert: mockInsert,
@@ -56,12 +59,21 @@ const UPSERT_INPUT: CheckinUpsert = {
 // Helpers to build fluent Drizzle query chain mocks
 // ---------------------------------------------------------------------------
 function makeSelectChain(rows: unknown[]) {
-  const chain = {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
+  // The chain needs to:
+  //  - support .from().where().orderBy().limit() for recent()
+  //  - support .from().where().orderBy() (awaitable) for range()
+  // Solution: make orderBy return a thenable chain that also has limit().
+  const thenableChain = Object.assign(Promise.resolve(rows), {
     limit: vi.fn().mockResolvedValue(rows),
-    orderBy: vi.fn().mockReturnThis(),
+  });
+  const chain = {
+    from: vi.fn(),
+    where: vi.fn(),
+    limit: vi.fn().mockResolvedValue(rows),
+    orderBy: vi.fn().mockReturnValue(thenableChain),
   };
+  (chain.from as ReturnType<typeof vi.fn>).mockReturnValue(chain);
+  (chain.where as ReturnType<typeof vi.fn>).mockReturnValue(chain);
   mockSelect.mockReturnValue(chain);
   return chain;
 }
