@@ -1,9 +1,20 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "files": {
-    "ignore": [".next/**", "node_modules/**", "dist/**", "supabase/**", ".husky/**", "bun.lock"]
+    "ignore": [
+      ".next/**",
+      "node_modules/**",
+      "dist/**",
+      "supabase/**",
+      ".husky/**",
+      "bun.lock",
+      "public/sw.js",
+      "public/sw.js.map"
+    ]
   },
-  "organizeImports": { "enabled": true },
+  "organizeImports": {
+    "enabled": true
+  },
   "linter": {
     "enabled": true,
     "rules": {
@@ -29,6 +40,10 @@
     "lineEnding": "lf"
   },
   "javascript": {
-    "formatter": { "quoteStyle": "single", "semicolons": "always", "trailingCommas": "all" }
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
   }
 }
