@@ -35,7 +35,9 @@ const mockRequireUser = vi.mocked(requireUser);
 const mockRepo = vi.mocked(checkinRepo);
 
 const FAKE_USER = { userId: 'user-xyz', email: 'ravi@example.com' };
-const TODAY = '2026-04-26';
+const TODAY = new Date().toISOString().slice(0, 10);
+const CREATED_AT = new Date('2026-04-26T10:00:00.000Z');
+const CREATED_AT_ISO = CREATED_AT.toISOString();
 const BASE_ROW = {
   id: 'row-1',
   user_id: 'user-xyz',
@@ -44,17 +46,19 @@ const BASE_ROW = {
   training: 'light' as const,
   hunger: 'normal' as const,
   note: null,
-  created_at: new Date('2026-04-26T10:00:00.000Z'),
+  created_at: CREATED_AT,
 };
 
 describe('getTodayCheckin', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("returns today's check-in when one exists", async () => {
+  it("returns today's check-in when one exists (created_at as ISO string)", async () => {
     mockRequireUser.mockResolvedValue(FAKE_USER);
     mockRepo.today.mockResolvedValue(BASE_ROW);
     const result = await getTodayCheckin();
-    expect(result).toEqual(BASE_ROW);
+    expect(result).not.toBeNull();
+    expect(result?.created_at).toBe(CREATED_AT_ISO);
+    expect(typeof result?.created_at).toBe('string');
     expect(mockRepo.today).toHaveBeenCalledWith('user-xyz', expect.any(String));
   });
 
@@ -105,6 +109,32 @@ describe('saveCheckin', () => {
       saveCheckin({ date: TODAY, energy: 99, training: 'light', hunger: 'normal' }),
     ).rejects.toThrow();
     expect(mockRepo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-today date so historical days cannot be overwritten', async () => {
+    mockRequireUser.mockResolvedValue(FAKE_USER);
+    await expect(
+      saveCheckin({
+        date: '2025-01-01',
+        energy: 3,
+        training: 'light',
+        hunger: 'normal',
+      }),
+    ).rejects.toThrow(/date must be today/);
+    expect(mockRepo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('serialises created_at to an ISO string in the returned row', async () => {
+    mockRequireUser.mockResolvedValue(FAKE_USER);
+    mockRepo.upsert.mockResolvedValue(BASE_ROW);
+    const result = await saveCheckin({
+      date: TODAY,
+      energy: 3,
+      training: 'light',
+      hunger: 'normal',
+    });
+    expect(result.created_at).toBe(CREATED_AT_ISO);
+    expect(typeof result.created_at).toBe('string');
   });
 });
 

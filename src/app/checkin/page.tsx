@@ -21,16 +21,8 @@ export default async function CheckinPage() {
   const todayUtc = new Date().toISOString().slice(0, 10);
   const rawExisting = await getTodayCheckin(todayUtc);
   // Parse through the Zod schema to get strongly typed fields (training, hunger as enums).
-  // created_at from Drizzle is Date; Zod expects datetime string - convert it.
-  const existing = rawExisting
-    ? Checkin.parse({
-        ...rawExisting,
-        created_at:
-          rawExisting.created_at instanceof Date
-            ? rawExisting.created_at.toISOString()
-            : rawExisting.created_at,
-      })
-    : null;
+  // The action serialises created_at to ISO string at the boundary, so we can pass through.
+  const existing = rawExisting ? Checkin.parse(rawExisting) : null;
 
   return (
     <main className="mx-auto max-w-lg px-4 py-10">
