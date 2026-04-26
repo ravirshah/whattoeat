@@ -65,17 +65,19 @@ export async function addPantryItem(rawInput: { name: string; category: string }
 // ---------------------------------------------------------------------------
 // togglePantryItem
 // ---------------------------------------------------------------------------
-// Passes the current available value from the client to avoid an extra round-
-// trip. RLS guarantees the row belongs to the authenticated user.
+// Idempotent: caller provides the *desired* next available value rather than
+// the current one. Two concurrent toggles with the same desired value resolve
+// to the same DB state (no flip-flop). RLS guarantees the row belongs to the
+// authenticated user.
 
 export async function togglePantryItem(
   id: string,
-  currentAvailable: boolean,
+  nextAvailable: boolean,
 ): Promise<ActionResult<PantryItem>> {
   try {
     const { userId } = await requireUser();
     const client = await getAnonClient();
-    const item = await updateItem(client, userId, id, { available: !currentAvailable });
+    const item = await updateItem(client, userId, id, { available: nextAvailable });
     return { ok: true, value: item };
   } catch (err) {
     if (err instanceof ServerError) return { ok: false, error: err };

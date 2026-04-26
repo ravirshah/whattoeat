@@ -81,8 +81,10 @@ describe('addPantryItem', () => {
 // ---------------------------------------------------------------------------
 
 describe('togglePantryItem', () => {
-  it('returns ok:true with flipped available', async () => {
-    const result = await togglePantryItem(SAMPLE_ITEM.id, SAMPLE_ITEM.available);
+  it('returns ok:true and writes the desired next value', async () => {
+    // Caller passes the desired next value (idempotent). SAMPLE_ITEM is
+    // available=true, so flipping to false and asserting.
+    const result = await togglePantryItem(SAMPLE_ITEM.id, false);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.available).toBe(false);

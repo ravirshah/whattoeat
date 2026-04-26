@@ -39,24 +39,37 @@ export function PantryClientIsland({ initialItems }: PantryClientIslandProps) {
   const [categoryFilter, setCategoryFilter] = useState<PantryCategory | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
 
   // -------------------------------------------------------------------------
-  // Toggle
+  // Toggle (idempotent: pass desired next value, not !current)
   // -------------------------------------------------------------------------
 
   function handleToggle(item: PantryItem) {
+    if (pendingIds.has(item.id)) return;
+    const nextAvailable = !item.available;
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      next.add(item.id);
+      return next;
+    });
     startTransition(async () => {
       addOptimisticAction({ type: 'toggle', id: item.id });
-      const result = await togglePantryItem(item.id, item.available);
+      const result = await togglePantryItem(item.id, nextAvailable);
       if (result.ok) {
-        // Reconcile with the server response.
         setItems((prev) => prev.map((i) => (i.id === item.id ? result.value : i)));
       } else {
-        // Rollback: re-set items to the pre-optimistic state (no change).
-        // useOptimistic auto-reverts when startTransition completes without update.
+        // Explicit rollback: re-set items to current authoritative state so
+        // the optimistic toggle is reverted on next render.
         console.error('[PantryClientIsland] toggle failed:', result.error.message);
+        setItems((prev) => [...prev]);
       }
+      setPendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
     });
   }
 
@@ -65,6 +78,12 @@ export function PantryClientIsland({ initialItems }: PantryClientIslandProps) {
   // -------------------------------------------------------------------------
 
   function handleRemove(item: PantryItem) {
+    if (pendingIds.has(item.id)) return;
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      next.add(item.id);
+      return next;
+    });
     startTransition(async () => {
       addOptimisticAction({ type: 'remove', id: item.id });
       const result = await removePantryItem(item.id);
@@ -72,7 +91,13 @@ export function PantryClientIsland({ initialItems }: PantryClientIslandProps) {
         setItems((prev) => prev.filter((i) => i.id !== item.id));
       } else {
         console.error('[PantryClientIsland] remove failed:', result.error.message);
+        setItems((prev) => [...prev]);
       }
+      setPendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
     });
   }
 
