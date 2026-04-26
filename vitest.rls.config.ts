@@ -5,14 +5,10 @@ export default defineConfig({
   resolve: {
     alias: { '@': resolve(__dirname, './src') },
   },
-  css: {
-    postcss: { plugins: [] },
-  },
   test: {
     environment: 'node',
     globals: false,
-    include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
-    exclude: ['node_modules/**', 'tests/rls/**'],
-    setupFiles: [],
+    include: ['tests/rls/**/*.test.ts'],
+    testTimeout: 30_000,
   },
 });
