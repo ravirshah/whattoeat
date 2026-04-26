@@ -26,7 +26,7 @@ export function SegmentedControl<T extends string>({
     <fieldset
       aria-label="Segmented control"
       className={cn(
-        'relative inline-flex rounded-lg bg-surface-elevated p-1 border-0 p-0 m-0',
+        'relative inline-flex rounded-lg bg-surface-elevated border-0 p-1 m-0',
         className,
       )}
     >

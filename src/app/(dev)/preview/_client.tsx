@@ -8,6 +8,10 @@ import * as React from 'react';
 export function DarkModeToggle() {
   const [dark, setDark] = React.useState(false);
 
+  React.useEffect(() => {
+    setDark(document.documentElement.classList.contains('dark'));
+  }, []);
+
   const toggle = (checked: boolean) => {
     setDark(checked);
     if (checked) {
