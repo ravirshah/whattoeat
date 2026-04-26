@@ -40,7 +40,7 @@ tracks:
       - Sonner + Vaul + Lucide installed and stroke-width pinned
       - dark mode is a token swap; both modes designed simultaneously
       - storybook-style preview page (or dev-only route) shows every primitive
-    plan: docs/superpowers/plans/<TBD>-plan-01-design-system.md
+    plan: docs/superpowers/plans/2026-04-26-plan-01-design-system.md
 
   - id: T2
     title: 'T2 — Engine core (TDD with fake LLM)'
@@ -56,7 +56,7 @@ tracks:
       - allergen filter throws EngineSafetyError when all candidates drop
       - schema-validation retry once then EngineParseError
       - 95%+ branch coverage with FakeLlmClient
-    plan: docs/superpowers/plans/<TBD>-plan-02-engine-core.md
+    plan: docs/superpowers/plans/2026-04-26-plan-02-engine-core.md
 
   - id: T3
     title: 'T3 — Gemini adapter + eval harness'
