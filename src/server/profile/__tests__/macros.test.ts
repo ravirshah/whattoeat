@@ -74,34 +74,39 @@ describe('computeTargets', () => {
   it('sedentary factor 1.2 produces lower kcal than moderate 1.55', () => {
     const sed = computeTargets(makeProfile({ activity_level: 'sedentary' }));
     const mod = computeTargets(makeProfile({ activity_level: 'moderate' }));
-    expect(sed?.kcal).toBeLessThan(mod?.kcal);
+    if (!sed || !mod) throw new Error('Expected non-null results');
+    expect(sed.kcal).toBeLessThan(mod.kcal);
   });
 
   it('very_active factor 1.9 produces highest kcal of all levels', () => {
     const va = computeTargets(makeProfile({ activity_level: 'very_active' }));
     const active = computeTargets(makeProfile({ activity_level: 'active' }));
-    expect(va?.kcal).toBeGreaterThan(active?.kcal);
+    if (!va || !active) throw new Error('Expected non-null results');
+    expect(va.kcal).toBeGreaterThan(active.kcal);
   });
 
   it('light activity (1.375) is between sedentary and moderate', () => {
     const sed = computeTargets(makeProfile({ activity_level: 'sedentary' }));
     const light = computeTargets(makeProfile({ activity_level: 'light' }));
     const mod = computeTargets(makeProfile({ activity_level: 'moderate' }));
-    expect(light?.kcal).toBeGreaterThan(sed?.kcal);
-    expect(light?.kcal).toBeLessThan(mod?.kcal);
+    if (!sed || !light || !mod) throw new Error('Expected non-null results');
+    expect(light.kcal).toBeGreaterThan(sed.kcal);
+    expect(light.kcal).toBeLessThan(mod.kcal);
   });
 
   // ── Goal adjustments ─────────────────────────────────────────────────────
   it('cut reduces kcal by ~20% vs maintain', () => {
     const maintain = computeTargets(makeProfile({ goal: 'maintain' }));
     const cut = computeTargets(makeProfile({ goal: 'cut' }));
-    expect(cut?.kcal).toBeCloseTo(maintain?.kcal * 0.8, -1);
+    if (!maintain || !cut) throw new Error('Expected non-null results');
+    expect(cut.kcal).toBeCloseTo(maintain.kcal * 0.8, -1);
   });
 
   it('bulk increases kcal by ~15% vs maintain', () => {
     const maintain = computeTargets(makeProfile({ goal: 'maintain' }));
     const bulk = computeTargets(makeProfile({ goal: 'bulk' }));
-    expect(bulk?.kcal).toBeCloseTo(maintain?.kcal * 1.15, -1);
+    if (!maintain || !bulk) throw new Error('Expected non-null results');
+    expect(bulk.kcal).toBeCloseTo(maintain.kcal * 1.15, -1);
   });
 
   // ── Macro split ──────────────────────────────────────────────────────────
@@ -117,16 +122,18 @@ describe('computeTargets', () => {
 
   it('fat is approximately 25% of kcal', () => {
     const result = computeTargets(makeProfile());
-    const fatKcal = result?.fat_g * 9;
-    const ratio = fatKcal / result?.kcal;
+    if (result === null) throw new Error('Expected non-null result');
+    const fatKcal = result.fat_g * 9;
+    const ratio = fatKcal / result.kcal;
     expect(ratio).toBeGreaterThan(0.22);
     expect(ratio).toBeLessThan(0.28);
   });
 
   it('macro calories sum to approximately total kcal (within ±10)', () => {
     const result = computeTargets(makeProfile());
-    const sum = result?.protein_g * 4 + result?.carbs_g * 4 + result?.fat_g * 9;
-    expect(Math.abs(sum - result?.kcal)).toBeLessThan(10);
+    if (result === null) throw new Error('Expected non-null result');
+    const sum = result.protein_g * 4 + result.carbs_g * 4 + result.fat_g * 9;
+    expect(Math.abs(sum - result.kcal)).toBeLessThan(10);
   });
 
   it('carbs are non-negative even on aggressive cut with high protein', () => {
