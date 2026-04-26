@@ -1,73 +1,101 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+
+/**
+ * SwRegister — mounts once in the root layout.
+ *
+ * Responsibilities:
+ *   1. Register /sw.js via workbox-window in production.
+ *   2. Listen for the 'waiting' lifecycle event (new SW installed, waiting to activate).
+ *   3. Show a Sonner toast with a "Refresh" CTA when a new version is waiting.
+ *   4. On "Refresh" click: post SKIP_WAITING to the waiting SW, then reload.
+ *   5. Show a small offline indicator badge when navigator.onLine is false.
+ *
+ * Disabled in dev (process.env.NODE_ENV !== 'production') to avoid conflicts
+ * with Next.js HMR. The SW file is not emitted in dev anyway.
+ */
+
+// Lazy type import — workbox-window is dynamically imported to keep it out of
+// the SSR bundle, but we need the type for useRef.
+// biome-ignore lint/suspicious/noExplicitAny: workbox-window type imported lazily
+type WorkboxInstance = any;
 
 const SW_PATH = '/sw.js';
 
-function showUpdateToast(reg: ServiceWorkerRegistration) {
-  toast('A new version of WhatToEat is ready.', {
-    id: 'sw-update',
-    duration: Number.POSITIVE_INFINITY,
-    action: {
-      label: 'Refresh',
-      onClick: () => {
-        reg.waiting?.postMessage({ type: 'SKIP_WAITING' });
-        window.location.reload();
-      },
-    },
-  });
-}
+// How long to wait before showing the update toast after detecting a waiting SW.
+const TOAST_DELAY_MS = 3000;
 
 function useServiceWorker() {
+  const wbRef = useRef<WorkboxInstance>(null);
   const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // Offline/online status
     setIsOnline(navigator.onLine);
-    const onOnline = () => setIsOnline(true);
-    const onOffline = () => setIsOnline(false);
-    window.addEventListener('online', onOnline);
-    window.addEventListener('offline', onOffline);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
+    // Only register the service worker in production.
     if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) {
       return () => {
-        window.removeEventListener('online', onOnline);
-        window.removeEventListener('offline', onOffline);
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
       };
     }
 
-    let cancelled = false;
+    let didCleanup = false;
+
     void (async () => {
-      try {
-        const reg = await navigator.serviceWorker.register(SW_PATH, { scope: '/' });
-        if (cancelled) return;
+      const { Workbox } = await import('workbox-window');
+      if (didCleanup) return;
 
-        if (reg.waiting) showUpdateToast(reg);
+      const wb = new Workbox(SW_PATH);
+      wbRef.current = wb;
 
-        reg.addEventListener('updatefound', () => {
-          const installing = reg.installing;
-          if (!installing) return;
-          installing.addEventListener('statechange', () => {
-            if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-              showUpdateToast(reg);
-            }
+      // 'waiting' fires when a new SW has installed but is blocked from activating.
+      wb.addEventListener('waiting', () => {
+        const toastTimer = setTimeout(() => {
+          toast('A new version of WhatToEat is ready.', {
+            id: 'sw-update',
+            duration: Number.POSITIVE_INFINITY,
+            action: {
+              label: 'Refresh',
+              onClick: () => {
+                wb.messageSkipWaiting();
+                window.location.reload();
+              },
+            },
           });
-        });
+        }, TOAST_DELAY_MS);
 
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          toast.dismiss('sw-update');
-        });
-      } catch (err) {
-        console.warn('[SW] registration failed:', err);
-      }
+        return () => clearTimeout(toastTimer);
+      });
+
+      // 'activated' fires when the SW takes control after install/update.
+      wb.addEventListener('activated', (event: { isUpdate?: boolean }) => {
+        if (!event.isUpdate) {
+          return;
+        }
+        toast.dismiss('sw-update');
+      });
+
+      wb.addEventListener('controlling', () => {
+        console.debug('[SW] Now controlling this page.');
+      });
+
+      await wb.register();
     })();
 
     return () => {
-      cancelled = true;
-      window.removeEventListener('online', onOnline);
-      window.removeEventListener('offline', onOffline);
+      didCleanup = true;
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
@@ -79,6 +107,7 @@ export function SwRegister() {
 
   if (isOnline) return null;
 
+  // Offline indicator badge — visible when the device is offline.
   return (
     <output
       aria-live="polite"
