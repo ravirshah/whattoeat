@@ -16,8 +16,9 @@ export function FeedMeCta() {
         'text-lg font-bold tracking-tight',
         // Colors (token-only — no raw hex)
         'bg-accent text-accent-foreground',
-        // Interaction
-        'transition-all duration-200 ease-out',
+        // Interaction — resting shimmer invites tap; spring-feel scale on press
+        'feedme-shimmer',
+        'transition-transform duration-200 ease-out',
         'hover:scale-[1.02] hover:shadow-lg hover:shadow-accent/25',
         'active:scale-[0.98]',
         // Focus

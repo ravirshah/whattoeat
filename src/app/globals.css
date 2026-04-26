@@ -75,3 +75,45 @@
     opacity: 1;
   }
 }
+
+@keyframes bento-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bento-rise {
+  animation: bento-rise 480ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.bento-rise-1 {
+  animation-delay: 60ms;
+}
+.bento-rise-2 {
+  animation-delay: 120ms;
+}
+.bento-rise-3 {
+  animation-delay: 180ms;
+}
+.bento-rise-4 {
+  animation-delay: 240ms;
+}
+
+@keyframes feedme-shimmer {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(var(--accent) / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(var(--accent) / 0.1);
+  }
+}
+
+.feedme-shimmer {
+  animation: feedme-shimmer 2.8s ease-in-out infinite;
+}

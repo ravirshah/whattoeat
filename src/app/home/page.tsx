@@ -43,14 +43,14 @@ export default async function HomePage() {
       </header>
 
       {/* Feed Me CTA (hero action) */}
-      <section className="mb-6">
+      <section className="mb-6 bento-rise">
         <FeedMeCta />
       </section>
 
       {/* Bento grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Macro ring tile */}
-        <div className="sm:col-span-2 rounded-2xl border border-border bg-card p-5 flex flex-col gap-3">
+        <div className="sm:col-span-2 rounded-2xl border border-border bg-card p-5 flex flex-col gap-3 bento-rise bento-rise-1">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Today&apos;s macros
           </p>
@@ -58,14 +58,18 @@ export default async function HomePage() {
         </div>
 
         {/* Pantry stat tile */}
-        <PantryStat itemCount={pantryItems.length} />
+        <div className="bento-rise bento-rise-2">
+          <PantryStat itemCount={pantryItems.length} />
+        </div>
 
         {/* Check-in peek tile */}
-        <CheckinPeek checkin={todayCheckin} />
+        <div className="bento-rise bento-rise-3">
+          <CheckinPeek checkin={todayCheckin} />
+        </div>
 
         {/* Last cooked tile */}
         {lastCooked && (
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-2 bento-rise bento-rise-4">
             <LastCookedCard entry={lastCooked} />
           </div>
         )}

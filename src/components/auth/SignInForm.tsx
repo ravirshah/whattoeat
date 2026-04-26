@@ -73,6 +73,20 @@ export function SignInForm({ next = '/' }: Props) {
       >
         {status === 'loading' ? 'Sending…' : 'Send magic link'}
       </button>
+
+      {process.env.NODE_ENV === 'development' && (
+        <div className="flex flex-col gap-1.5 pt-2 mt-2 border-t border-border">
+          <p className="text-xs text-muted-foreground">
+            Dev shortcut — bypasses email (localhost only)
+          </p>
+          <a
+            href={`/auth/dev?email=${encodeURIComponent(email || 'dev@whattoeat.local')}&next=${encodeURIComponent(next)}`}
+            className="rounded-md border border-dashed border-border px-4 py-2 text-center text-sm font-medium text-foreground hover:bg-surface-elevated transition-colors"
+          >
+            Sign in as {email || 'dev@whattoeat.local'}
+          </a>
+        </div>
+      )}
     </form>
   );
 }

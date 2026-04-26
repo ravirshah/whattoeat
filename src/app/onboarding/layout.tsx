@@ -1,6 +1,6 @@
 import { OnboardingStepper } from '@/components/feature/home/OnboardingStepper';
 import type { Profile } from '@/contracts/zod/profile';
-import { ONBOARDING_STEPS, isOnboardingComplete } from '@/lib/onboarding';
+import { isOnboardingComplete } from '@/lib/onboarding';
 import { createServerClient } from '@/lib/supabase/server';
 import { getUserId } from '@/server/auth';
 import { redirect } from 'next/navigation';
@@ -56,7 +56,7 @@ export default async function OnboardingLayout({ children }: Props) {
 
       {/* Stepper progress bar */}
       <div className="px-4 pt-8 pb-4 flex justify-center">
-        <OnboardingStepper steps={ONBOARDING_STEPS} profile={profile} />
+        <OnboardingStepper profile={profile} />
       </div>
 
       {/* Step content */}

@@ -1,25 +1,25 @@
-'use client';
+// Server component — no client interactivity needed.
+// Receives only serializable data (no functions) so it works across the RSC boundary.
 
 import { cn } from '@/components/ui/utils';
 import type { Profile } from '@/contracts/zod/profile';
-import type { OnboardingStepMeta } from '@/lib/onboarding';
+import { ONBOARDING_STEPS } from '@/lib/onboarding';
 import { CheckIcon } from 'lucide-react';
 
 interface OnboardingStepperProps {
-  steps: readonly OnboardingStepMeta[];
   profile: Partial<Profile> | null;
   /** The currently active step number (1-indexed). */
   activeStep?: number;
 }
 
-export function OnboardingStepper({ steps, profile, activeStep }: OnboardingStepperProps) {
+export function OnboardingStepper({ profile, activeStep }: OnboardingStepperProps) {
   return (
     <nav aria-label="Onboarding progress" className="w-full max-w-md">
       <ol className="flex items-center gap-0">
-        {steps.map((s, idx) => {
+        {ONBOARDING_STEPS.map((s, idx) => {
           const complete = s.isComplete(profile);
           const active = s.step === activeStep;
-          const isLast = idx === steps.length - 1;
+          const isLast = idx === ONBOARDING_STEPS.length - 1;
 
           return (
             <li key={s.step} className="flex items-center flex-1 last:flex-none">
