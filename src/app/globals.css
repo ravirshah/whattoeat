@@ -1,0 +1,48 @@
+/* Tailwind directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Token surface — must come after @tailwind base so vars are available */
+@import '../styles/tokens.css';
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: rgb(var(--border));
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Geist Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: rgb(var(--surface));
+    color: rgb(var(--text));
+    min-height: 100dvh;
+    line-height: 1.5;
+  }
+
+  /* Accessible focus rings — visible only on keyboard nav */
+  :focus-visible {
+    outline: 2px solid rgb(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Reduced motion — respect user preference */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
