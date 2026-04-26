@@ -1,4 +1,5 @@
 import { FakeLlmClient } from '@/engine/__fixtures__/llm-fakes';
+import type { LlmClient } from '@/engine/ports/llm';
 import { recommend } from '@/engine/recommend';
 import datasetRaw from './dataset.json';
 import { EvalDataset } from './schema';
@@ -21,33 +22,15 @@ export interface EvalReport {
   totalFailed: number;
 }
 
+/** Eval run mode — duplicated here to avoid circular import with run.ts. */
+export type EvalMode = 'fake' | 'real';
+
 // ---------------------------------------------------------------------------
 // Per-entry validation
 // ---------------------------------------------------------------------------
 
-async function runEntry(entry: EvalEntry): Promise<EvalEntryResult> {
+async function runEntry(entry: EvalEntry, llm: LlmClient): Promise<EvalEntryResult> {
   const start = Date.now();
-  // Pass timeBudgetMin so FakeLlmClient caps totalMinutes to within budget.
-  const timeBudget = entry.ctx.request.timeBudgetMin;
-  const llm = new FakeLlmClient(
-    timeBudget != null
-      ? {
-          detail: (title) => ({
-            title,
-            oneLineWhy: `${title} — great choice.`,
-            ingredients: [{ name: 'chicken breast', qty: 200, unit: 'g' as const, note: null }],
-            steps: [{ idx: 1, text: 'Prepare and cook.', durationMin: timeBudget }],
-            estMacros: { kcal: 400, protein_g: 40, carbs_g: 20, fat_g: 10 },
-            servings: 1,
-            totalMinutes: timeBudget,
-            cuisine: 'american' as const,
-            tags: ['quick'],
-            pantryCoverage: 0.8,
-            missingItems: [],
-          }),
-        }
-      : {},
-  );
   const result = await recommend(entry.ctx, { llm });
   const latencyMs = Date.now() - start;
 
@@ -115,9 +98,44 @@ async function runEntry(entry: EvalEntry): Promise<EvalEntryResult> {
 // Public API
 // ---------------------------------------------------------------------------
 
-export async function runEval(): Promise<EvalReport> {
+export async function runEval(
+  llmOverride?: LlmClient,
+  opts?: { mode?: EvalMode },
+): Promise<EvalReport> {
   const dataset = EvalDataset.parse(datasetRaw);
-  const results = await Promise.all(dataset.map(runEntry));
+
+  const results = await Promise.all(
+    dataset.map((entry) => {
+      const timeBudget = entry.ctx.request.timeBudgetMin;
+      const llm =
+        llmOverride ??
+        new FakeLlmClient(
+          timeBudget != null
+            ? {
+                detail: (title) => ({
+                  title,
+                  oneLineWhy: `${title} — great choice.`,
+                  ingredients: [
+                    { name: 'chicken breast', qty: 200, unit: 'g' as const, note: null },
+                  ],
+                  steps: [{ idx: 1, text: 'Prepare and cook.', durationMin: timeBudget }],
+                  estMacros: { kcal: 400, protein_g: 40, carbs_g: 20, fat_g: 10 },
+                  servings: 1,
+                  totalMinutes: timeBudget,
+                  cuisine: 'american' as const,
+                  tags: ['quick'],
+                  pantryCoverage: 0.8,
+                  missingItems: [],
+                }),
+              }
+            : {},
+        );
+      return runEntry(entry, llm);
+    }),
+  );
+
+  if (opts?.mode) {
+  }
 
   return {
     entries: results,

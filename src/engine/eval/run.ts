@@ -1,27 +1,21 @@
-import { formatMarkdownReport, runEval } from './harness';
+import type { EvalMode } from './harness';
 
-const isCi = process.argv.includes('--ci');
+// ---------------------------------------------------------------------------
+// Mode helpers — exported for unit testing and scripts/run-eval.ts
+// ---------------------------------------------------------------------------
 
-const report = await runEval();
+export type { EvalMode };
 
-if (isCi) {
-  // In CI, output the markdown report for PR comment posting.
-  process.stdout.write(`${formatMarkdownReport(report)}
-`);
-} else {
-  // Local: human-readable summary.
-  for (const entry of report.entries) {
-    const icon = entry.passed ? '✓' : '✗';
-    process.stdout.write(`${icon} [${entry.id}] ${entry.label} (${entry.latencyMs}ms)\n`);
-    if (!entry.passed) {
-      for (const r of entry.failureReasons) {
-        process.stdout.write(`    → ${r}\n`);
-      }
-    }
+export function parseMode(argv: string[]): EvalMode {
+  const flag = argv.find((a) => a.startsWith('--mode='));
+  if (!flag) return 'fake';
+  const value = flag.slice('--mode='.length);
+  if (value !== 'fake' && value !== 'real') {
+    throw new Error(`Invalid mode: "${value}". Expected "fake" or "real".`);
   }
-  process.stdout.write(`\n${report.totalPassed}/${report.entries.length} entries passed.\n`);
+  return value;
 }
 
-if (report.totalFailed > 0) {
-  process.exit(1);
+export function shouldSkipReal(): boolean {
+  return !process.env.GEMINI_API_KEY;
 }
