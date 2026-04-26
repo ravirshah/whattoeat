@@ -44,7 +44,7 @@ const BASE_ROW = {
   training: 'light' as const,
   hunger: 'normal' as const,
   note: null,
-  created_at: '2026-04-26T10:00:00.000Z',
+  created_at: new Date('2026-04-26T10:00:00.000Z'),
 };
 
 describe('getTodayCheckin', () => {
@@ -60,14 +60,16 @@ describe('getTodayCheckin', () => {
 
   it('returns null when no check-in exists', async () => {
     mockRequireUser.mockResolvedValue(FAKE_USER);
-    mockRepo.today.mockResolvedValue(null);
+    // biome-ignore lint/suspicious/noExplicitAny: test null return
+    mockRepo.today.mockResolvedValue(null as any);
     const result = await getTodayCheckin();
     expect(result).toBeNull();
   });
 
   it('always uses userId from requireUser, not a caller argument', async () => {
     mockRequireUser.mockResolvedValue({ userId: 'server-user', email: 'x@x.com' });
-    mockRepo.today.mockResolvedValue(null);
+    // biome-ignore lint/suspicious/noExplicitAny: test null return
+    mockRepo.today.mockResolvedValue(null as any);
     await getTodayCheckin();
     expect(mockRepo.today).toHaveBeenCalledWith('server-user', expect.any(String));
   });
@@ -100,7 +102,6 @@ describe('saveCheckin', () => {
   it('throws a validation error if energy is out of range', async () => {
     mockRequireUser.mockResolvedValue(FAKE_USER);
     await expect(
-      // @ts-expect-error — deliberately invalid
       saveCheckin({ date: TODAY, energy: 99, training: 'light', hunger: 'normal' }),
     ).rejects.toThrow();
     expect(mockRepo.upsert).not.toHaveBeenCalled();
