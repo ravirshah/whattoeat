@@ -78,7 +78,15 @@ export async function assertWithinDailyCap(
   }
 
   const key = buildKey(userId, action);
-  const result = await client.limit(key);
+
+  let result: Awaited<ReturnType<RateLimitClient['limit']>>;
+  try {
+    result = await client.limit(key);
+  } catch (err) {
+    // fail-open chosen — see commit msg
+    console.warn('[rate-limit] upstash unreachable, allowing request:', err);
+    return { ok: true, remaining: -1 };
+  }
 
   if (result.success) {
     return { ok: true, remaining: result.remaining };

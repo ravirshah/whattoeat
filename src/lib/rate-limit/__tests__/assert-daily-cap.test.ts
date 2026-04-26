@@ -88,4 +88,17 @@ describe('assertWithinDailyCap', () => {
     });
     expect(result.ok).toBe(true);
   });
+
+  it('returns ok:true (fail-open) when the Upstash client throws', async () => {
+    const errorClient: RateLimitClient = {
+      limit: async (_key: string) => {
+        throw new Error('Upstash connection refused');
+      },
+    };
+    const result = await assertWithinDailyCap('u-6', 'engine:recommend', {
+      client: errorClient,
+    });
+    // fail-open: a Redis outage must not block LLM calls
+    expect(result.ok).toBe(true);
+  });
 });
