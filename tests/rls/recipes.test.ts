@@ -3,13 +3,17 @@ import { admin, createUserWithPassword, signInClient } from './_helpers';
 
 const aEmail = `rls-ra-${Date.now()}@example.test`;
 const bEmail = `rls-rb-${Date.now()}@example.test`;
-let aId: string; let bId: string; let aPwd: string;
+let aId: string;
+let bId: string;
+let aPwd: string;
 
 describe('RLS: recipes', () => {
   beforeAll(async () => {
     const a = await createUserWithPassword(aEmail);
     const b = await createUserWithPassword(bEmail);
-    aId = a.user.id; bId = b.user.id; aPwd = a.password;
+    aId = a.user.id;
+    bId = b.user.id;
+    aPwd = a.password;
 
     const minimalRecipe = {
       title: 'Test',

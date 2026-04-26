@@ -7,7 +7,6 @@ const userBEmail = `rls-b-${Date.now()}@example.test`;
 let userAId: string;
 let userBId: string;
 let aPwd: string;
-let bPwd: string;
 
 describe('RLS: profiles', () => {
   beforeAll(async () => {
@@ -16,7 +15,6 @@ describe('RLS: profiles', () => {
     userAId = a.user.id;
     userBId = b.user.id;
     aPwd = a.password;
-    bPwd = b.password;
 
     // Insert profile rows for both via service-role
     await admin.from('profiles').insert({

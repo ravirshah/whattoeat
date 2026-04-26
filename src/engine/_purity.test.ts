@@ -1,6 +1,6 @@
-import { describe, expect, test } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, expect, test } from 'vitest';
 
 const ENGINE_DIR = 'src/engine';
 const FORBIDDEN = [

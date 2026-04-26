@@ -3,17 +3,25 @@ import { admin, createUserWithPassword, signInClient } from './_helpers';
 
 const aEmail = `rls-ca-${Date.now()}@example.test`;
 const bEmail = `rls-cb-${Date.now()}@example.test`;
-let aId: string; let bId: string; let aPwd: string;
+let aId: string;
+let bId: string;
+let aPwd: string;
 
 describe('RLS: checkins', () => {
   beforeAll(async () => {
     const a = await createUserWithPassword(aEmail);
     const b = await createUserWithPassword(bEmail);
-    aId = a.user.id; bId = b.user.id; aPwd = a.password;
+    aId = a.user.id;
+    bId = b.user.id;
+    aPwd = a.password;
 
     const today = new Date().toISOString().slice(0, 10);
-    await admin.from('checkins').insert({ user_id: aId, date: today, energy: 4, training: 'light', hunger: 'normal' });
-    await admin.from('checkins').insert({ user_id: bId, date: today, energy: 2, training: 'hard', hunger: 'high' });
+    await admin
+      .from('checkins')
+      .insert({ user_id: aId, date: today, energy: 4, training: 'light', hunger: 'normal' });
+    await admin
+      .from('checkins')
+      .insert({ user_id: bId, date: today, energy: 2, training: 'hard', hunger: 'high' });
   });
   afterAll(async () => {
     await admin.auth.admin.deleteUser(aId);

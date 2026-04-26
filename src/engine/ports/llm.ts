@@ -1,5 +1,5 @@
-import type { ZodSchema } from 'zod';
 import type { TokenUsage } from '@/contracts/zod';
+import type { ZodSchema } from 'zod';
 
 export interface LlmGenerateArgs<T> {
   system: string;

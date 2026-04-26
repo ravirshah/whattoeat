@@ -1,9 +1,9 @@
 import { z } from 'zod';
+import { Checkin } from './checkin';
+import { PantryItem } from './pantry';
+import { Profile } from './profile';
 import { Ingredient, Macros, Step } from './recipe';
 import { HealthSignals } from './signals';
-import { Profile } from './profile';
-import { PantryItem } from './pantry';
-import { Checkin } from './checkin';
 
 export const MealType = z.enum(['breakfast', 'lunch', 'dinner', 'snack', 'any']);
 export type MealType = z.infer<typeof MealType>;

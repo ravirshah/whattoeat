@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+set -e
+echo "→ typecheck"
+bun run typecheck
+echo "→ lint"
+bun run lint

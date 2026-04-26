@@ -1,5 +1,5 @@
-import { index, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import type { MealCandidate, RecommendationContext } from '@/contracts/zod';
+import { index, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 export const recommendation_runs = pgTable(
   'recommendation_runs',

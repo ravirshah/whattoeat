@@ -1,13 +1,6 @@
 import { z } from 'zod';
 
-export const PantryCategory = z.enum([
-  'protein',
-  'produce',
-  'grain',
-  'dairy',
-  'pantry',
-  'other',
-]);
+export const PantryCategory = z.enum(['protein', 'produce', 'grain', 'dairy', 'pantry', 'other']);
 export type PantryCategory = z.infer<typeof PantryCategory>;
 
 export const PantryItem = z.object({

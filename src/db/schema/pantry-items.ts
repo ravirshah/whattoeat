@@ -14,7 +14,10 @@ export const pantry_items = pgTable(
   },
   (t) => ({
     userAvailableIdx: index('pantry_items_user_available_idx').on(t.user_id, t.available),
-    userNameUnique: uniqueIndex('pantry_items_user_name_unique').on(t.user_id, sql`lower(${t.name})`),
+    userNameUnique: uniqueIndex('pantry_items_user_name_unique').on(
+      t.user_id,
+      sql`lower(${t.name})`,
+    ),
   }),
 );
 

@@ -2,12 +2,14 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { admin, createUserWithPassword, signInClient } from './_helpers';
 
 const aEmail = `rls-rra-${Date.now()}@example.test`;
-let aId: string; let aPwd: string;
+let aId: string;
+let aPwd: string;
 
 describe('RLS: recommendation_runs', () => {
   beforeAll(async () => {
     const a = await createUserWithPassword(aEmail);
-    aId = a.user.id; aPwd = a.password;
+    aId = a.user.id;
+    aPwd = a.password;
     await admin.from('recommendation_runs').insert({
       user_id: aId,
       context_snapshot: {},
@@ -19,7 +21,9 @@ describe('RLS: recommendation_runs', () => {
       latency_ms: 1,
     });
   });
-  afterAll(async () => { await admin.auth.admin.deleteUser(aId); });
+  afterAll(async () => {
+    await admin.auth.admin.deleteUser(aId);
+  });
 
   test('user can read own runs', async () => {
     const sb = await signInClient(aEmail, aPwd);

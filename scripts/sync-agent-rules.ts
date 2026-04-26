@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 const RULES_PATH = 'docs/PROJECT_RULES.md';
@@ -33,5 +33,5 @@ const targets = [
 for (const target of targets) {
   mkdirSync(dirname(target) || '.', { recursive: true });
   writeFileSync(target, HEADER + PREAMBLE + rules);
-  console.log(`wrote ${target}`);
+  console.info(`wrote ${target}`);
 }
