@@ -18,7 +18,9 @@
     "db:studio": "drizzle-kit studio",
     "agents:sync": "bun scripts/sync-agent-rules.ts",
     "kanban:seed": "bun scripts/seed-kanban.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "engine:eval": "bun scripts/run-eval.ts",
+    "engine:eval:ci": "bun scripts/run-eval.ts --ci"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.2.7",
@@ -60,7 +62,8 @@
     "tailwindcss": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "zod-to-json-schema": "^3.23.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,md}": ["biome check --write --no-errors-on-unmatched"]
