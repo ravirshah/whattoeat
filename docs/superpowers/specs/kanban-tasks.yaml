@@ -1,0 +1,229 @@
+# Cline Kanban seed for WhatToEat 2.0
+# Regenerable from this file via `bun run kanban:seed`. Never edit cards directly.
+
+board: whattoeat
+url: http://127.0.0.1:3484/whattoeat
+
+tracks:
+  - id: T0
+    title: 'T0 — Contracts + DB schema + RLS'
+    wave: 0
+    branch: wt/track-0-contracts
+    status: done   # landed by Plan 00
+    owned_paths:
+      - src/contracts/zod/**
+      - src/engine/ports/**
+      - src/engine/types.ts
+      - src/server/contracts.ts
+      - src/db/schema/**
+      - src/db/client.ts
+      - drizzle.config.ts
+      - supabase/migrations/**
+      - tests/rls/**
+    depends_on: []
+    plan: docs/superpowers/plans/2026-04-26-plan-00-bootstrap-and-track-0.md
+
+  - id: T1
+    title: 'T1 — Design system, tokens, shadcn fork'
+    wave: 1
+    branch: wt/track-1-design-system
+    status: ready
+    owned_paths:
+      - src/styles/**
+      - tailwind.config.ts
+      - postcss.config.mjs
+      - src/components/ui/**
+    depends_on: [T0]
+    acceptance:
+      - tokens.css authored; tailwind.config.ts derives from tokens
+      - shadcn primitives forked into src/components/ui/* and re-themed
+      - Sonner + Vaul + Lucide installed and stroke-width pinned
+      - dark mode is a token swap; both modes designed simultaneously
+      - storybook-style preview page (or dev-only route) shows every primitive
+    plan: docs/superpowers/plans/<TBD>-plan-01-design-system.md
+
+  - id: T2
+    title: 'T2 — Engine core (TDD with fake LLM)'
+    wave: 1
+    branch: wt/track-2-engine-core
+    status: ready
+    owned_paths:
+      - src/engine/**
+    depends_on: [T0]
+    acceptance:
+      - recommend(ctx, deps) implemented with two-call flow (plan + detail)
+      - score + sanitize pure helpers implemented and tested
+      - allergen filter throws EngineSafetyError when all candidates drop
+      - schema-validation retry once then EngineParseError
+      - 95%+ branch coverage with FakeLlmClient
+    plan: docs/superpowers/plans/<TBD>-plan-02-engine-core.md
+
+  - id: T3
+    title: 'T3 — Gemini adapter + eval harness'
+    wave: 2
+    branch: wt/track-3-gemini-adapter
+    status: blocked
+    owned_paths:
+      - src/server/adapters/gemini.ts
+      - src/engine/eval/**
+      - scripts/run-eval.ts
+    depends_on: [T0, T2]
+    acceptance:
+      - GeminiLlmClient implements LlmClient with structured outputs
+      - eval harness runs ~20 fixtures; emits cost-vs-quality table
+      - first PR posts table; production model selected from data
+    plan: docs/superpowers/plans/<TBD>-plan-03-gemini-adapter-and-evals.md
+
+  - id: T4
+    title: 'T4 — Auth + middleware'
+    wave: 1
+    branch: wt/track-4-auth
+    status: ready
+    owned_paths:
+      - src/server/auth/**
+      - src/middleware.ts
+      - src/app/auth/**
+    depends_on: [T0]
+    acceptance:
+      - magic-link flow end-to-end via @supabase/ssr
+      - middleware enforces auth on /(authenticated)/**
+      - server-side getUser used everywhere (never getSession)
+      - account-deletion flow + Danger zone
+    plan: docs/superpowers/plans/<TBD>-plan-04-auth-and-middleware.md
+
+  - id: T5
+    title: 'T5 — Pantry feature'
+    wave: 2
+    branch: wt/track-5-pantry
+    status: blocked
+    owned_paths:
+      - src/server/pantry/**
+      - src/app/pantry/**
+      - src/components/feature/pantry/**
+    depends_on: [T0, T1]
+    acceptance:
+      - server actions for add/toggle/delete/bulkAdd
+      - LLM-assisted normalization with confirmation chip + 2s undo
+      - Web Speech API voice add (real, not stubbed)
+      - chip grid grouped by category, search, paste add
+    plan: docs/superpowers/plans/<TBD>-plan-05-pantry-feature.md
+
+  - id: T6
+    title: 'T6 — Profile feature'
+    wave: 2
+    branch: wt/track-6-profile
+    status: blocked
+    owned_paths:
+      - src/server/profile/**
+      - src/app/profile/**
+      - src/components/feature/profile/**
+    depends_on: [T0, T1]
+    acceptance:
+      - TDEE + macro split server-suggested, editable
+      - allergies/dislikes/cuisines/equipment chip multi-selects
+      - Connections placeholder cards for HealthKit/Eight Sleep/Superpower
+    plan: docs/superpowers/plans/<TBD>-plan-06-profile-feature.md
+
+  - id: T7
+    title: 'T7 — Daily check-in'
+    wave: 2
+    branch: wt/track-7-checkin
+    status: blocked
+    owned_paths:
+      - src/server/checkin/**
+      - src/app/checkin/**
+      - src/components/feature/checkin/**
+    depends_on: [T0, T1]
+    acceptance:
+      - Vaul drawer 3-tap UI
+      - idempotent upsert on (user_id, date)
+      - shows today's status from Home tile
+    plan: docs/superpowers/plans/<TBD>-plan-07-checkin-feature.md
+
+  - id: T8
+    title: 'T8 — Feed Me flow + recommendation result UI'
+    wave: 3
+    branch: wt/track-8-feed-me
+    status: blocked
+    owned_paths:
+      - src/app/feed-me/**
+      - src/app/api/recommend/**
+      - src/components/feature/recommendation/**
+      - src/server/recommendation/**
+    depends_on: [T1, T2, T3, T5, T6, T7]
+    acceptance:
+      - Server Action assembles RecommendationContext
+      - Route Handler streams from recommend()
+      - staged reveal motion on result; 1–3 MealCards
+      - persists recommendation_runs before showing candidates
+    plan: docs/superpowers/plans/<TBD>-plan-08-feed-me-flow.md
+
+  - id: T9
+    title: 'T9 — Recipe view + saved + cooked log'
+    wave: 3
+    branch: wt/track-9-recipe-view
+    status: blocked
+    owned_paths:
+      - src/app/recipes/**
+      - src/app/saved/**
+      - src/server/recipes/**
+      - src/components/feature/recipe/**
+    depends_on: [T0, T1]
+    acceptance:
+      - structured ingredients/steps render
+      - MacroRing animated count-up
+      - I-cooked-this writes cooked_log + 1-tap rating
+      - lazy persistence: recipes saved only on save/cook
+    plan: docs/superpowers/plans/<TBD>-plan-09-recipe-and-saved.md
+
+  - id: T10
+    title: 'T10 — Home + onboarding + signature moments'
+    wave: 4
+    branch: wt/track-10-home-onboarding
+    status: blocked
+    owned_paths:
+      - src/app/(home)/**
+      - src/app/onboarding/**
+      - src/components/feature/home/**
+    depends_on: [T1, T5, T6, T8]
+    acceptance:
+      - animated gradient hero
+      - Feed Me CTA staged motion (compress → bloom → cards)
+      - 3-pane onboarding with brand-voice copy
+      - delight-skill polish on every core surface
+    plan: docs/superpowers/plans/<TBD>-plan-10-home-and-onboarding.md
+
+  - id: T11
+    title: 'T11 — PWA shell + offline pantry cache'
+    wave: 2
+    branch: wt/track-11-pwa
+    status: blocked
+    owned_paths:
+      - public/manifest.json
+      - public/icons/**
+      - src/app/sw.ts
+      - src/app/offline/**
+    depends_on: [T1, T5]
+    acceptance:
+      - installable PWA on iOS Safari + Chromium
+      - pantry view readable offline (cached SWR)
+      - graceful empty state for offline recommendation attempts
+    plan: docs/superpowers/plans/<TBD>-plan-11-pwa-shell-offline.md
+
+  - id: T12
+    title: 'T12 — Observability + rate limit + error boundary'
+    wave: 2
+    branch: wt/track-12-observability
+    status: blocked
+    owned_paths:
+      - src/server/instrumentation/**
+      - src/server/ratelimit/**
+      - src/app/error.tsx
+      - sentry.client.config.ts
+      - sentry.server.config.ts
+    depends_on: [T0, T4]
+    acceptance:
+      - Sentry wired with source maps, tagged events
+      - Upstash rate limit on /api/recommend, normalize, magic-link
+      - feature-level error boundary on Feed Me with retry CTA
+    plan: docs/superpowers/plans/<TBD>-plan-12-observability.md

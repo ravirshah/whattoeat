@@ -1,0 +1,21 @@
+name: security-review
+
+on:
+  pull_request:
+    paths:
+      - 'src/middleware.ts'
+      - 'src/server/auth/**'
+      - 'src/app/api/**'
+      - 'supabase/migrations/**'
+      - 'src/db/schema/**'
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Notice
+        run: |
+          echo "Security-review agent runs on auth/RLS/route changes once configured."
+          echo "Local /security-review slash command is the interim gate."
