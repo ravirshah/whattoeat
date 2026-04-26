@@ -1,3 +1,4 @@
+import { onboardingRedirectPath } from '@/lib/onboarding';
 import { createMiddlewareClient } from '@/lib/supabase/middleware';
 import { type NextRequest, NextResponse } from 'next/server';
 
@@ -25,6 +26,7 @@ export async function middleware(request: NextRequest) {
     pathname === segment || pathname.startsWith(`${segment}/`);
   const isProtected =
     pathname.startsWith('/(authenticated)') ||
+    isOnSegment('/home') ||
     isOnSegment('/pantry') ||
     isOnSegment('/profile') ||
     isOnSegment('/feed-me') ||
@@ -41,6 +43,44 @@ export async function middleware(request: NextRequest) {
   if (user && (isOnSegment('/auth/login') || isOnSegment('/auth/signup'))) {
     return NextResponse.redirect(new URL('/', request.url));
   }
+
+  // ── Onboarding gate ──────────────────────────────────────────────────────
+  // For authenticated users on protected routes, check whether onboarding is
+  // complete. Fetch only the minimal profile fields needed for the gate.
+  if (user && isProtected) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('goal, height_cm, weight_kg, birthdate, sex, activity_level, target_kcal, allergies')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    // Normalise to the shape expected by onboardingRedirectPath:
+    // The DB returns flat target_kcal; we map it to targets.kcal for the profile contract.
+    const profileForGate = profile
+      ? {
+          goal: profile.goal as string | undefined,
+          height_cm: profile.height_cm ? Number(profile.height_cm) : null,
+          weight_kg: profile.weight_kg ? Number(profile.weight_kg) : null,
+          birthdate: profile.birthdate as string | null,
+          sex: profile.sex as string | null,
+          activity_level: profile.activity_level as string | null,
+          targets: { kcal: profile.target_kcal ?? 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
+          allergies: profile.allergies ?? [],
+        }
+      : null;
+
+    const redirectPath = onboardingRedirectPath(
+      profileForGate as Parameters<typeof onboardingRedirectPath>[0],
+      pathname,
+    );
+
+    if (redirectPath) {
+      const url = request.nextUrl.clone();
+      url.pathname = redirectPath;
+      return NextResponse.redirect(url);
+    }
+  }
+  // ── End onboarding gate ──────────────────────────────────────────────────
 
   return response;
 }
