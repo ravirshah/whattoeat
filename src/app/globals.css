@@ -1,10 +1,10 @@
+/* Token surface — imported first so vars are available in base layer */
+@import "../styles/tokens.css";
+
 /* Tailwind directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Token surface — must come after @tailwind base so vars are available */
-@import '../styles/tokens.css';
 
 @layer base {
   *,
@@ -15,7 +15,7 @@
   }
 
   html {
-    font-family: 'Geist Sans', system-ui, sans-serif;
+    font-family: "Geist Sans", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
