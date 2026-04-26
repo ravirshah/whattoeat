@@ -10,7 +10,7 @@ export const metadata = { title: 'Profile — WhatToEat' };
  */
 export default async function ProfilePage() {
   const profile = await getMyProfile();
-  if (!profile) redirect('/onboarding');
+  if (!profile || profile.targets.kcal === 0) redirect('/onboarding');
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-8">

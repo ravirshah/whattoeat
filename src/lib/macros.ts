@@ -56,6 +56,10 @@ export function computeTargets(profile: Profile): MacroTargets | null {
   const goalFactor = GOAL_ADJUSTMENTS[goal] ?? 1.0;
   const kcal = Math.round(tdee * goalFactor);
 
+  if (kcal <= 0) {
+    throw new Error('kcal must be positive to compute macro split');
+  }
+
   // Macro split
   // Protein: 1 g per lb of body weight, capped at 250 g
   const protein_g = Math.min(Math.floor(weight_kg * 2.20462), 250);

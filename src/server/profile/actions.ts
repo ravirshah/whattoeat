@@ -50,6 +50,14 @@ export async function updateProfile(patch: Partial<Profile>): Promise<Profile> {
       const merged: Profile = { ...current, ...validated };
       const computed = computeTargets(merged);
       if (computed) {
+        if (
+          computed.kcal <= 0 ||
+          computed.protein_g <= 0 ||
+          computed.carbs_g <= 0 ||
+          computed.fat_g <= 0
+        ) {
+          throw new Error('Computed targets must be positive — check biometric inputs');
+        }
         finalPatch = { ...finalPatch, targets: computed };
       }
     }
@@ -72,6 +80,14 @@ export async function recomputeMacros(): Promise<Profile> {
   const computed = computeTargets(current);
   if (!computed) {
     throw new Error('Cannot compute targets: profile is missing biometric fields.');
+  }
+  if (
+    computed.kcal <= 0 ||
+    computed.protein_g <= 0 ||
+    computed.carbs_g <= 0 ||
+    computed.fat_g <= 0
+  ) {
+    throw new Error('Computed targets must be positive — check biometric inputs');
   }
   return upsertProfile(userId, { targets: computed });
 }

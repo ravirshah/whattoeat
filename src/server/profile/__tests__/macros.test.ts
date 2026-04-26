@@ -142,4 +142,19 @@ describe('computeTargets', () => {
     );
     expect(result?.carbs_g).toBeGreaterThanOrEqual(0);
   });
+
+  // ── kcal guard ───────────────────────────────────────────────────────────
+  it('throws when computed kcal is <= 0 (extreme cut on near-zero BMR)', () => {
+    // Craft a profile where Mifflin yields negative TDEE * goal adjustment:
+    // Very low weight (1 kg), very low height (1 cm), very old age → huge negative BMR,
+    // then cut factor 0.8 → still negative → kcal rounds to <= 0.
+    const extreme = makeProfile({
+      weight_kg: 1,
+      height_cm: 1,
+      birthdate: '1900-01-01', // ~126 yrs old
+      activity_level: 'sedentary',
+      goal: 'cut',
+    });
+    expect(() => computeTargets(extreme)).toThrow('kcal must be positive to compute macro split');
+  });
 });

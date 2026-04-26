@@ -38,6 +38,8 @@ export async function getProfileByUserId(userId: string): Promise<Profile | null
   if (rows.length === 0) return null;
   const row = rows[0];
   if (!row) return null;
+  // target_kcal === 0 is the onboarding-pending sentinel written by the auth trigger
+  if (row.target_kcal === 0) return null;
   return rowToProfile(row);
 }
 

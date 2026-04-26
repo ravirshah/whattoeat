@@ -119,6 +119,92 @@ describe('updateProfile', () => {
   });
 });
 
+describe('updateProfile — validation rejection', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('throws when computeTargets returns non-positive kcal', async () => {
+    const { getProfileByUserId } = await import('@/server/profile/repo');
+    const { computeTargets } = await import('@/lib/macros');
+
+    const baseProfile = {
+      user_id: 'user-test-123',
+      goal: 'maintain',
+      targets: { kcal: 2000, protein_g: 150, carbs_g: 220, fat_g: 55 },
+      height_cm: 175,
+      weight_kg: 80,
+      birthdate: '1990-01-01',
+      sex: 'male',
+      activity_level: 'moderate',
+      display_name: null,
+      allergies: [],
+      dislikes: [],
+      cuisines: [],
+      equipment: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    (getProfileByUserId as ReturnType<typeof vi.fn>).mockResolvedValue(baseProfile);
+    (computeTargets as ReturnType<typeof vi.fn>).mockReturnValue({
+      kcal: 0,
+      protein_g: 0,
+      carbs_g: 0,
+      fat_g: 0,
+    });
+
+    const { updateProfile } = await import('@/server/profile/actions');
+    await expect(updateProfile({ weight_kg: 1 })).rejects.toThrow(
+      'Computed targets must be positive',
+    );
+  });
+
+  it('throws when recomputeMacros yields non-positive targets', async () => {
+    const { getProfileByUserId } = await import('@/server/profile/repo');
+    const { computeTargets } = await import('@/lib/macros');
+
+    const profile = {
+      user_id: 'user-test-123',
+      goal: 'cut',
+      targets: { kcal: 1800, protein_g: 160, carbs_g: 150, fat_g: 50 },
+      height_cm: 175,
+      weight_kg: 80,
+      birthdate: '1990-01-01',
+      sex: 'male',
+      activity_level: 'active',
+      display_name: null,
+      allergies: [],
+      dislikes: [],
+      cuisines: [],
+      equipment: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    (getProfileByUserId as ReturnType<typeof vi.fn>).mockResolvedValue(profile);
+    (computeTargets as ReturnType<typeof vi.fn>).mockReturnValue({
+      kcal: 0,
+      protein_g: 0,
+      carbs_g: 0,
+      fat_g: 0,
+    });
+
+    const { recomputeMacros } = await import('@/server/profile/actions');
+    await expect(recomputeMacros()).rejects.toThrow('Computed targets must be positive');
+  });
+});
+
+describe('getMyProfile — onboarding sentinel', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns null when getProfileByUserId returns null (kcal=0 sentinel from repo)', async () => {
+    const { getProfileByUserId } = await import('@/server/profile/repo');
+    // repo already converts target_kcal===0 rows to null
+    (getProfileByUserId as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+    const { getMyProfile } = await import('@/server/profile/actions');
+    const result = await getMyProfile();
+    expect(result).toBeNull();
+  });
+});
+
 describe('recomputeMacros', () => {
   beforeEach(() => vi.clearAllMocks());
 
