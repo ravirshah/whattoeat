@@ -16,18 +16,15 @@ import {
 
 type Terminal = { data: unknown; error: unknown };
 
-function makeMockChain(
-  resolvedValue: unknown,
-  errorValue: unknown = null,
-): Promise<Terminal> & Record<string, unknown> {
+function makeMockChain(resolvedValue: unknown, errorValue: unknown = null): unknown {
   const terminal: Terminal = { data: resolvedValue, error: errorValue };
   const methods = ['select', 'eq', 'gte', 'order', 'single', 'insert', 'update', 'delete'];
   const promise = Promise.resolve(terminal);
-  const chain = Object.assign(promise, terminal);
+  const chain = Object.assign(promise, terminal) as unknown as Record<string, unknown>;
   for (const m of methods) {
-    (chain as Record<string, unknown>)[m] = vi.fn(() => chain);
+    chain[m] = vi.fn(() => chain);
   }
-  return chain as Promise<Terminal> & Record<string, unknown>;
+  return chain;
 }
 
 function makeSupabase(resolvedValue: unknown = null, error: unknown = null) {
