@@ -292,8 +292,12 @@ in the database.
 4. Add to `upsertProfile()` values spread in `src/server/profile/repo.ts` if
    the field should be patchable.
 5. Write `supabase/migrations/<next-number>_<description>.sql` with the `ALTER
-   TABLE` statement.
-6. Update all test fixtures (see mistake #2 above).
+   TABLE` statement. Use `IF NOT EXISTS` / `IF EXISTS` so re-runs are safe.
+6. Apply it: `bun run db:migrate` (runs everything pending against
+   `$SUPABASE_DB_URL`; tracked in the `_wte_applied_migrations` table).
+   Use `bun run db:migrate:status` to see applied vs pending.
+7. Update all test fixtures (see mistake #2 above).
 
 Missing step 5 means the column exists in TypeScript types but not in the actual
-database, causing silent `undefined` values in prod.
+database, causing silent `undefined` values in prod. Missing step 6 is the same
+thing in disguise — the file is committed but the schema never changes.

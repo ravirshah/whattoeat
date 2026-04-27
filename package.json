@@ -16,6 +16,8 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "db:migrate": "bun scripts/db-migrate.ts apply",
+    "db:migrate:status": "bun scripts/db-migrate.ts status",
     "agents:sync": "bun scripts/sync-agent-rules.ts",
     "kanban:seed": "bun scripts/seed-kanban.ts",
     "prepare": "husky",
