@@ -10,7 +10,7 @@ export const PantryItem = z.object({
   display_name: z.string().min(1).max(120),
   category: PantryCategory,
   available: z.boolean(),
-  added_at: z.string().datetime(),
+  added_at: z.string().datetime({ offset: true }),
 });
 export type PantryItem = z.infer<typeof PantryItem>;
 
