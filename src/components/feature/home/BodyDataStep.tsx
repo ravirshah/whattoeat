@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import type { Profile } from '@/contracts/zod/profile';
+import { cmToFtIn, kgToLb } from '@/lib/units';
 import { useMemo, useState } from 'react';
 import { useActionState } from 'react';
 
@@ -36,22 +37,6 @@ async function bodyDataStepAdapter(_prev: FormState, formData: FormData): Promis
 
 interface BodyDataStepProps {
   profile: Partial<Profile> | null;
-}
-
-// cm → ft/in for prefilling existing profiles.
-function cmToFtIn(cm: number | null | undefined): { ft: string; inch: string } {
-  if (!cm || cm <= 0) return { ft: '', inch: '' };
-  const totalInches = cm / 2.54;
-  const ft = Math.floor(totalInches / 12);
-  const inch = Math.round(totalInches - ft * 12);
-  // Carry 12 in -> +1 ft.
-  if (inch === 12) return { ft: String(ft + 1), inch: '0' };
-  return { ft: String(ft), inch: String(inch) };
-}
-
-function kgToLb(kg: number | null | undefined): string {
-  if (!kg || kg <= 0) return '';
-  return (kg * 2.2046226218).toFixed(1).replace(/\.0$/, '');
 }
 
 export function BodyDataStep({ profile }: BodyDataStepProps) {

@@ -1,10 +1,13 @@
 'use client';
 import { cn } from '@/components/ui/utils';
 import { XIcon } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 type PantryCategory = 'protein' | 'produce' | 'grain' | 'dairy' | 'pantry' | 'other';
 
 interface PantryChipProps {
+  /** Stable identifier — used to form the `view-transition-name`. */
+  id?: string;
   name: string;
   category: PantryCategory;
   available: boolean;
@@ -22,12 +25,15 @@ const categoryColorMap: Record<PantryCategory, string> = {
   other: 'bg-cat-other/20   text-cat-other   border-cat-other/30',
 };
 
+const HOLD_MS = 600;
+
 /**
- * PantryChip — togglable chip with category color and optional remove button.
- *
- * TODO: Plan 05 fills — real server action wiring, voice add, optimistic UI.
+ * PantryChip — togglable chip with category color and a tactile long-press
+ * remove gesture (a radial progress ring fills around the chip; release early
+ * to cancel). The X button remains as an accessible immediate fallback.
  */
 export function PantryChip({
+  id,
   name,
   category,
   available,
@@ -35,21 +41,76 @@ export function PantryChip({
   onRemove,
   className,
 }: PantryChipProps) {
+  const [pressing, setPressing] = useState(false);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completed = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+    };
+  }, []);
+
+  function startHold() {
+    if (!onRemove) return;
+    completed.current = false;
+    setPressing(true);
+    holdTimer.current = setTimeout(() => {
+      completed.current = true;
+      setPressing(false);
+      onRemove?.();
+    }, HOLD_MS);
+  }
+
+  function cancelHold() {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+    setPressing(false);
+  }
+
+  function handleClick() {
+    // If a long-press just fired the remove, swallow the click.
+    if (completed.current) {
+      completed.current = false;
+      return;
+    }
+    onToggle?.();
+  }
+
+  const vtName = id ? `vt-chip-${id}` : undefined;
+
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium',
-        'transition-all duration-snap select-none',
+        'relative isolate inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium chip-press',
+        'transition-[opacity,filter] duration-snap select-none',
         categoryColorMap[category],
         !available && 'opacity-40',
         className,
       )}
+      style={vtName ? ({ viewTransitionName: vtName } as React.CSSProperties) : undefined}
     >
+      {/* Long-press progress ring — sits behind the chip text */}
+      {onRemove && (
+        <span
+          aria-hidden
+          data-pressing={pressing ? 'true' : 'false'}
+          className="press-ring pointer-events-none absolute -inset-px rounded-full"
+        />
+      )}
+
       <button
         type="button"
         aria-pressed={available}
-        onClick={onToggle}
-        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+        onClick={handleClick}
+        onPointerDown={startHold}
+        onPointerUp={cancelHold}
+        onPointerLeave={cancelHold}
+        onPointerCancel={cancelHold}
+        onContextMenu={(e) => e.preventDefault()}
+        className="relative z-[1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
       >
         {name}
       </button>
@@ -61,7 +122,7 @@ export function PantryChip({
             e.stopPropagation();
             onRemove();
           }}
-          className="rounded-full p-0.5 hover:bg-text/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="relative z-[1] rounded-full p-0.5 hover:bg-text/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <XIcon strokeWidth={1.75} className="size-3" />
         </button>
