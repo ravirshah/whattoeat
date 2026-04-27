@@ -3,6 +3,7 @@ import { listMyIntegrations } from '@/server/integrations/actions';
 import { redirect } from 'next/navigation';
 
 export const metadata = { title: 'Integrations — WhatToEat' };
+export const dynamic = 'force-dynamic';
 
 export default async function IntegrationsPage() {
   const result = await listMyIntegrations();
