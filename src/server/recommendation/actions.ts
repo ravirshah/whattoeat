@@ -68,13 +68,19 @@ async function _runEngineSpan(
     const result = await recommend(ctx, {
       llm,
       recentCookTitles,
-      timeoutMs: 30_000,
+      timeoutMs: 120_000,
+      logger: {
+        info: (m: string, f?: Record<string, unknown>) => console.info('[engine]', m, f ?? {}),
+        warn: (m: string, f?: Record<string, unknown>) => console.warn('[engine]', m, f ?? {}),
+        error: (m: string, f?: Record<string, unknown>) => console.error('[engine]', m, f ?? {}),
+      },
     });
 
     const durationMs = Math.round(performance.now() - start);
 
     if (!result.ok) {
       const err = result.error;
+      console.error('[regenerateAction] engine !ok:', err?.name, err?.message, err);
       let errorCode: RecommendActionError['code'];
       if (err instanceof EngineSafetyError) {
         errorCode = 'ENGINE_SAFETY';

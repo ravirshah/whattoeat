@@ -37,13 +37,21 @@ function dedup(arr: string[]): string[] {
   return Array.from(new Set(arr.filter(Boolean)));
 }
 
-/** Returns true when the error looks like a quota/rate-limit failure (HTTP 429). */
-function isQuotaError(err: unknown): boolean {
+/**
+ * Returns true when the error is the kind that should rotate to the next model:
+ *   429 — quota / rate-limit exhausted on this model
+ *   503 — model temporarily unavailable
+ *   500 — model-side internal error (often transient and model-specific)
+ * Other failures (timeout, refusal, schema, 4xx other than 429) bubble up.
+ */
+function isModelRotationError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as { status?: number; message?: unknown };
-  if (e.status === 429) return true;
-  if (typeof e.message === 'string' && /\b429\b|quota|Too Many Requests/i.test(e.message)) {
-    return true;
+  if (e.status === 429 || e.status === 503 || e.status === 500) return true;
+  if (typeof e.message === 'string') {
+    if (/\b(429|503|500)\b|quota|Too Many Requests|Service Unavailable|Internal/i.test(e.message)) {
+      return true;
+    }
   }
   return false;
 }
@@ -166,27 +174,27 @@ export class GeminiLlmClient implements LlmClient {
   }
 
   // ---------------------------------------------------------------------------
-  // Private: walk the fallback chain, advancing on 429 quota errors only.
-  // Non-quota errors (timeout, refusal, schema) bubble up immediately so the
-  // caller's retry-with-feedback path still runs.
+  // Private: walk the fallback chain, advancing on transient model-side failures
+  // (429 quota, 503 unavailable, 500 internal). Non-rotation errors (timeout,
+  // refusal, schema) bubble up immediately so the schema-retry path still runs.
   // ---------------------------------------------------------------------------
 
   private async callOnce<T>(args: LlmGenerateArgs<T>): Promise<LlmGenerateResult<T>> {
     const chain = args.modelHint === 'strong' ? this.qualityChain : this.cheapChain;
-    let lastQuotaError: unknown;
+    let lastRotationError: unknown;
     for (const modelName of chain) {
       try {
         return await this.callWithModel(args, modelName);
       } catch (err) {
-        if (isQuotaError(err)) {
-          lastQuotaError = err;
+        if (isModelRotationError(err)) {
+          lastRotationError = err;
           continue;
         }
         throw err;
       }
     }
-    // Whole chain exhausted by 429s.
-    throw lastQuotaError ?? new Error('All Gemini models exhausted with no error captured');
+    // Whole chain exhausted by transient errors.
+    throw lastRotationError ?? new Error('All Gemini models exhausted with no error captured');
   }
 
   // ---------------------------------------------------------------------------
