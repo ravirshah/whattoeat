@@ -7,15 +7,19 @@ import {
   HarmCategory,
 } from '@google/generative-ai';
 import type { ZodSchema } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { zodToGeminiSchema } from './gemini-schema';
 import { LruCache } from './lru-cache';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const DEFAULT_CHEAP_MODEL = 'gemini-1.5-flash';
-const DEFAULT_QUALITY_MODEL = 'gemini-1.5-pro';
+// Google retired the 1.5 family; 2.5 is the current stable lineup.
+// Default both tiers to 2.5-flash because gemini-2.5-pro has 0 free-tier quota
+// (instant 429). Override either via GEMINI_MODEL_CHEAP / GEMINI_MODEL_QUALITY
+// once a paid key is wired up.
+const DEFAULT_CHEAP_MODEL = 'gemini-2.5-flash';
+const DEFAULT_QUALITY_MODEL = 'gemini-2.5-flash';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const CACHE_CAPACITY = 50;
 
@@ -143,7 +147,7 @@ export class GeminiLlmClient implements LlmClient {
       safetySettings: SAFETY_SETTINGS,
       generationConfig: {
         responseMimeType: 'application/json',
-        responseSchema: zodToJsonSchema(args.schema as ZodSchema<unknown>) as never,
+        responseSchema: zodToGeminiSchema(args.schema as ZodSchema<unknown>) as never,
       },
     });
 

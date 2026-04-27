@@ -196,7 +196,7 @@ describe('GeminiLlmClient', () => {
   // modelHint routing
   // -------------------------------------------------------------------------
 
-  it('uses the cheap model (gemini-1.5-flash) by default', async () => {
+  it('uses the cheap model (gemini-2.5-flash) by default', async () => {
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const getGenerativeModelSpy = vi.fn().mockReturnValue({
       generateContent: mockGenerateContent.mockResolvedValueOnce(
@@ -214,15 +214,15 @@ describe('GeminiLlmClient', () => {
     await freshClient.generateStructured({ system: 's', user: 'u', schema: DishSchema });
 
     expect(getGenerativeModelSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'gemini-1.5-flash' }),
+      expect.objectContaining({ model: 'gemini-2.5-flash' }),
     );
   });
 
-  it('uses the quality model (gemini-1.5-pro) when modelHint is "strong"', async () => {
+  it('uses the quality model (gemini-2.5-flash) when modelHint is "strong"', async () => {
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const getGenerativeModelSpy = vi.fn().mockReturnValue({
       generateContent: mockGenerateContent.mockResolvedValueOnce(
-        makeSuccessResponse({ name: 'Dish', calories: 100 }, 'gemini-1.5-pro'),
+        makeSuccessResponse({ name: 'Dish', calories: 100 }, 'gemini-2.5-flash'),
       ),
     });
     vi.mocked(GoogleGenerativeAI).mockImplementationOnce(
@@ -241,7 +241,7 @@ describe('GeminiLlmClient', () => {
     });
 
     expect(getGenerativeModelSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'gemini-1.5-pro' }),
+      expect.objectContaining({ model: 'gemini-2.5-flash' }),
     );
   });
 
