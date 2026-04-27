@@ -1,4 +1,5 @@
 'use client';
+import { getSiteUrl } from '@/lib/site-url';
 import { createBrowserClient } from '@/lib/supabase/browser';
 import { useState } from 'react';
 
@@ -18,7 +19,7 @@ export function SignInForm({ next = '/' }: Props) {
     setErrorMsg('');
 
     const supabase = createBrowserClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+    const redirectTo = `${getSiteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
