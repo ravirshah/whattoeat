@@ -33,10 +33,18 @@ const globalForDb = globalThis as unknown as { __wte_db_cache?: DbCache };
 const cache: DbCache = globalForDb.__wte_db_cache ?? { pg: null, db: null };
 globalForDb.__wte_db_cache = cache;
 
+// Resolution order:
+//   POSTGRES_URL — auto-injected by the Supabase ↔ Vercel integration; this
+//     is the pgbouncer pooler endpoint, correct for app runtime traffic.
+//   SUPABASE_DB_URL — local-dev convenience name (set in .env.local).
+function resolveDbUrl(): string | undefined {
+  return process.env.POSTGRES_URL ?? process.env.SUPABASE_DB_URL;
+}
+
 function getDb(): DbClient {
   if (cache.db) return cache.db;
-  const url = process.env.SUPABASE_DB_URL;
-  if (!url) throw new Error('SUPABASE_DB_URL is not set');
+  const url = resolveDbUrl();
+  if (!url) throw new Error('POSTGRES_URL / SUPABASE_DB_URL is not set');
   // max:5 keeps a single Bun/Next process well under the upstream pool_size:15
   // limit even if multiple workers are running. idle_timeout:20 closes
   // unused conns quickly so a long-idle dev session doesn't hold them.

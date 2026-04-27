@@ -3,6 +3,7 @@
   "files": {
     "ignore": [
       ".next/**",
+      ".vercel/**",
       "node_modules/**",
       "dist/**",
       "supabase/**",
