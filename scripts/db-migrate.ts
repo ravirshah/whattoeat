@@ -68,9 +68,13 @@ async function listApplied(sql: postgres.Sql): Promise<Map<string, string>> {
 }
 
 async function main() {
-  const url = process.env.SUPABASE_DB_URL;
+  // Migrations need a direct (non-pooler) connection because pgbouncer in
+  // transaction mode rejects multi-statement DDL. POSTGRES_URL_NON_POOLING is
+  // auto-injected by the Supabase ↔ Vercel integration; SUPABASE_DB_URL is
+  // the local-dev convenience name.
+  const url = process.env.POSTGRES_URL_NON_POOLING ?? process.env.SUPABASE_DB_URL;
   if (!url) {
-    console.error('SUPABASE_DB_URL is not set');
+    console.error('POSTGRES_URL_NON_POOLING / SUPABASE_DB_URL is not set');
     process.exit(1);
   }
 
