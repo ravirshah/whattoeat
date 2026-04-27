@@ -1,4 +1,4 @@
-import type { RecommendationContext } from '@/contracts/zod';
+import type { MealCandidate, RecommendationContext } from '@/contracts/zod';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -278,6 +278,43 @@ If a step would normally use a forbidden ingredient, substitute explicitly (e.g.
     equipment: ctx.profile.equipment,
     pantry: ctx.pantry.map((p) => p.name),
     request: ctx.request,
+    promptsVersion: PROMPTS_VERSION,
+  });
+
+  return { system, user };
+}
+
+// ---------------------------------------------------------------------------
+// Modify prompt — mutate an existing recipe based on a natural-language instruction
+// ---------------------------------------------------------------------------
+
+export function buildModifyPrompt(
+  original: MealCandidate,
+  instruction: string,
+  priorTweaks: string[],
+  ctx: Pick<RecommendationContext, 'profile'>,
+): { system: string; user: string } {
+  const system = `${SYSTEM_PROMPT_BASE}
+
+Task: Mutate the given recipe according to the user instruction. Preserve everything not explicitly changed.
+
+MUTATION RULES:
+- Change only what the instruction asks for. If the instruction is ambiguous (e.g. "make it better"), change exactly one dimension and make it substantive.
+- Preserve the same JSON schema shape as the original recipe.
+- ALLERGY HARD CONSTRAINT: the mutated recipe must still respect the user's allergies. Never introduce a forbidden ingredient even if the user's instruction implies it.
+- KCAL CONSTRAINT: unless the instruction explicitly requests a calorie change, the mutated recipe kcal must stay within ±20% of the original kcal.
+
+ALLERGEN REMINDER — forbidden in BOTH ingredient.name AND ingredient.note:
+${JSON.stringify(ctx.profile.allergies)}
+
+Return a JSON object matching the DetailResponse schema exactly.`;
+
+  const user = stableJson({
+    original_recipe: original,
+    instruction,
+    prior_tweaks: priorTweaks,
+    HARD_ALLERGIES_NEVER_INCLUDE: ctx.profile.allergies,
+    goal: ctx.profile.goal,
     promptsVersion: PROMPTS_VERSION,
   });
 

@@ -87,7 +87,7 @@ export function FeedMeIsland({ localDate }: FeedMeIslandProps) {
   // phase === 'success'
   return (
     <div className="w-full space-y-6">
-      <MealCardStack candidates={islandState.candidates} />
+      <MealCardStack candidates={islandState.candidates} runId={islandState.runId} />
 
       <div className="flex justify-center pb-8">
         <RegenerateButton onRegenerate={runAction} isPending={isPending} />

@@ -15,6 +15,7 @@ import type { RecommendationContext } from '@/contracts/zod/recommendation';
 import type { MealCandidate } from '@/contracts/zod/recommendation';
 import { db } from '@/db/client';
 import { recommendation_runs } from '@/db/schema/recommendation-runs';
+import { eq } from 'drizzle-orm';
 
 export interface InsertRunArgs {
   userId: string;
@@ -59,4 +60,27 @@ export async function insertRecommendationRun(args: InsertRunArgs): Promise<stri
   }
 
   return row.id;
+}
+
+export interface GetRunResult {
+  candidates: MealCandidate[];
+  context: RecommendationContext;
+}
+
+export async function getRecommendationRun(
+  runId: string,
+  userId: string,
+): Promise<GetRunResult | null> {
+  const [row] = await db
+    .select({
+      candidates: recommendation_runs.candidates,
+      context_snapshot: recommendation_runs.context_snapshot,
+      user_id: recommendation_runs.user_id,
+    })
+    .from(recommendation_runs)
+    .where(eq(recommendation_runs.id, runId))
+    .limit(1);
+
+  if (!row || row.user_id !== userId) return null;
+  return { candidates: row.candidates, context: row.context_snapshot };
 }
