@@ -51,14 +51,17 @@ export function StepsList({ steps }: StepsListProps) {
         const timerForStep = timer?.stepIdx === step.idx ? timer : null;
 
         return (
-          <li key={step.idx}>
+          <li
+            key={step.idx}
+            className={cn(
+              'rounded-xl transition-all duration-base',
+              isActive ? 'bg-surface-elevated border border-border shadow-1' : 'hover:bg-surface',
+            )}
+          >
             <button
               type="button"
               onClick={() => setActiveStep(i)}
-              className={cn(
-                'flex w-full gap-4 rounded-xl p-4 text-left transition-all duration-base',
-                isActive ? 'bg-surface-elevated border border-border shadow-1' : 'hover:bg-surface',
-              )}
+              className="flex w-full gap-4 p-4 text-left"
             >
               {/* Step number badge */}
               <span
@@ -70,39 +73,36 @@ export function StepsList({ steps }: StepsListProps) {
                 {step.idx}
               </span>
 
-              <div className="flex flex-1 flex-col gap-2">
-                <p
-                  className={cn(
-                    'text-sm leading-relaxed',
-                    isActive ? 'text-text' : 'text-text-muted',
-                  )}
-                >
-                  {step.text}
-                </p>
-
-                {step.durationMin != null && step.durationMin > 0 && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      startTimer(step.idx, step.durationMin ?? 0);
-                    }}
-                    className="flex w-fit items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-text-muted hover:border-accent hover:text-accent transition-colors duration-snap"
-                  >
-                    <ClockIcon
-                      strokeWidth={1.75}
-                      className={cn(
-                        'size-3.5 transition-all',
-                        timerForStep?.running && 'text-accent animate-pulse',
-                      )}
-                    />
-                    {timerForStep
-                      ? formatTime(timerForStep.remainingSeconds)
-                      : `${step.durationMin} min`}
-                  </button>
+              <p
+                className={cn(
+                  'flex-1 text-sm leading-relaxed',
+                  isActive ? 'text-text' : 'text-text-muted',
                 )}
-              </div>
+              >
+                {step.text}
+              </p>
             </button>
+
+            {step.durationMin != null && step.durationMin > 0 && (
+              <div className="flex pl-15 pr-4 pb-4 -mt-1">
+                <button
+                  type="button"
+                  onClick={() => startTimer(step.idx, step.durationMin ?? 0)}
+                  className="flex w-fit items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-text-muted hover:border-accent hover:text-accent transition-colors duration-snap"
+                >
+                  <ClockIcon
+                    strokeWidth={1.75}
+                    className={cn(
+                      'size-3.5 transition-all',
+                      timerForStep?.running && 'text-accent animate-pulse',
+                    )}
+                  />
+                  {timerForStep
+                    ? formatTime(timerForStep.remainingSeconds)
+                    : `${step.durationMin} min`}
+                </button>
+              </div>
+            )}
           </li>
         );
       })}
