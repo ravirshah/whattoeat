@@ -15,7 +15,7 @@ import type { RecommendationContext } from '@/contracts/zod/recommendation';
 import type { MealCandidate } from '@/contracts/zod/recommendation';
 import { db } from '@/db/client';
 import { recommendation_runs } from '@/db/schema/recommendation-runs';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, gte, sql } from 'drizzle-orm';
 
 export interface InsertRunArgs {
   userId: string;
@@ -83,4 +83,47 @@ export async function getRecommendationRun(
 
   if (!row || row.user_id !== userId) return null;
   return { candidates: row.candidates, context: row.context_snapshot };
+}
+
+export interface LatestRunResult {
+  runId: string;
+  candidates: MealCandidate[];
+  context: RecommendationContext;
+  createdAt: Date;
+}
+
+/**
+ * Returns the most recent successful (non-empty candidates) run for a user
+ * since `sinceDate` (inclusive). Used to seed /feed-me with cached results
+ * so a same-day re-visit renders instantly instead of re-running the engine.
+ */
+export async function getLatestSuccessfulRun(
+  userId: string,
+  sinceDate: Date,
+): Promise<LatestRunResult | null> {
+  const [row] = await db
+    .select({
+      id: recommendation_runs.id,
+      candidates: recommendation_runs.candidates,
+      context_snapshot: recommendation_runs.context_snapshot,
+      created_at: recommendation_runs.created_at,
+    })
+    .from(recommendation_runs)
+    .where(
+      and(
+        eq(recommendation_runs.user_id, userId),
+        gte(recommendation_runs.created_at, sinceDate),
+        sql`jsonb_array_length(${recommendation_runs.candidates}) > 0`,
+      ),
+    )
+    .orderBy(desc(recommendation_runs.created_at))
+    .limit(1);
+
+  if (!row) return null;
+  return {
+    runId: row.id,
+    candidates: row.candidates,
+    context: row.context_snapshot,
+    createdAt: row.created_at,
+  };
 }

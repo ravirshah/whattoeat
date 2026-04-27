@@ -1,10 +1,17 @@
 import { FeedMeIsland } from '@/components/feature/feed-me/FeedMeIsland';
+import { getUserId } from '@/server/auth/index';
+import { getLatestSuccessfulRun } from '@/server/recommendation/repo';
 import { cookies } from 'next/headers';
 
 export const metadata = {
   title: 'Feed Me - WhatToEat',
   description: 'Get personalised meal recommendations based on your pantry and goals.',
 };
+
+// Server actions invoked from this route can take up to 120s when the engine
+// walks the Gemini fallback chain. Vercel's per-plan default is 300s, but we
+// set this explicitly so the limit is clear in code review.
+export const maxDuration = 180;
 
 // The page RSC does not call requireUser() — the middleware at src/middleware.ts
 // already protects authenticated routes. If middleware is bypassed, the island's
@@ -21,10 +28,19 @@ export default async function FeedMePage() {
     ? getLocalDateFromOffset(tzOffset)
     : new Date().toISOString().slice(0, 10);
 
+  // Seed the island with the most recent successful run from the last 24h, if
+  // one exists. This makes same-day re-visits instant — no engine call needed.
+  const userId = await getUserId();
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const cached = userId ? await getLatestSuccessfulRun(userId, since) : null;
+
   return (
     <main className="min-h-screen bg-background">
       <div className="py-6">
-        <FeedMeIsland localDate={localDate} />
+        <FeedMeIsland
+          localDate={localDate}
+          initialRun={cached ? { runId: cached.runId, candidates: cached.candidates } : null}
+        />
       </div>
     </main>
   );

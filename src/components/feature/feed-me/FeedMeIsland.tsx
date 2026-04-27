@@ -2,7 +2,7 @@
 
 import type { MealCandidate } from '@/contracts/zod/recommendation';
 import { type RecommendActionResult, regenerateAction } from '@/server/recommendation/actions';
-import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { EmptyState, type EmptyStateVariant } from './EmptyState';
 import { MealCardStack } from './MealCardStack';
 import { RegenerateButton } from './RegenerateButton';
@@ -11,6 +11,12 @@ import { SkeletonStack } from './SkeletonStack';
 interface FeedMeIslandProps {
   /** Client's local date string (YYYY-MM-DD) passed from the RSC page. */
   localDate: string;
+  /**
+   * Most recent successful run from the last 24h, fetched server-side.
+   * When present, the island renders these candidates immediately and skips
+   * the auto-fire on mount — the user can still tap "Get new suggestions".
+   */
+  initialRun: { runId: string; candidates: MealCandidate[] } | null;
 }
 
 type IslandPhase =
@@ -18,9 +24,15 @@ type IslandPhase =
   | { phase: 'success'; candidates: MealCandidate[]; runId: string }
   | { phase: 'error'; variant: EmptyStateVariant; resetAt?: string };
 
-export function FeedMeIsland({ localDate }: FeedMeIslandProps) {
-  const [islandState, setIslandState] = useState<IslandPhase>({ phase: 'loading' });
+export function FeedMeIsland({ localDate, initialRun }: FeedMeIslandProps) {
+  const [islandState, setIslandState] = useState<IslandPhase>(
+    initialRun
+      ? { phase: 'success', candidates: initialRun.candidates, runId: initialRun.runId }
+      : { phase: 'loading' },
+  );
   const [isPending, startTransition] = useTransition();
+  // Guards against the StrictMode double-mount in dev firing the action twice.
+  const didAutoRunRef = useRef(false);
 
   const runAction = useCallback(() => {
     setIslandState({ phase: 'loading' });
@@ -61,10 +73,15 @@ export function FeedMeIsland({ localDate }: FeedMeIslandProps) {
     });
   }, [localDate]);
 
-  // Fire on mount — no stale-while-revalidate needed; engine results are ephemeral.
+  // Fire on mount only when there is no cached run to display. The ref guard
+  // prevents the StrictMode double-mount in dev from triggering two parallel
+  // engine calls (which would burn duplicate Gemini quota).
   useEffect(() => {
+    if (initialRun) return;
+    if (didAutoRunRef.current) return;
+    didAutoRunRef.current = true;
     runAction();
-  }, [runAction]);
+  }, [initialRun, runAction]);
 
   // -------------------------------------------------------------------------
   // Render
