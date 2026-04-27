@@ -196,7 +196,7 @@ describe('GeminiLlmClient', () => {
   // modelHint routing
   // -------------------------------------------------------------------------
 
-  it('uses the cheap model (gemini-2.5-flash) by default', async () => {
+  it('uses gemini-3.1-flash-lite-preview as the cheap-tier primary by default', async () => {
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const getGenerativeModelSpy = vi.fn().mockReturnValue({
       generateContent: mockGenerateContent.mockResolvedValueOnce(
@@ -214,15 +214,15 @@ describe('GeminiLlmClient', () => {
     await freshClient.generateStructured({ system: 's', user: 'u', schema: DishSchema });
 
     expect(getGenerativeModelSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'gemini-2.5-flash' }),
+      expect.objectContaining({ model: 'gemini-3.1-flash-lite-preview' }),
     );
   });
 
-  it('uses the quality model (gemini-2.5-flash) when modelHint is "strong"', async () => {
+  it('uses gemini-3.1-flash-lite-preview as the quality-tier primary when modelHint is "strong"', async () => {
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const getGenerativeModelSpy = vi.fn().mockReturnValue({
       generateContent: mockGenerateContent.mockResolvedValueOnce(
-        makeSuccessResponse({ name: 'Dish', calories: 100 }, 'gemini-2.5-flash'),
+        makeSuccessResponse({ name: 'Dish', calories: 100 }, 'gemini-3.1-flash-lite-preview'),
       ),
     });
     vi.mocked(GoogleGenerativeAI).mockImplementationOnce(
@@ -241,8 +241,41 @@ describe('GeminiLlmClient', () => {
     });
 
     expect(getGenerativeModelSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'gemini-2.5-flash' }),
+      expect.objectContaining({ model: 'gemini-3.1-flash-lite-preview' }),
     );
+  });
+
+  it('falls through the chain on 429 quota errors and succeeds on the next model', async () => {
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const calls: string[] = [];
+    const getGenerativeModelSpy = vi.fn().mockImplementation(({ model }: { model: string }) => {
+      calls.push(model);
+      return {
+        generateContent: () => {
+          if (calls.length === 1) {
+            const err: Error & { status?: number } = Object.assign(
+              new Error('Quota exceeded for metric'),
+              { status: 429 },
+            );
+            return Promise.reject(err);
+          }
+          return Promise.resolve(makeSuccessResponse({ name: 'Dish', calories: 100 }, model));
+        },
+      };
+    });
+    vi.mocked(GoogleGenerativeAI).mockImplementationOnce(
+      () =>
+        ({
+          getGenerativeModel: getGenerativeModelSpy,
+        }) as never,
+    );
+
+    const fb = new GeminiLlmClient();
+    const result = await fb.generateStructured({ system: 's', user: 'u', schema: DishSchema });
+
+    expect(calls[0]).toBe('gemini-3.1-flash-lite-preview');
+    expect(calls[1]).toBe('gemini-3-flash-preview');
+    expect(result.modelUsed).toBe('gemini-3-flash-preview');
   });
 
   it('respects GEMINI_MODEL_CHEAP env override', async () => {

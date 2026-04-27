@@ -37,6 +37,7 @@ const STRIPPED_KEYS = new Set([
   'writeOnly',
   'allOf',
   'oneOf',
+  'anyOf',
   'not',
   'if',
   'then',

@@ -14,14 +14,39 @@ import { LruCache } from './lru-cache';
 // Constants
 // ---------------------------------------------------------------------------
 
-// Google retired the 1.5 family; 2.5 is the current stable lineup.
-// Default both tiers to 2.5-flash because gemini-2.5-pro has 0 free-tier quota
-// (instant 429). Override either via GEMINI_MODEL_CHEAP / GEMINI_MODEL_QUALITY
-// once a paid key is wired up.
-const DEFAULT_CHEAP_MODEL = 'gemini-2.5-flash';
-const DEFAULT_QUALITY_MODEL = 'gemini-2.5-flash';
+// Fallback chains: each tier walks a list of models. On a 429 (per-day or
+// per-minute quota), we try the next model in the chain. 3.1 is the newest
+// generation and currently has the most generous free-tier headroom; 2.5-pro
+// is the strongest legacy model and still has free-tier quota for low volume.
+const CHEAP_FALLBACK_CHAIN = [
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3-flash-preview',
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+];
+const QUALITY_FALLBACK_CHAIN = [
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3-flash-preview',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
+];
 const DEFAULT_TIMEOUT_MS = 30_000;
 const CACHE_CAPACITY = 50;
+
+function dedup(arr: string[]): string[] {
+  return Array.from(new Set(arr.filter(Boolean)));
+}
+
+/** Returns true when the error looks like a quota/rate-limit failure (HTTP 429). */
+function isQuotaError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { status?: number; message?: unknown };
+  if (e.status === 429) return true;
+  if (typeof e.message === 'string' && /\b429\b|quota|Too Many Requests/i.test(e.message)) {
+    return true;
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------------------
 // Error types
@@ -81,8 +106,8 @@ const SAFETY_SETTINGS = [
 
 export class GeminiLlmClient implements LlmClient {
   private readonly genAI: GoogleGenerativeAI;
-  private readonly cheapModel: string;
-  private readonly qualityModel: string;
+  private readonly cheapChain: string[];
+  private readonly qualityChain: string[];
   private readonly cache = new LruCache<LlmGenerateResult<unknown>>(CACHE_CAPACITY);
 
   constructor() {
@@ -94,8 +119,14 @@ export class GeminiLlmClient implements LlmClient {
       );
     }
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.cheapModel = process.env.GEMINI_MODEL_CHEAP ?? DEFAULT_CHEAP_MODEL;
-    this.qualityModel = process.env.GEMINI_MODEL_QUALITY ?? DEFAULT_QUALITY_MODEL;
+    // env overrides become the primary model; fallback chain follows.
+    const cheapPrimary = process.env.GEMINI_MODEL_CHEAP;
+    const qualityPrimary = process.env.GEMINI_MODEL_QUALITY;
+    this.cheapChain = dedup([...(cheapPrimary ? [cheapPrimary] : []), ...CHEAP_FALLBACK_CHAIN]);
+    this.qualityChain = dedup([
+      ...(qualityPrimary ? [qualityPrimary] : []),
+      ...QUALITY_FALLBACK_CHAIN,
+    ]);
   }
 
   async generateStructured<T>(args: LlmGenerateArgs<T>): Promise<LlmGenerateResult<T>> {
@@ -135,11 +166,37 @@ export class GeminiLlmClient implements LlmClient {
   }
 
   // ---------------------------------------------------------------------------
-  // Private: single SDK call with timeout + error mapping
+  // Private: walk the fallback chain, advancing on 429 quota errors only.
+  // Non-quota errors (timeout, refusal, schema) bubble up immediately so the
+  // caller's retry-with-feedback path still runs.
   // ---------------------------------------------------------------------------
 
   private async callOnce<T>(args: LlmGenerateArgs<T>): Promise<LlmGenerateResult<T>> {
-    const modelName = args.modelHint === 'strong' ? this.qualityModel : this.cheapModel;
+    const chain = args.modelHint === 'strong' ? this.qualityChain : this.cheapChain;
+    let lastQuotaError: unknown;
+    for (const modelName of chain) {
+      try {
+        return await this.callWithModel(args, modelName);
+      } catch (err) {
+        if (isQuotaError(err)) {
+          lastQuotaError = err;
+          continue;
+        }
+        throw err;
+      }
+    }
+    // Whole chain exhausted by 429s.
+    throw lastQuotaError ?? new Error('All Gemini models exhausted with no error captured');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private: single SDK call with timeout + error mapping
+  // ---------------------------------------------------------------------------
+
+  private async callWithModel<T>(
+    args: LlmGenerateArgs<T>,
+    modelName: string,
+  ): Promise<LlmGenerateResult<T>> {
     const timeoutMs = args.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
     const model = this.genAI.getGenerativeModel({
