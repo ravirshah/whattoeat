@@ -23,10 +23,6 @@ export default async function FeedMePage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border px-4 py-3">
-        <h1 className="text-lg font-semibold text-foreground">Feed Me</h1>
-      </div>
-
       <div className="py-6">
         <FeedMeIsland localDate={localDate} />
       </div>

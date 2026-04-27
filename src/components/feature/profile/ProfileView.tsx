@@ -1,4 +1,4 @@
-import { MacroRing } from '@/components/ui/macro-ring';
+import { KcalCircle } from '@/components/ui/macro-ring';
 import { StatTile } from '@/components/ui/stat-tile';
 import type { Profile } from '@/contracts/zod/profile';
 import Link from 'next/link';
@@ -53,7 +53,7 @@ export function ProfileView({ profile }: ProfileViewProps) {
       <section className="flex flex-col gap-4">
         <h2 className="text-base font-semibold text-text">Daily Targets</h2>
         <div className="flex items-center gap-4">
-          <MacroRing
+          <KcalCircle
             consumed={{ kcal: 0, protein: 0, carbs: 0, fat: 0 }}
             target={{
               kcal: targets.kcal,

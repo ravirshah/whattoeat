@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MacroRing } from '@/components/ui/macro-ring';
+import { KcalCircle } from '@/components/ui/macro-ring';
 import { MealCard } from '@/components/ui/meal-card';
 import { PantryChip } from '@/components/ui/pantry-chip';
 import { Separator } from '@/components/ui/separator';
@@ -211,18 +211,18 @@ export default function PreviewPage() {
 
         <Separator />
 
-        {/* MacroRing */}
+        {/* KcalCircle */}
         <section className="flex flex-col gap-4">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-            MacroRing (stub)
+            KcalCircle
           </h2>
           <div className="flex gap-6">
-            <MacroRing
+            <KcalCircle
               consumed={{ kcal: 1800, protein: 140, carbs: 180, fat: 60 }}
               target={{ kcal: 2450, protein: 187, carbs: 245, fat: 82 }}
               size={120}
             />
-            <MacroRing
+            <KcalCircle
               consumed={{ kcal: 2450, protein: 187, carbs: 245, fat: 82 }}
               target={{ kcal: 2450, protein: 187, carbs: 245, fat: 82 }}
               size={80}

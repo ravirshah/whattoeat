@@ -134,18 +134,9 @@ export function ProactiveBrief(props: ProactiveBriefProps) {
 
   return (
     <section
-      className={cn(
-        'relative overflow-hidden rounded-2xl border border-border',
-        'bg-gradient-to-br from-surface-elevated via-card to-card',
-        'px-5 py-5 sm:px-6 sm:py-6',
-      )}
+      className={cn('rounded-2xl border border-border bg-card', 'px-5 py-5 sm:px-6 sm:py-6')}
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full bg-accent/10 blur-2xl"
-      />
-
-      <div className="relative flex flex-col gap-3">
+      <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-accent/10 text-accent">
             <SparklesIcon className="h-3.5 w-3.5" strokeWidth={2.5} />

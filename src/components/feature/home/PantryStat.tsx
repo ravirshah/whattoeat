@@ -17,7 +17,7 @@ export function PantryStat({ itemCount }: PantryStatProps) {
       className={cn(
         'rounded-2xl border bg-card p-5 flex flex-col gap-3',
         'transition-colors duration-150 hover:bg-muted/50',
-        isLow ? 'border-orange-200 dark:border-orange-900' : 'border-border',
+        isLow ? 'border-warn/30' : 'border-border',
       )}
     >
       <div className="flex items-center justify-between">
@@ -25,7 +25,7 @@ export function PantryStat({ itemCount }: PantryStatProps) {
           Pantry
         </p>
         {isLow ? (
-          <AlertTriangleIcon className="w-4 h-4 text-orange-500" />
+          <AlertTriangleIcon className="w-4 h-4 text-warn" />
         ) : (
           <ShoppingBasketIcon className="w-4 h-4 text-muted-foreground" />
         )}
@@ -39,7 +39,7 @@ export function PantryStat({ itemCount }: PantryStatProps) {
       </div>
 
       {isLow && (
-        <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+        <p className="text-xs text-warn font-medium">
           Running low &mdash; add more for better recommendations
         </p>
       )}

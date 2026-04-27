@@ -7,7 +7,7 @@ interface Macros {
   fat: number;
 }
 
-interface MacroRingProps {
+interface KcalCircleProps {
   consumed: Macros;
   target: Macros;
   size?: number;
@@ -15,12 +15,13 @@ interface MacroRingProps {
 }
 
 /**
- * MacroRing — Apple-Activity-style three-ring with gradient fills and
- * animated count-up numerals.
+ * KcalCircle — a circle badge showing consumed / target kcal.
  *
- * TODO: Plan 08 fills this in — leave the stub.
+ * Named to match what it actually renders: a single bordered circle
+ * with a kcal fraction inside. The three-ring Apple Activity design
+ * is deferred until a food-log feature is implemented.
  */
-export function MacroRing({ consumed, target, size = 120, className }: MacroRingProps) {
+export function KcalCircle({ consumed, target, size = 120, className }: KcalCircleProps) {
   return (
     <div
       className={cn('flex flex-col items-center gap-2', className)}
@@ -39,3 +40,6 @@ export function MacroRing({ consumed, target, size = 120, className }: MacroRing
     </div>
   );
 }
+
+/** @deprecated Use KcalCircle instead. */
+export const MacroRing = KcalCircle;

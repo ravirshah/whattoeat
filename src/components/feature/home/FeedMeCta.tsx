@@ -19,7 +19,7 @@ export function FeedMeCta() {
         // Interaction — resting shimmer invites tap; spring-feel scale on press
         'feedme-shimmer',
         'transition-transform duration-200 ease-out',
-        'hover:scale-[1.02] hover:shadow-lg hover:shadow-accent/25',
+        'hover:scale-[1.02] hover:shadow-3',
         'active:scale-[0.98]',
         // Focus
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
