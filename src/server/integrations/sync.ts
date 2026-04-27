@@ -127,7 +127,7 @@ export async function getLatestSnapshot(
     .select()
     .from(signal_snapshots)
     .where(and(eq(signal_snapshots.user_id, userId), eq(signal_snapshots.source, provider)))
-    .orderBy(desc(signal_snapshots.observed_at))
+    .orderBy(desc(signal_snapshots.observed_at), desc(signal_snapshots.created_at))
     .limit(1);
   const latest = rows[0];
   if (!latest) return null;

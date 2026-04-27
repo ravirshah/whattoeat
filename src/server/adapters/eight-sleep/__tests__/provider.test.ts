@@ -195,7 +195,7 @@ describe('EightSleepSignalProvider', () => {
     expect(insertSnapshot).not.toHaveBeenCalled();
   });
 
-  it('marks an error when days are returned but none have sleep duration', async () => {
+  it('marks an error AND stores a diagnostic snapshot when days have no duration', async () => {
     const getTrends = vi.fn(async () => [{ day: '2026-04-25' }]); // no duration
     const client = buildClient(getTrends);
     const { deps, markSuccess, markError, insertSnapshot } = buildDeps({
@@ -207,7 +207,13 @@ describe('EightSleepSignalProvider', () => {
     expect(out).toEqual({});
     expect(markSuccess).not.toHaveBeenCalled();
     expect(markError).toHaveBeenCalledWith(USER_ID, expect.stringContaining('1 day(s)'));
-    expect(insertSnapshot).not.toHaveBeenCalled();
+    // Diagnostic snapshot is persisted so the debug panel can reveal the raw
+    // shape Eight Sleep returned (helps diagnose schema drift).
+    expect(insertSnapshot).toHaveBeenCalledTimes(1);
+    expect(insertSnapshot.mock.calls[0]?.[0].payload).toMatchObject({
+      _diagnostic: 'no_usable_day',
+      daysReturned: 1,
+    });
   });
 
   it('still inserts a snapshot for a day with duration but no score yet', async () => {

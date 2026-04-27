@@ -75,10 +75,21 @@ export class EightSleepSignalProvider implements SignalProvider {
 
       const latest = pickLatestUsableDay(days);
       if (!latest) {
+        // Persist whatever Eight Sleep did return so the debug panel can show
+        // the raw payload — useful for diagnosing schema drift (the field
+        // name we expect may not match what the API actually emits).
+        const lastDay = days.length > 0 ? days[days.length - 1] : null;
+        if (lastDay) {
+          await this.deps.insertSnapshot({
+            userId,
+            observedAt: parseSleepDayObservedAt(lastDay.day),
+            payload: { _diagnostic: 'no_usable_day', daysReturned: days.length, latest: lastDay },
+          });
+        }
         const detail =
           days.length === 0
             ? `Eight Sleep returned no sleep days for ${range.from}→${range.to}. Sleep on the bed and re-sync, or widen the range.`
-            : `Eight Sleep returned ${days.length} day(s) but none had a recorded sleep duration.`;
+            : `Eight Sleep returned ${days.length} day(s) but none had a recorded sleep duration. Open "Show raw payload" to inspect.`;
         await this.deps.markError(userId, detail);
         return {};
       }
