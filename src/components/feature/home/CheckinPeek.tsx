@@ -1,6 +1,6 @@
 import { cn } from '@/components/ui/utils';
 import type { CheckinDTO } from '@/server/checkin/actions';
-import { SmileIcon, ZapIcon } from 'lucide-react';
+import { DumbbellIcon, ZapIcon } from 'lucide-react';
 import Link from 'next/link';
 
 interface CheckinPeekProps {
@@ -34,7 +34,7 @@ export function CheckinPeek({ checkin }: CheckinPeekProps) {
           Today&apos;s check-in
         </p>
         {hasCheckin && (
-          <span className="text-[10px] font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950 px-2 py-0.5 rounded-full">
+          <span className="text-[10px] font-medium text-ok bg-ok/10 px-2 py-0.5 rounded-full">
             Logged
           </span>
         )}
@@ -44,7 +44,7 @@ export function CheckinPeek({ checkin }: CheckinPeekProps) {
         <div className="flex gap-4">
           {/* Energy */}
           <div className="flex items-center gap-1.5">
-            <ZapIcon className="w-4 h-4 text-amber-500" />
+            <ZapIcon className="w-4 h-4 text-warn" />
             <div>
               <p className="text-xs text-muted-foreground">Energy</p>
               <p className="text-sm font-semibold text-foreground">
@@ -55,7 +55,7 @@ export function CheckinPeek({ checkin }: CheckinPeekProps) {
 
           {/* Training */}
           <div className="flex items-center gap-1.5">
-            <SmileIcon className="w-4 h-4 text-blue-500" />
+            <DumbbellIcon className="w-4 h-4 text-cat-dairy" />
             <div>
               <p className="text-xs text-muted-foreground">Training</p>
               <p className="text-sm font-semibold text-foreground capitalize">{checkin.training}</p>

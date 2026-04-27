@@ -46,10 +46,12 @@ export default withSentryConfig(baseConfig, {
     disable: !process.env.SENTRY_AUTH_TOKEN,
   },
 
-  // Auto-instrument Server Components, Route Handlers, Server Actions.
-  autoInstrumentServerFunctions: true,
+  // HOC-based auto-instrumentation conflicts with Next 15.5's new RSC render
+  // paths (E692 InvariantError: clientReferenceManifest undefined). Sentry
+  // still captures RSC errors via the onRequestError hook in instrumentation.ts.
+  autoInstrumentServerFunctions: false,
   autoInstrumentMiddleware: true,
-  autoInstrumentAppDirectory: true,
+  autoInstrumentAppDirectory: false,
 
   // Suppress the "sentry.server.config.ts will be bundled" log in dev.
   hideSourceMaps: false,

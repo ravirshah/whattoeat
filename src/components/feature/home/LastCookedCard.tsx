@@ -52,13 +52,13 @@ export function LastCookedCard({ entry }: LastCookedCardProps) {
               kcal
             </span>
             <span className="text-xs text-muted-foreground">
-              <span className="font-medium text-blue-500">
+              <span className="font-medium text-cat-dairy">
                 {Math.round(recipe.macros.protein_g ?? 0)}g
               </span>{' '}
               protein
             </span>
             <span className="text-xs text-muted-foreground">
-              <span className="font-medium text-amber-500">
+              <span className="font-medium text-cat-grain">
                 {Math.round(recipe.macros.carbs_g ?? 0)}g
               </span>{' '}
               carbs
