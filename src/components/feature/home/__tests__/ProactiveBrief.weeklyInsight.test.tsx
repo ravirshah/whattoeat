@@ -28,11 +28,14 @@ const PROFILE: Profile = {
 };
 
 const CHECKIN: CheckinDTO = {
+  id: '00000000-0000-0000-0000-000000000099',
+  user_id: '00000000-0000-0000-0000-000000000001',
   date: '2026-04-26',
   energy: 4,
   training: 'light',
   hunger: 'normal',
   note: null,
+  created_at: '2026-04-26T00:00:00.000Z',
 };
 
 describe('ProactiveBrief — weeklyInsight', () => {
