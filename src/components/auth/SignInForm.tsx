@@ -1,6 +1,7 @@
 'use client';
 import { getSiteUrl } from '@/lib/site-url';
 import { createBrowserClient } from '@/lib/supabase/browser';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 type Props = {
@@ -8,8 +9,13 @@ type Props = {
   next?: string;
 };
 
+type Mode = 'magic' | 'password';
+
 export function SignInForm({ next = '/' }: Props) {
+  const router = useRouter();
+  const [mode, setMode] = useState<Mode>('password');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -19,13 +25,24 @@ export function SignInForm({ next = '/' }: Props) {
     setErrorMsg('');
 
     const supabase = createBrowserClient();
-    const redirectTo = `${getSiteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
 
+    if (mode === 'password') {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setStatus('error');
+        setErrorMsg(error.message);
+        return;
+      }
+      router.push(next);
+      router.refresh();
+      return;
+    }
+
+    const redirectTo = `${getSiteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: redirectTo },
     });
-
     if (error) {
       setStatus('error');
       setErrorMsg(error.message);
@@ -45,6 +62,39 @@ export function SignInForm({ next = '/' }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div
+        role="tablist"
+        aria-label="Sign-in method"
+        className="grid grid-cols-2 rounded-md border border-border bg-surface p-0.5 text-xs font-medium"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'password'}
+          onClick={() => setMode('password')}
+          className={
+            mode === 'password'
+              ? 'rounded-sm bg-accent px-2 py-1.5 text-accent-foreground'
+              : 'rounded-sm px-2 py-1.5 text-muted-foreground'
+          }
+        >
+          Password
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'magic'}
+          onClick={() => setMode('magic')}
+          className={
+            mode === 'magic'
+              ? 'rounded-sm bg-accent px-2 py-1.5 text-accent-foreground'
+              : 'rounded-sm px-2 py-1.5 text-muted-foreground'
+          }
+        >
+          Magic link
+        </button>
+      </div>
+
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-foreground">
           Email
@@ -61,6 +111,23 @@ export function SignInForm({ next = '/' }: Props) {
         />
       </div>
 
+      {mode === 'password' && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="password" className="text-sm font-medium text-foreground">
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+      )}
+
       {status === 'error' && (
         <p role="alert" className="text-sm text-destructive">
           {errorMsg}
@@ -72,7 +139,13 @@ export function SignInForm({ next = '/' }: Props) {
         disabled={status === 'loading'}
         className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-opacity disabled:opacity-50"
       >
-        {status === 'loading' ? 'Sending…' : 'Send magic link'}
+        {status === 'loading'
+          ? mode === 'password'
+            ? 'Signing in…'
+            : 'Sending…'
+          : mode === 'password'
+            ? 'Sign in'
+            : 'Send magic link'}
       </button>
 
       {process.env.NODE_ENV === 'development' && (
