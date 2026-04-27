@@ -81,30 +81,31 @@ export function ProfileView({ profile }: ProfileViewProps) {
         <PreferenceRow label="Equipment" items={equipment} emptyText="Standard kitchen" />
       </section>
 
-      {/* Connections — Coming Soon */}
+      {/* Connections */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-base font-semibold text-text">Connections</h2>
-        <p className="text-sm text-text-muted">
-          Connect health platforms to improve recommendations.
-        </p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {[
-            { name: 'Apple Health', icon: '🍎' },
-            { name: 'Eight Sleep', icon: '🛏' },
-            { name: 'Superpower Labs', icon: '⚡' },
-          ].map(({ name, icon }) => (
-            <div
-              key={name}
-              className="flex items-center gap-3 rounded-xl border border-border/50 bg-surface-elevated px-4 py-3 opacity-50"
-            >
-              <span className="text-xl">{icon}</span>
-              <div>
-                <p className="text-sm font-medium text-text">{name}</p>
-                <p className="text-xs text-text-muted">Coming soon</p>
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-text">Connections</h2>
+          <Link
+            href="/settings/integrations"
+            className="text-sm font-medium text-accent hover:underline"
+          >
+            Manage →
+          </Link>
         </div>
+        <p className="text-sm text-text-muted">
+          Connect health platforms so Feed Me adapts to how you slept, trained, and recovered.
+        </p>
+        <Link
+          href="/settings/integrations"
+          className="flex items-center gap-3 rounded-xl border border-border bg-surface-elevated px-4 py-3 transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="text-xl">🛏</span>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-text">Eight Sleep</p>
+            <p className="text-xs text-text-muted">Sleep score, duration, resting HR</p>
+          </div>
+          <span className="text-xs text-text-muted">Connect →</span>
+        </Link>
       </section>
     </div>
   );
