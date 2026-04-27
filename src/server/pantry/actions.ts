@@ -21,6 +21,18 @@ const BulkAddInput = z.object({
   names: z.array(z.string().min(1).max(80)).min(1).max(50),
 });
 
+const BulkAddCategorisedInput = z.object({
+  items: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(80),
+        category: PantryCategory,
+      }),
+    )
+    .min(1)
+    .max(50),
+});
+
 // ---------------------------------------------------------------------------
 // Helper: build RLS-anon client from the current request cookies
 // ---------------------------------------------------------------------------
@@ -153,6 +165,40 @@ export async function bulkAddPantryItems(names: string[]): Promise<ActionResult<
       return {
         ok: false,
         error: new ServerError('validation_failed', err.errors[0]?.message ?? 'Invalid names', err),
+      };
+    }
+    return { ok: false, error: new ServerError('internal', 'Unexpected error', err) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// bulkAddCategorisedPantryItems — used by the natural-language paste flow.
+// Each item arrives with a category already assigned (LLM-parsed or user-edited).
+// ---------------------------------------------------------------------------
+
+export async function bulkAddCategorisedPantryItems(
+  rawItems: { name: string; category: string }[],
+): Promise<ActionResult<PantryItem[]>> {
+  try {
+    const { userId } = await requireUser();
+    const { items: validated } = BulkAddCategorisedInput.parse({ items: rawItems });
+    const client = await getAnonClient();
+    const items = await bulkAddItems(
+      client,
+      userId,
+      validated.map((i) => ({
+        name: i.name.trim().toLowerCase(),
+        display_name: i.name.trim(),
+        category: i.category,
+      })),
+    );
+    return { ok: true, value: items };
+  } catch (err) {
+    if (err instanceof ServerError) return { ok: false, error: err };
+    if (err instanceof z.ZodError) {
+      return {
+        ok: false,
+        error: new ServerError('validation_failed', err.errors[0]?.message ?? 'Invalid items', err),
       };
     }
     return { ok: false, error: new ServerError('internal', 'Unexpected error', err) };

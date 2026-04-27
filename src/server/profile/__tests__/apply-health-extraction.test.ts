@@ -37,6 +37,7 @@ const FAKE_PROFILE = {
   birthdate: '1990-01-01',
   sex: 'male' as const,
   activity_level: 'active' as const,
+  dietary_pattern: null,
   display_name: null,
   allergies: [],
   dislikes: [],

@@ -20,6 +20,7 @@ const mockProfile = {
   birthdate: '1990-01-01',
   sex: 'male' as const,
   activity_level: 'moderate' as const,
+  dietary_pattern: null,
   targets: { kcal: 2200, protein_g: 165, carbs_g: 275, fat_g: 73 },
   allergies: [],
   dislikes: [],

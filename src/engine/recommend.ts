@@ -65,7 +65,7 @@ async function _recommend(
   // ------------------------------------------------------------------
   // 1. Plan call — cheap model produces N concept sketches
   // ------------------------------------------------------------------
-  const planPrompts = buildPlanPrompt(ctx);
+  const planPrompts = buildPlanPrompt(ctx, recentCookTitles);
   let planResponse: Awaited<ReturnType<typeof llm.generateStructured<PlanResponse>>>;
   try {
     planResponse = await llm.generateStructured({

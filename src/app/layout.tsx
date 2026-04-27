@@ -11,6 +11,7 @@
  *   - InstallPrompt shows the "Add to home screen" banner when supported
  */
 
+import { AppShell } from '@/components/layout/AppShell';
 import { SwRegister } from '@/components/pwa';
 import { InstallPrompt } from '@/components/pwa';
 import { THEME_COLOR_DARK, THEME_COLOR_LIGHT } from '@/lib/pwa/theme-colors';
@@ -106,7 +107,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           'pr-[env(safe-area-inset-right)]',
         ].join(' ')}
       >
-        {children}
+        <AppShell>{children}</AppShell>
         <Toaster
           position="bottom-center"
           toastOptions={{

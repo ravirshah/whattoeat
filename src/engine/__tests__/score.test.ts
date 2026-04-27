@@ -20,6 +20,7 @@ function makeCtx(overrides: Partial<RecommendationContext['profile']> = {}): Rec
       birthdate: '1990-01-01',
       sex: 'male',
       activity_level: 'moderate',
+      dietary_pattern: null,
       allergies: [],
       dislikes: [],
       cuisines: [],

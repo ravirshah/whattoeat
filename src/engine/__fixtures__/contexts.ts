@@ -10,6 +10,7 @@ const BASE_PROFILE = {
   birthdate: '1990-01-01',
   sex: 'male' as const,
   activity_level: 'moderate' as const,
+  dietary_pattern: null,
   allergies: [] as string[],
   dislikes: [] as string[],
   cuisines: [] as string[],

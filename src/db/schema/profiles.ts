@@ -14,6 +14,7 @@ export const profiles = pgTable('profiles', {
   birthdate: date('birthdate'),
   sex: text('sex'),
   activity_level: text('activity_level'),
+  dietary_pattern: text('dietary_pattern'),
   allergies: jsonb('allergies').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   dislikes: jsonb('dislikes').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   cuisines: jsonb('cuisines').$type<string[]>().notNull().default(sql`'[]'::jsonb`),

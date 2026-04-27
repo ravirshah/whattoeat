@@ -33,9 +33,9 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <div className="mx-auto w-full max-w-2xl px-4 pb-24 sm:px-6">
+      <div className="mx-auto w-full max-w-2xl px-4 pb-12 sm:px-6">
         {/* Greeting */}
-        <header className="pt-10 pb-5 sm:pt-14 sm:pb-7">
+        <header className="pt-6 pb-5 sm:pt-10 sm:pb-7">
           <p className="text-[13px] font-medium text-muted-foreground">
             Good {tod}, {displayName}
           </p>

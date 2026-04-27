@@ -12,12 +12,20 @@ import * as React from 'react';
 import { AllergyChipPicker } from './AllergyChipPicker';
 import { MacroTargetsEditor } from './MacroTargetsEditor';
 
-import type { ActivityLevel, Goal } from '@/contracts/zod/profile';
+import type { ActivityLevel, DietaryPattern, Goal } from '@/contracts/zod/profile';
 
 const GOAL_OPTIONS: { label: string; value: Goal }[] = [
   { label: 'Cut', value: 'cut' },
   { label: 'Maintain', value: 'maintain' },
   { label: 'Bulk', value: 'bulk' },
+];
+
+const DIETARY_PATTERN_OPTIONS: { label: string; value: DietaryPattern; hint: string }[] = [
+  { label: 'Omnivore', value: 'omnivore', hint: 'Anything goes' },
+  { label: 'Flexitarian', value: 'flexitarian', hint: 'Mostly plants, sometimes meat' },
+  { label: 'Pescatarian', value: 'pescatarian', hint: 'Fish + dairy + eggs' },
+  { label: 'Vegetarian', value: 'vegetarian', hint: 'No meat or fish' },
+  { label: 'Vegan', value: 'vegan', hint: 'No animal products' },
 ];
 
 const ACTIVITY_OPTIONS: { label: string; value: ActivityLevel }[] = [
@@ -100,6 +108,7 @@ export function ProfileForm({ profile, className }: ProfileFormProps) {
         birthdate: draft.birthdate,
         sex: draft.sex,
         activity_level: draft.activity_level,
+        dietary_pattern: draft.dietary_pattern,
         allergies: draft.allergies,
         dislikes: draft.dislikes,
         cuisines: draft.cuisines,
@@ -228,6 +237,38 @@ export function ProfileForm({ profile, className }: ProfileFormProps) {
       {/* ── Dietary Preferences ── */}
       <section className="flex flex-col gap-5">
         <h2 className="text-base font-semibold text-text">Dietary Preferences</h2>
+
+        <div className="flex flex-col gap-2">
+          <Label>Dietary pattern</Label>
+          <p className="text-xs text-text-muted">
+            We&apos;ll use this to filter proteins and steer flavor — vegetarians get high-protein,
+            savory dishes (paneer, tempeh, lentils) instead of generic tofu bowls.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {DIETARY_PATTERN_OPTIONS.map((opt) => {
+              const active = draft.dietary_pattern === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => patchDraft({ dietary_pattern: active ? null : opt.value })}
+                  aria-pressed={active}
+                  title={opt.hint}
+                  className={cn(
+                    'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    active
+                      ? 'border-accent bg-accent/10 text-accent'
+                      : 'border-border text-text-muted hover:border-accent/40 hover:text-text',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <AllergyChipPicker
           label="Allergies & Intolerances"
           value={draft.allergies}

@@ -4,16 +4,50 @@ import type { MealCandidate, RecommendationContext } from '@/contracts/zod';
 // Allergy filter
 // ---------------------------------------------------------------------------
 
+// Cross-contamination map: hidden sources that should be flagged when the
+// listed top-level allergen is present. Substrings are matched against
+// ingredient.name AND ingredient.note (case-insensitive).
+const ALLERGEN_HIDDEN_SOURCES: Record<string, string[]> = {
+  peanut: ['satay', 'groundnut', 'botan', 'mole'],
+  shellfish: ['shrimp paste', 'prawn cracker', 'tom yum'],
+  fish: ['worcestershire', 'caesar dressing', 'fish sauce', 'nam pla', 'anchovy'],
+  'tree nut': ['praline', 'nut butter', 'mixed nut', 'trail mix', 'marzipan', 'frangipane'],
+  almond: ['marcona', 'frangipane', 'marzipan'],
+  cashew: ['cashew butter'],
+  walnut: ['walnut oil'],
+  soy: ['miso', 'tempeh', 'edamame', 'tamari', 'soy sauce', 'shoyu'],
+  dairy: ['ghee', 'whey', 'casein', 'paneer'],
+  milk: ['ghee', 'whey', 'casein'],
+  egg: ['mayo', 'aioli', 'meringue'],
+  gluten: ['seitan', 'farro', 'spelt', 'kamut', 'bulgur'],
+  wheat: ['seitan', 'bulgur', 'farro', 'spelt'],
+  sesame: ['tahini', 'gomashio', 'halva'],
+};
+
+function expandedAllergenTerms(allergies: string[]): string[] {
+  const expanded = new Set<string>();
+  for (const raw of allergies) {
+    const a = raw.toLowerCase().trim();
+    expanded.add(a);
+    for (const [key, hidden] of Object.entries(ALLERGEN_HIDDEN_SOURCES)) {
+      if (a.includes(key)) for (const h of hidden) expanded.add(h);
+    }
+  }
+  return Array.from(expanded);
+}
+
 /**
  * Returns true if any ingredient in the candidate contains a forbidden allergen.
- * Case-insensitive substring match — errs on the side of safety.
+ * Case-insensitive substring match against ingredient.name AND ingredient.note,
+ * expanded with a cross-contamination map. Errs on the side of safety.
  */
 function containsAllergen(candidate: MealCandidate, allergies: string[]): boolean {
   if (allergies.length === 0) return false;
-  const lower = allergies.map((a) => a.toLowerCase());
-  return candidate.ingredients.some((ing) =>
-    lower.some((allergen) => ing.name.toLowerCase().includes(allergen)),
-  );
+  const terms = expandedAllergenTerms(allergies);
+  return candidate.ingredients.some((ing) => {
+    const haystack = `${ing.name} ${ing.note ?? ''}`.toLowerCase();
+    return terms.some((t) => haystack.includes(t));
+  });
 }
 
 // ---------------------------------------------------------------------------

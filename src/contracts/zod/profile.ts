@@ -9,6 +9,15 @@ export type Sex = z.infer<typeof Sex>;
 export const ActivityLevel = z.enum(['sedentary', 'light', 'moderate', 'active', 'very_active']);
 export type ActivityLevel = z.infer<typeof ActivityLevel>;
 
+export const DietaryPattern = z.enum([
+  'omnivore',
+  'pescatarian',
+  'vegetarian',
+  'vegan',
+  'flexitarian',
+]);
+export type DietaryPattern = z.infer<typeof DietaryPattern>;
+
 export const MacroTargets = z.object({
   kcal: z.number().int().positive(),
   protein_g: z.number().int().nonnegative(),
@@ -27,6 +36,7 @@ export const Profile = z.object({
   birthdate: z.string().date().nullable(),
   sex: Sex.nullable(),
   activity_level: ActivityLevel.nullable(),
+  dietary_pattern: DietaryPattern.nullable(),
   allergies: z.array(z.string().min(1)).default([]),
   dislikes: z.array(z.string().min(1)).default([]),
   cuisines: z.array(z.string().min(1)).default([]),

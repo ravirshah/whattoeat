@@ -3,7 +3,7 @@
 import type { PantryCategory, PantryItem } from '@/contracts/zod/pantry';
 import {
   addPantryItem,
-  bulkAddPantryItems,
+  bulkAddCategorisedPantryItems,
   removePantryItem,
   togglePantryItem,
 } from '@/server/pantry/actions';
@@ -154,7 +154,7 @@ export function PantryClientIsland({ initialItems }: PantryClientIslandProps) {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onAdd={addPantryItem}
-        onBulkAdd={bulkAddPantryItems}
+        onBulkAddCategorised={bulkAddCategorisedPantryItems}
         onSuccess={handleAddSuccess}
       />
     </div>
