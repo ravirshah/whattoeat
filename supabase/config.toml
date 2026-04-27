@@ -1,0 +1,24 @@
+# Supabase project config — synced to the linked Supabase project via the
+# Supabase ↔ GitHub integration on merges to `main`.
+#
+# Scope: auth URL allow-list only. We deliberately omit other sections so
+# the integration leaves their values untouched.
+#
+# Why this exists: magic-link emails were redirecting to localhost in prod
+# because Supabase's Site URL was still localhost and the prod URL wasn't in
+# the redirect allow-list, so Supabase fell back to Site URL after token
+# verification. Keeping these values in code prevents that drift.
+
+[auth]
+# Base URL Supabase uses when (a) constructing the link in auth emails and
+# (b) as the fallback redirect target if `redirect_to` isn't allow-listed.
+site_url = "https://eat.ravishah.work"
+
+# Exact URLs / glob patterns Supabase will honor as `redirect_to` after
+# verifying a magic link or OAuth callback. Anything not matching here gets
+# silently rewritten to `site_url`.
+additional_redirect_urls = [
+  "https://eat.ravishah.work/**",
+  "https://*.vercel.app/**",
+  "http://localhost:3000/**",
+]
