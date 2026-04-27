@@ -117,3 +117,113 @@
 .feedme-shimmer {
   animation: feedme-shimmer 2.8s ease-in-out infinite;
 }
+
+/* ── View Transitions: opt in to cross-document MPA transitions for browsers
+   that support it. Same-document VTs are still triggered explicitly via
+   document.startViewTransition() in client code. ── */
+@view-transition {
+  /* biome-ignore lint/correctness/noUnknownProperty: @view-transition descriptor */
+  navigation: auto;
+}
+
+/* Default cross-fade root tuned to feel snappy, not laggy. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 220ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ── Long-press radial progress ── */
+@property --press-progress {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+.press-ring {
+  --press-progress: 0%;
+  background: conic-gradient(
+    rgb(var(--accent) / 0.85) var(--press-progress),
+    transparent var(--press-progress)
+  );
+  -webkit-mask: radial-gradient(circle, transparent 60%, black 62%);
+  mask: radial-gradient(circle, transparent 60%, black 62%);
+  transition: --press-progress 0ms linear;
+}
+
+.press-ring[data-pressing="true"] {
+  --press-progress: 100%;
+  transition: --press-progress 600ms linear;
+}
+
+/* ── Category dot pulse — fired briefly when a category's count changes ── */
+@keyframes count-pulse {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.55);
+    filter: brightness(1.4);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+.count-pulse {
+  animation: count-pulse 480ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ── Pantry chip: tactile press feedback ── */
+.chip-press {
+  transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform-origin: center;
+}
+.chip-press:active {
+  transform: scale(0.94);
+}
+
+/* ── Magnetic CTA ── */
+.magnetic {
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+/* ── Spring-stagger reveal for recommendation cards ── */
+@keyframes spring-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.005);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.spring-rise {
+  animation: spring-rise 620ms cubic-bezier(0.22, 1.1, 0.36, 1) both;
+}
+
+/* ── Reduced-motion overrides for the heavier custom animations ── */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+  .press-ring[data-pressing="true"] {
+    transition: none;
+    --press-progress: 0%;
+  }
+  .count-pulse,
+  .spring-rise {
+    animation: none !important;
+  }
+  .magnetic {
+    transform: none !important;
+  }
+}

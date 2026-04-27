@@ -2,10 +2,13 @@
 
 import { Input } from '@/components/ui/input';
 import { MealCard } from '@/components/ui/meal-card';
+import { VtLink } from '@/components/ui/vt-link';
 import type { Recipe } from '@/contracts/zod/recipe';
 import { SearchIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+
+// `Link` retained for the empty-state CTA below.
 
 interface SavedGridProps {
   recipes: Recipe[];
@@ -81,7 +84,12 @@ export function SavedGrid({ recipes }: SavedGridProps) {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {filtered.map((recipe) => (
-            <Link key={recipe.id} href={`/recipes/${recipe.id}`}>
+            <VtLink
+              key={recipe.id}
+              href={`/recipes/${recipe.id}`}
+              style={{ viewTransitionName: `vt-recipe-${recipe.id}` } as React.CSSProperties}
+              className="block rounded-2xl"
+            >
               <MealCard
                 title={recipe.title}
                 oneLineWhy={recipe.description ?? ''}
@@ -95,7 +103,7 @@ export function SavedGrid({ recipes }: SavedGridProps) {
                 pantryCoverage={1}
                 missingItems={[]}
               />
-            </Link>
+            </VtLink>
           ))}
         </div>
       )}

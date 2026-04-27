@@ -1,7 +1,7 @@
 [
   {
     "id": "cut-01",
-    "label": "Cutting day \u2014 dinner, stocked pantry",
+    "label": "Cutting day — dinner, stocked pantry",
     "ctx": {
       "pantry": [
         {
@@ -52,7 +52,8 @@
         "cuisines": [],
         "equipment": ["stovetop", "oven"],
         "created_at": "2026-04-26T00:00:00.000Z",
-        "updated_at": "2026-04-26T00:00:00.000Z"
+        "updated_at": "2026-04-26T00:00:00.000Z",
+        "dietary_pattern": null
       },
       "checkin": {
         "id": "00000000-0000-0002-0000-000000000001",
@@ -77,7 +78,7 @@
   },
   {
     "id": "bulk-01",
-    "label": "Bulk training day \u2014 hard session, high protein",
+    "label": "Bulk training day — hard session, high protein",
     "ctx": {
       "pantry": [
         {
@@ -128,7 +129,8 @@
         "cuisines": [],
         "equipment": ["stovetop", "oven", "grill"],
         "created_at": "2026-04-26T00:00:00.000Z",
-        "updated_at": "2026-04-26T00:00:00.000Z"
+        "updated_at": "2026-04-26T00:00:00.000Z",
+        "dietary_pattern": null
       },
       "checkin": {
         "id": "00000000-0000-0002-0000-000000000002",
@@ -153,7 +155,7 @@
   },
   {
     "id": "allergy-peanut-01",
-    "label": "Peanut allergy \u2014 no peanut in any candidate",
+    "label": "Peanut allergy — no peanut in any candidate",
     "ctx": {
       "pantry": [
         {
@@ -195,7 +197,8 @@
         "cuisines": [],
         "equipment": ["stovetop"],
         "created_at": "2026-04-26T00:00:00.000Z",
-        "updated_at": "2026-04-26T00:00:00.000Z"
+        "updated_at": "2026-04-26T00:00:00.000Z",
+        "dietary_pattern": null
       },
       "request": {
         "mealType": "lunch",
@@ -210,7 +213,7 @@
   },
   {
     "id": "allergy-shellfish-01",
-    "label": "Shellfish allergy \u2014 no shellfish in any candidate",
+    "label": "Shellfish allergy — no shellfish in any candidate",
     "ctx": {
       "pantry": [
         {
@@ -252,7 +255,8 @@
         "cuisines": [],
         "equipment": ["stovetop", "oven"],
         "created_at": "2026-04-26T00:00:00.000Z",
-        "updated_at": "2026-04-26T00:00:00.000Z"
+        "updated_at": "2026-04-26T00:00:00.000Z",
+        "dietary_pattern": null
       },
       "request": {
         "mealType": "dinner",
@@ -267,7 +271,7 @@
   },
   {
     "id": "low-sleep-quick-01",
-    "label": "Low sleep \u2014 quick meal under 15 min",
+    "label": "Low sleep — quick meal under 15 min",
     "ctx": {
       "pantry": [
         {
@@ -309,7 +313,8 @@
         "cuisines": [],
         "equipment": ["microwave"],
         "created_at": "2026-04-26T00:00:00.000Z",
-        "updated_at": "2026-04-26T00:00:00.000Z"
+        "updated_at": "2026-04-26T00:00:00.000Z",
+        "dietary_pattern": null
       },
       "checkin": {
         "id": "00000000-0000-0002-0000-000000000005",
@@ -342,7 +347,7 @@
   },
   {
     "id": "bulk-training-day-02",
-    "label": "Bulk \u2014 post-workout lunch, need calorie surplus",
+    "label": "Bulk — post-workout lunch, need calorie surplus",
     "ctx": {
       "pantry": [
         {
@@ -393,7 +398,8 @@
         "cuisines": [],
         "equipment": ["stovetop", "microwave"],
         "created_at": "2026-04-26T00:00:00.000Z",
-        "updated_at": "2026-04-26T00:00:00.000Z"
+        "updated_at": "2026-04-26T00:00:00.000Z",
+        "dietary_pattern": null
       },
       "checkin": {
         "id": "00000000-0000-0002-0000-000000000006",
@@ -418,7 +424,7 @@
   },
   {
     "id": "bare-pantry-01",
-    "label": "Bare pantry \u2014 only eggs + salt available",
+    "label": "Bare pantry — only eggs + salt available",
     "ctx": {
       "pantry": [
         {
@@ -460,7 +466,8 @@
         "cuisines": [],
         "equipment": ["stovetop"],
         "created_at": "2026-04-26T00:00:00.000Z",
-        "updated_at": "2026-04-26T00:00:00.000Z"
+        "updated_at": "2026-04-26T00:00:00.000Z",
+        "dietary_pattern": null
       },
       "request": {
         "mealType": "any",
@@ -475,7 +482,7 @@
   },
   {
     "id": "multi-allergy-01",
-    "label": "Multiple allergies \u2014 peanut + tree nuts + shellfish",
+    "label": "Multiple allergies — peanut + tree nuts + shellfish",
     "ctx": {
       "pantry": [
         {
@@ -517,7 +524,8 @@
         "cuisines": [],
         "equipment": ["stovetop", "oven"],
         "created_at": "2026-04-26T00:00:00.000Z",
-        "updated_at": "2026-04-26T00:00:00.000Z"
+        "updated_at": "2026-04-26T00:00:00.000Z",
+        "dietary_pattern": null
       },
       "request": {
         "mealType": "dinner",
@@ -532,7 +540,7 @@
   },
   {
     "id": "time-budget-20-01",
-    "label": "Time budget 20 min \u2014 fast meal required",
+    "label": "Time budget 20 min — fast meal required",
     "ctx": {
       "pantry": [
         {
@@ -583,7 +591,8 @@
         "cuisines": [],
         "equipment": ["microwave"],
         "created_at": "2026-04-26T00:00:00.000Z",
-        "updated_at": "2026-04-26T00:00:00.000Z"
+        "updated_at": "2026-04-26T00:00:00.000Z",
+        "dietary_pattern": null
       },
       "request": {
         "mealType": "lunch",
@@ -600,7 +609,7 @@
   },
   {
     "id": "snack-01",
-    "label": "Snack request \u2014 mealType snack, small calorie target",
+    "label": "Snack request — mealType snack, small calorie target",
     "ctx": {
       "pantry": [
         {
@@ -651,7 +660,8 @@
         "cuisines": [],
         "equipment": ["microwave"],
         "created_at": "2026-04-26T00:00:00.000Z",
-        "updated_at": "2026-04-26T00:00:00.000Z"
+        "updated_at": "2026-04-26T00:00:00.000Z",
+        "dietary_pattern": null
       },
       "request": {
         "mealType": "snack",

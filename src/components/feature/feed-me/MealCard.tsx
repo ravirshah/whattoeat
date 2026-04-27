@@ -72,10 +72,7 @@ export function MealCard({ candidate, index, runId }: MealCardProps) {
   };
 
   return (
-    <div
-      className="animate-in fade-in slide-in-from-bottom-4"
-      style={{ animationDelay: `${staggerDelayMs}ms`, animationFillMode: 'both' }}
-    >
+    <div className="spring-rise" style={{ animationDelay: `${staggerDelayMs}ms` }}>
       <div className={cn('relative', isTweaked && 'ring-1 ring-accent/40 rounded-xl')}>
         {isTweaked && (
           <span className="absolute top-2 right-2 z-10 rounded-full bg-accent/10 border border-accent/30 px-2 py-0.5 text-[10px] font-medium text-accent">

@@ -37,7 +37,7 @@ export interface WeeklyStats {
 // Version — bump this whenever prompt text changes
 // ---------------------------------------------------------------------------
 
-export const PROMPTS_VERSION = '2026-04-26.3';
+export const PROMPTS_VERSION = '2026-04-26.4';
 
 // ---------------------------------------------------------------------------
 // LLM output schemas (used by FakeLlmClient in tests + GeminiLlmClient in prod)
@@ -193,6 +193,14 @@ STYLE — oneLineWhy must name one specific user signal AND one specific nutriti
   Banned phrases without specifics: "balanced", "healthy", "fits your goals", "well-rounded".
 
 ADVERSARIAL GUARD: If the user has ≥4 allergies (HIGH_ALLERGY_LOAD), generate only concepts you are highly confident are 100% allergen-free including hidden sources. It is better to return fewer concepts than to risk one that fails post-filtering.
+
+UNITS — this user is in the United States. Use ONLY U.S. customary units in recipe ingredients and steps:
+• Volume → tsp, tbsp, cup, fl oz, qt, gallon (NEVER ml, l, dl).
+• Weight → oz, lb (NEVER g, kg). For very small spice quantities prefer tsp/tbsp over weight.
+• Temperature in step text → °F (NEVER °C).
+• Length → inch (NEVER cm). e.g. "cut into 1-inch cubes".
+• Counts (whole eggs, cloves, sprigs) stay as integer counts with appropriate unit ("clove", "sprig", null for "1 lemon").
+Macros (kcal, protein_g, carbs_g, fat_g) stay as listed — those are the canonical fields and "g" is the macro convention, not a metric leak.
 
 Respond ONLY with valid JSON. No markdown. No explanations outside the JSON.`;
 

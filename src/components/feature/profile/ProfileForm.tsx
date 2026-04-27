@@ -6,6 +6,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { cn } from '@/components/ui/utils';
 import type { MacroTargets, Profile } from '@/contracts/zod/profile';
 import { computeTargets } from '@/lib/macros';
+import { cmToFtIn, ftInToCm, kgToLb, lbToKg } from '@/lib/units';
 import { recomputeMacros, updateProfile } from '@/server/profile/actions';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -87,11 +88,33 @@ export function ProfileForm({ profile, className }: ProfileFormProps) {
   const [isRecalculating, setIsRecalculating] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  // U.S. unit display for height (ft + in) and weight (lbs).
+  // Storage is cm/kg — we convert at the UI boundary only.
+  const initialHeight = React.useMemo(() => cmToFtIn(profile.height_cm), [profile.height_cm]);
+  const [heightFt, setHeightFt] = React.useState<string>(initialHeight.ft);
+  const [heightIn, setHeightIn] = React.useState<string>(initialHeight.inch);
+  const [weightLb, setWeightLb] = React.useState<string>(kgToLb(profile.weight_kg));
+
   // Live macro preview derived client-side from biometrics
   const previewTargets = React.useMemo(() => computeTargets(draft) ?? draft.targets, [draft]);
 
   function patchDraft(fields: Partial<Profile>) {
     setDraft((prev) => ({ ...prev, ...fields }));
+  }
+
+  function handleHeightFtChange(value: string) {
+    setHeightFt(value);
+    patchDraft({ height_cm: ftInToCm(value, heightIn) });
+  }
+
+  function handleHeightInChange(value: string) {
+    setHeightIn(value);
+    patchDraft({ height_cm: ftInToCm(heightFt, value) });
+  }
+
+  function handleWeightLbChange(value: string) {
+    setWeightLb(value);
+    patchDraft({ weight_kg: lbToKg(value) });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -150,38 +173,67 @@ export function ProfileForm({ profile, className }: ProfileFormProps) {
       {/* ── Body ── */}
       <section className="flex flex-col gap-4">
         <h2 className="text-base font-semibold text-text">Body</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="height_cm">Height (cm)</Label>
-            <Input
-              id="height_cm"
-              type="number"
-              min={100}
-              max={250}
-              step={0.1}
-              value={draft.height_cm ?? ''}
-              onChange={(e) =>
-                patchDraft({ height_cm: e.target.value ? Number(e.target.value) : null })
-              }
-              placeholder="175"
-              className="font-mono"
-            />
+
+        {/* Height — ft / in */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="height_ft">Height</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="relative">
+              <Input
+                id="height_ft"
+                type="number"
+                inputMode="numeric"
+                min={3}
+                max={8}
+                step={1}
+                placeholder="5"
+                value={heightFt}
+                onChange={(e) => handleHeightFtChange(e.target.value)}
+                className="font-mono pr-10"
+              />
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-text-muted">
+                ft
+              </span>
+            </div>
+            <div className="relative">
+              <Input
+                id="height_in"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={11}
+                step={1}
+                placeholder="10"
+                value={heightIn}
+                onChange={(e) => handleHeightInChange(e.target.value)}
+                className="font-mono pr-10"
+              />
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-text-muted">
+                in
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="weight_kg">Weight (kg)</Label>
+        </div>
+
+        {/* Weight — lbs */}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="weight_lb">Weight</Label>
+          <div className="relative">
             <Input
-              id="weight_kg"
+              id="weight_lb"
               type="number"
-              min={30}
-              max={300}
+              inputMode="decimal"
+              min={60}
+              max={660}
               step={0.1}
-              value={draft.weight_kg ?? ''}
-              onChange={(e) =>
-                patchDraft({ weight_kg: e.target.value ? Number(e.target.value) : null })
-              }
-              placeholder="80"
-              className="font-mono"
+              placeholder="160"
+              value={weightLb}
+              onChange={(e) => handleWeightLbChange(e.target.value)}
+              className="font-mono pr-12"
             />
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-text-muted">
+              lbs
+            </span>
           </div>
         </div>
         <div className="flex flex-col gap-1">
