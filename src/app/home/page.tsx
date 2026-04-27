@@ -14,6 +14,7 @@ import { getTodayCheckin } from '@/server/checkin';
 import { listForUser } from '@/server/pantry/repo';
 import { getMyProfile } from '@/server/profile';
 import { listCookedLog } from '@/server/recipes';
+import { getOrComputeForWeek } from '@/server/recommendation/weekly-insight-repo';
 
 export default async function HomePage() {
   const { userId } = await requireUser();
@@ -30,6 +31,12 @@ export default async function HomePage() {
   const displayName = profile?.display_name ?? 'there';
   const hour = new Date().getHours();
   const tod = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+
+  // Weekly insight — computed once per week; null if insufficient data or LLM unavailable.
+  // Failure is fully swallowed so it never breaks the page.
+  const weeklyInsight = profile
+    ? await getOrComputeForWeek(userId, profile).catch(() => null)
+    : null;
 
   return (
     <div className="min-h-dvh bg-background">
@@ -51,6 +58,7 @@ export default async function HomePage() {
             checkin={todayCheckin}
             pantryItemCount={pantryItems.length}
             hour={hour}
+            weeklyInsight={weeklyInsight}
           />
         </div>
 

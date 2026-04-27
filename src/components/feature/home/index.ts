@@ -3,6 +3,7 @@ export { PantryStat } from './PantryStat';
 export { CheckinPeek } from './CheckinPeek';
 export { LastCookedCard } from './LastCookedCard';
 export { FeedMeCta } from './FeedMeCta';
+export { ProactiveBrief } from './ProactiveBrief';
 export { OnboardingStepper } from './OnboardingStepper';
 export { OnboardingStepFrame } from './OnboardingStepFrame';
 export { GoalStep } from './GoalStep';

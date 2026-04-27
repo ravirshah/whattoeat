@@ -1,5 +1,37 @@
 import type { MealCandidate, RecommendationContext } from '@/contracts/zod';
+import type { Profile } from '@/contracts/zod/profile';
 import { z } from 'zod';
+
+// ---------------------------------------------------------------------------
+// WeeklyStats — defined here (engine layer) to keep the engine pure.
+// Re-exported from @/server/recommendation/weekly-stats for server callers.
+// ---------------------------------------------------------------------------
+
+export interface WeeklyStats {
+  /** Number of successful recommendation runs in the last 7 days. */
+  runCount: number;
+  /** Distinct calendar days that had at least one successful run. */
+  distinctDays: number;
+  /** Mean kcal across the top candidate of each run. Rounded to integer. */
+  meanKcal: number;
+  /** Mean protein_g. Rounded to integer. */
+  meanProtein: number;
+  /** Mean carbs_g. Rounded to integer. */
+  meanCarbs: number;
+  /** Mean fat_g. Rounded to integer. */
+  meanFat: number;
+  /** Most-frequent cuisine across all top candidates. Null if all are null. */
+  topCuisine: string | null;
+  /** Distinct protein names used across all top candidates (lowercase, normalised). */
+  distinctProteins: string[];
+  /**
+   * Count of the most-repeated protein source across all runs.
+   * e.g. if chicken appears in 3 out of 5 runs, repeatedProteinCount = 3.
+   */
+  repeatedProteinCount: number;
+  /** Name of the most-repeated protein. Null if no proteins detected. */
+  repeatedProteinName: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // Version — bump this whenever prompt text changes
@@ -316,6 +348,67 @@ Return a JSON object matching the DetailResponse schema exactly.`;
     HARD_ALLERGIES_NEVER_INCLUDE: ctx.profile.allergies,
     goal: ctx.profile.goal,
     promptsVersion: PROMPTS_VERSION,
+  });
+
+  return { system, user };
+}
+
+// ---------------------------------------------------------------------------
+// Weekly insight prompt — coaching insight for the home dashboard
+// ---------------------------------------------------------------------------
+
+/** Schema for the single-sentence weekly insight response. */
+export const WeeklyInsightResponseSchema = z.object({
+  insight: z.string().min(10).max(150),
+  family: z.enum(['trend', 'deficit_surplus', 'variety']),
+});
+export type WeeklyInsightResponse = z.infer<typeof WeeklyInsightResponseSchema>;
+
+/**
+ * Builds the system + user prompt for generating a weekly nutrition insight.
+ *
+ * The stats are injected as facts — the LLM writes the sentence, never the
+ * numbers. This prevents hallucination of numeric data.
+ */
+export function buildWeeklyInsightPrompt(
+  stats: WeeklyStats,
+  profile: Profile,
+): { system: string; user: string } {
+  const system = `You are a personal nutrition advisor producing a single, sharp, advisor-style sentence for a mobile app home screen.
+
+Rules:
+- Respond ONLY with valid JSON: { "insight": string, "family": "trend" | "deficit_surplus" | "variety" }
+- insight must be ≤150 characters total.
+- insight must cite one specific stat from the data provided.
+- Never use "balanced" or "healthy" without specifics.
+- No emojis.
+- Pick the most informative insight family given the data:
+  • trend: protein/kcal direction, week-on-week pattern (use when protein or kcal is notably above or below target)
+  • deficit_surplus: kcal gap relative to target (use when mean kcal diverges from target by >100 kcal)
+  • variety: cuisine/protein-source repetition (use when repeatedProteinCount ≥ 3 or topCuisine dominates)
+- Tone: sharp, conversational, like a knowledgeable friend — not a wellness chatbot.
+- Respond ONLY with valid JSON. No markdown fences, no prose outside JSON.`;
+
+  const proteinGap = stats.meanProtein - profile.targets.protein_g;
+  const kcalGap = stats.meanKcal - profile.targets.kcal;
+
+  const user = stableJson({
+    weekStats: {
+      runCount: stats.runCount,
+      distinctDays: stats.distinctDays,
+      meanKcal: stats.meanKcal,
+      meanProtein: stats.meanProtein,
+      meanCarbs: stats.meanCarbs,
+      meanFat: stats.meanFat,
+      topCuisine: stats.topCuisine,
+      distinctProteins: stats.distinctProteins,
+      repeatedProteinCount: stats.repeatedProteinCount,
+      repeatedProteinName: stats.repeatedProteinName,
+      proteinGapVsTarget: proteinGap,
+      kcalGapVsTarget: kcalGap,
+    },
+    userGoal: profile.goal,
+    targets: profile.targets,
   });
 
   return { system, user };

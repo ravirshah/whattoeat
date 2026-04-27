@@ -27,6 +27,7 @@ export default defineConfig({
       ['src/app/__tests__/**', 'happy-dom'],
       // Use happy-dom for PWA browser tests (offline badge, navigator.onLine)
       ['tests/pwa/**', 'happy-dom'],
+      ['src/components/**/__tests__/**', 'happy-dom'],
     ],
   },
 });

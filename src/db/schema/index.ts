@@ -6,3 +6,4 @@ export * from './cooked-log';
 export * from './recommendation-runs';
 export * from './signal-snapshots';
 export * from './health-extractions';
+export * from './weekly-insights';

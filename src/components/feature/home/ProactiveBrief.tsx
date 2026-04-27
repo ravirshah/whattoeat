@@ -2,7 +2,14 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/utils';
 import type { Profile } from '@/contracts/zod/profile';
 import type { CheckinDTO } from '@/server/checkin/actions';
-import { ArrowRightIcon, SparklesIcon } from 'lucide-react';
+import type { WeeklyInsightValue } from '@/server/recommendation/weekly-insight';
+import {
+  ArrowRightIcon,
+  ShuffleIcon,
+  SparklesIcon,
+  TargetIcon,
+  TrendingUpIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 
 interface ProactiveBriefProps {
@@ -11,6 +18,8 @@ interface ProactiveBriefProps {
   pantryItemCount: number;
   /** Locally-derived hour 0–23 — passed in so server-render is timezone-aware. */
   hour: number;
+  /** Optional weekly nutrition insight rendered as a subtle italic line under the body. */
+  weeklyInsight?: WeeklyInsightValue | null;
 }
 
 interface Brief {
@@ -19,15 +28,31 @@ interface Brief {
   cta: { href: string; label: string };
 }
 
+const FAMILY_ICON = {
+  trend: TrendingUpIcon,
+  deficit_surplus: TargetIcon,
+  variety: ShuffleIcon,
+} as const;
+
+const FAMILY_COLOR = {
+  trend: 'text-blue-500',
+  deficit_surplus: 'text-amber-500',
+  variety: 'text-violet-500',
+} as const;
+
 // Deterministic insight that *feels* AI-generated. Uses real signal —
 // time of day, check-in status, pantry depth, macro target — to compose
 // a single conversational nudge with a clear next action.
-function buildBrief({ profile, checkin, pantryItemCount, hour }: ProactiveBriefProps): Brief {
+function buildBrief({
+  profile,
+  checkin,
+  pantryItemCount,
+  hour,
+}: Omit<ProactiveBriefProps, 'weeklyInsight'>): Brief {
   const target = profile?.targets?.kcal ?? 0;
   const partOfDay =
     hour < 11 ? 'morning' : hour < 14 ? 'midday' : hour < 17 ? 'afternoon' : 'evening';
 
-  // Highest-priority nudge first.
   if (!checkin) {
     return {
       greeting: 'Quick check-in?',
@@ -103,6 +128,9 @@ function labelEnergy(e: number): string {
 
 export function ProactiveBrief(props: ProactiveBriefProps) {
   const brief = buildBrief(props);
+  const { weeklyInsight } = props;
+  const InsightIcon = weeklyInsight ? FAMILY_ICON[weeklyInsight.family] : null;
+  const iconColor = weeklyInsight ? FAMILY_COLOR[weeklyInsight.family] : null;
 
   return (
     <section
@@ -112,7 +140,6 @@ export function ProactiveBrief(props: ProactiveBriefProps) {
         'px-5 py-5 sm:px-6 sm:py-6',
       )}
     >
-      {/* Subtle accent glow in the corner — signals "intelligent" without screaming */}
       <div
         aria-hidden
         className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full bg-accent/10 blur-2xl"
@@ -132,6 +159,18 @@ export function ProactiveBrief(props: ProactiveBriefProps) {
           <h2 className="text-lg font-semibold tracking-tight text-foreground">{brief.greeting}</h2>
           <p className="text-[14px] leading-relaxed text-muted-foreground">{brief.body}</p>
         </div>
+
+        {weeklyInsight && InsightIcon && iconColor && (
+          <div className="flex items-start gap-1.5 pt-2 mt-1 border-t border-border/50">
+            <InsightIcon
+              className={cn('w-3.5 h-3.5 flex-shrink-0 mt-0.5', iconColor)}
+              strokeWidth={1.75}
+            />
+            <p className="text-xs italic text-muted-foreground leading-snug">
+              {weeklyInsight.insight}
+            </p>
+          </div>
+        )}
 
         <Button asChild variant="default" size="sm" className="self-start mt-1">
           <Link href={brief.cta.href}>
