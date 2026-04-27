@@ -1,5 +1,3 @@
-'use client';
-
 import { cn } from '@/components/ui/utils';
 import { SparklesIcon } from 'lucide-react';
 import Link from 'next/link';

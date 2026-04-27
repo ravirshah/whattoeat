@@ -22,10 +22,11 @@ const ACTIVITY_OPTIONS = [
 const SEX_OPTIONS = [
   { value: 'male' as const, label: 'Male' },
   { value: 'female' as const, label: 'Female' },
+  { value: 'prefer_not_to_say' as const, label: 'Prefer not to say' },
 ];
 
 type ActivityLevelValue = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
-type SexValue = 'male' | 'female';
+type SexValue = 'male' | 'female' | 'prefer_not_to_say';
 
 async function bodyDataStepAdapter(_prev: FormState, formData: FormData): Promise<FormState> {
   const result = await submitBodyDataStep({ ok: true, value: undefined }, formData);
@@ -69,7 +70,9 @@ export function BodyDataStep({ profile }: BodyDataStepProps) {
   const [inch, setInch] = useState<string>(initial.inch);
   const [lb, setLb] = useState<string>(initial.lb);
   const [sex, setSex] = useState<SexValue>(
-    (profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : 'male') as SexValue,
+    (profile?.sex === 'male' || profile?.sex === 'female' || profile?.sex === 'prefer_not_to_say'
+      ? profile.sex
+      : 'male') as SexValue,
   );
   const [activityLevel, setActivityLevel] = useState<ActivityLevelValue>(
     (profile?.activity_level as ActivityLevelValue) ?? 'moderate',

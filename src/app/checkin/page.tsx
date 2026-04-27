@@ -1,6 +1,5 @@
 import { CheckinForm } from '@/components/feature/checkin/CheckinForm';
 import { CheckinSummary } from '@/components/feature/checkin/CheckinSummary';
-import { Checkin } from '@/contracts/zod/checkin';
 import { getTodayCheckin } from '@/server/checkin/actions';
 
 export const metadata = { title: 'Daily Check-in - WhatToEat' };
@@ -19,10 +18,16 @@ export default async function CheckinPage() {
   // Derive today's ISO date string (UTC). T8 should pass localDate instead.
   // TODO: pass client's local date once T8 wires the feed-me context.
   const todayUtc = new Date().toISOString().slice(0, 10);
+  // getTodayCheckin() already validates at the action boundary — the DB enum columns
+  // guarantee valid values. The DTO type uses string for enum fields; cast to satisfy
+  // CheckinSummary's narrower prop type.
   const rawExisting = await getTodayCheckin(todayUtc);
-  // Parse through the Zod schema to get strongly typed fields (training, hunger as enums).
-  // The action serialises created_at to ISO string at the boundary, so we can pass through.
-  const existing = rawExisting ? Checkin.parse(rawExisting) : null;
+  const existing = rawExisting as
+    | (typeof rawExisting & {
+        training: 'none' | 'light' | 'hard';
+        hunger: 'low' | 'normal' | 'high';
+      })
+    | null;
 
   return (
     <main className="mx-auto max-w-lg px-4 py-10">

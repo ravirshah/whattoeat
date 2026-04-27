@@ -1,5 +1,3 @@
-'use client';
-
 import { cn } from '@/components/ui/utils';
 import { CheckCircleIcon, ClockIcon } from 'lucide-react';
 

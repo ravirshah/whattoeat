@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/components/ui/utils';
 import type { PantryCategory, PantryItem } from '@/contracts/zod/pantry';
 import type { ActionResult } from '@/server/contracts';
@@ -134,20 +135,17 @@ export function PantryAddDialog({
     setPhase({ kind: 'review', items: phase.items.filter((_, i) => i !== idx) });
   }
 
-  if (!open) return null;
+  const title =
+    phase.kind === 'review'
+      ? "Here's what I parsed"
+      : phase.kind === 'manual'
+        ? 'Add one item'
+        : 'Add to pantry';
 
   return (
-    <dialog
-      open
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center m-0 p-0 max-w-none w-full h-full bg-transparent border-0"
-      aria-label="Add to pantry"
-      onClose={handleClose}
-    >
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" />
-
-      <div className="relative z-10 w-full max-w-lg rounded-t-2xl sm:rounded-2xl bg-card border border-border p-5 sm:p-6 shadow-3 max-h-[92vh] overflow-y-auto">
-        {/* Header */}
-        <div className="mb-4 flex items-center justify-between">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-full max-w-lg rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto">
+        <DialogHeader className="mb-4 flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {phase.kind === 'review' && (
               <button
@@ -159,23 +157,9 @@ export function PantryAddDialog({
                 <ArrowLeftIcon className="size-4" />
               </button>
             )}
-            <h2 className="text-lg font-semibold tracking-tight text-foreground">
-              {phase.kind === 'review'
-                ? "Here's what I parsed"
-                : phase.kind === 'manual'
-                  ? 'Add one item'
-                  : 'Add to pantry'}
-            </h2>
+            <DialogTitle>{title}</DialogTitle>
           </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="rounded-md p-1 text-muted-foreground hover:bg-surface-elevated hover:text-foreground transition-colors"
-            aria-label="Close"
-          >
-            <XIcon className="size-4" />
-          </button>
-        </div>
+        </DialogHeader>
 
         {/* Compose: freeform LLM input */}
         {phase.kind === 'compose' && (
@@ -200,18 +184,21 @@ export function PantryAddDialog({
               )}
             />
 
-            {/* Example chips — tappable seeds */}
+            {/* Example chips — tappable seeds with short preview */}
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {FREEFORM_EXAMPLES.map((ex, i) => (
-                <button
-                  key={ex}
-                  type="button"
-                  onClick={() => setText(ex)}
-                  className="rounded-full border border-dashed border-border bg-surface-elevated px-2.5 py-1 text-[11px] text-muted-foreground hover:border-accent/50 hover:text-foreground transition-colors"
-                >
-                  Example {i + 1}
-                </button>
-              ))}
+              {FREEFORM_EXAMPLES.map((ex) => {
+                const preview = ex.length > 32 ? `${ex.slice(0, 32)}…` : ex;
+                return (
+                  <button
+                    key={ex}
+                    type="button"
+                    onClick={() => setText(ex)}
+                    className="rounded-full border border-dashed border-border bg-surface-elevated px-2.5 py-1 text-[11px] text-muted-foreground hover:border-accent/50 hover:text-foreground transition-colors"
+                  >
+                    {preview}
+                  </button>
+                );
+              })}
             </div>
 
             {error && (
@@ -374,7 +361,7 @@ export function PantryAddDialog({
             </div>
           </>
         )}
-      </div>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }

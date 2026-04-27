@@ -122,7 +122,7 @@ function Hero() {
 function HeroPreview() {
   return (
     <div className="relative mx-auto w-full max-w-md lg:max-w-none">
-      <div className="rounded-3xl border border-border bg-card p-5 shadow-3">
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-3">
         <div className="mb-4 flex items-center gap-2">
           <span className="grid h-8 w-8 place-items-center rounded-full bg-accent/10 text-accent">
             <SparklesIcon className="h-4 w-4" />
@@ -326,7 +326,7 @@ function SignatureMoments() {
           </div>
 
           <div className="relative mx-auto w-full max-w-sm">
-            <div className="rounded-3xl border border-border bg-card p-6 shadow-3">
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-3">
               <Link
                 href="/auth/login"
                 className="feedme-shimmer flex w-full items-center justify-center gap-3 rounded-2xl bg-accent px-6 py-5 text-lg font-bold tracking-tight text-accent-foreground transition-transform duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]"
@@ -335,7 +335,7 @@ function SignatureMoments() {
                 Feed Me
               </Link>
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                Powered by Gemini · Tuned to you
+                AI-powered · Tuned to you
               </p>
             </div>
           </div>

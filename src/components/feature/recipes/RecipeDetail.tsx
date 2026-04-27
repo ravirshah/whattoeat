@@ -13,7 +13,7 @@ interface RecipeDetailProps {
 
 export function RecipeDetail({ recipe, pantryNames, targetKcal }: RecipeDetailProps) {
   return (
-    <div className="relative flex flex-col gap-8 pb-32">
+    <div className="relative flex flex-col gap-8 pb-[calc(env(safe-area-inset-bottom)+140px)]">
       {/* Hero */}
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold tracking-tight text-text leading-snug">{recipe.title}</h1>
