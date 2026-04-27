@@ -1,8 +1,9 @@
 import { OnboardingStepper } from '@/components/feature/home/OnboardingStepper';
-import type { Profile } from '@/contracts/zod/profile';
 import { isOnboardingComplete } from '@/lib/onboarding';
 import { createServerClient } from '@/lib/supabase/server';
 import { getUserId } from '@/server/auth';
+import { getPartialProfileForOnboarding } from '@/server/profile/onboarding-query';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 interface Props {
@@ -17,35 +18,19 @@ export default async function OnboardingLayout({ children }: Props) {
   }
 
   const supabase = await createServerClient();
-  const { data: profileRow } = await supabase
-    .from('profiles')
-    .select('goal, height_cm, weight_kg, birthdate, sex, activity_level, target_kcal, allergies')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  // Normalise DB row to partial Profile shape for onboarding checks.
-  const profile: Partial<Profile> | null = profileRow
-    ? {
-        goal: profileRow.goal as Profile['goal'],
-        height_cm: profileRow.height_cm ? Number(profileRow.height_cm) : null,
-        weight_kg: profileRow.weight_kg ? Number(profileRow.weight_kg) : null,
-        birthdate: profileRow.birthdate ?? null,
-        sex: (profileRow.sex as Profile['sex']) ?? null,
-        activity_level: (profileRow.activity_level as Profile['activity_level']) ?? null,
-        targets: {
-          kcal: profileRow.target_kcal ?? 0,
-          protein_g: 0,
-          carbs_g: 0,
-          fat_g: 0,
-        },
-        allergies: (profileRow.allergies as string[]) ?? [],
-      }
-    : null;
+  const profile = await getPartialProfileForOnboarding(userId, supabase);
 
   // If onboarding already complete, send to home.
   if (isOnboardingComplete(profile)) {
     redirect('/home');
   }
+
+  // Derive active step from the current URL so the stepper highlights the right circle.
+  // e.g. /onboarding/step/2 → stepNum = 2
+  const headersList = await headers();
+  const pathname = headersList.get('x-invoke-path') ?? headersList.get('referer') ?? '';
+  const stepMatch = pathname.match(/\/onboarding\/step\/(\d+)/);
+  const activeStep = stepMatch ? Number.parseInt(stepMatch[1] ?? '0', 10) : undefined;
 
   return (
     <div className="min-h-dvh flex flex-col bg-background">
@@ -56,7 +41,7 @@ export default async function OnboardingLayout({ children }: Props) {
 
       {/* Stepper progress bar */}
       <div className="px-4 pt-8 pb-4 flex justify-center">
-        <OnboardingStepper profile={profile} />
+        <OnboardingStepper profile={profile} activeStep={activeStep} />
       </div>
 
       {/* Step content */}

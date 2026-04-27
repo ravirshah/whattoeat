@@ -74,7 +74,7 @@ export function RecipeTweakPanel({
           {priorTweaks.map((t) => (
             <span
               key={t}
-              className="inline-flex items-center rounded-full bg-surface-elevated border border-border px-2.5 py-0.5 text-xs text-text-secondary"
+              className="inline-flex items-center rounded-full bg-surface-elevated border border-border px-2.5 py-0.5 text-xs text-text-muted"
             >
               {t}
             </span>
@@ -83,7 +83,7 @@ export function RecipeTweakPanel({
             <button
               type="button"
               onClick={handleRevert}
-              className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-text transition-colors ml-1"
+              className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text transition-colors ml-1"
               aria-label="Revert to original recipe"
             >
               <RotateCcw className="h-3 w-3" />
@@ -102,7 +102,7 @@ export function RecipeTweakPanel({
             onClick={() => submit(chip)}
             className={cn(
               'rounded-full border border-border px-3 py-1 text-xs font-medium',
-              'text-text-secondary bg-surface hover:bg-surface-elevated hover:text-text',
+              'text-text-muted bg-surface hover:bg-surface-elevated hover:text-text',
               'transition-colors duration-snap disabled:opacity-40 disabled:cursor-not-allowed',
             )}
           >

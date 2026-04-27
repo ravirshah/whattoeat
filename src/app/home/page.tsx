@@ -67,13 +67,13 @@ export default async function HomePage() {
           <FeedMeCta />
         </div>
 
-        {/* Today's macros — full-width, the most-glanced surface */}
+        {/* Daily targets — full-width macro target reference */}
         <section className="mt-6 rounded-2xl border border-border bg-card p-5 sm:p-6 bento-rise bento-rise-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Today&apos;s macros
+            Daily targets
           </p>
           <div className="mt-3">
-            <HomeMacroRing profile={profile} checkin={todayCheckin} />
+            <HomeMacroRing profile={profile} />
           </div>
         </section>
 

@@ -39,7 +39,7 @@ export function CookButton({ recipeId, recipeTitle }: CookButtonProps) {
   }
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-surface/90 backdrop-blur-sm pb-safe">
+    <div className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-surface/90 backdrop-blur-sm pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto max-w-2xl px-4 py-3 flex flex-col gap-2">
         {/* Inline rating (optional, pre-cook) */}
         {showRating && !cooked && (
@@ -76,7 +76,7 @@ export function CookButton({ recipeId, recipeTitle }: CookButtonProps) {
           <Button
             onClick={handleCook}
             disabled={isPending || cooked}
-            className={cn('flex-1 gap-2 font-semibold', cooked && 'bg-ok text-white')}
+            className={cn('flex-1 gap-2 font-semibold', cooked && 'bg-ok text-ok-fg')}
           >
             {cooked ? (
               <>
