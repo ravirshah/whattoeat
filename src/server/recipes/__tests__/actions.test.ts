@@ -102,15 +102,15 @@ describe('unsaveRecipe', () => {
   it('calls dbSetSaved(false)', async () => {
     vi.mocked(repo.dbSetSaved).mockResolvedValueOnce(undefined);
     await unsaveRecipe('recipe-id');
-    expect(repo.dbSetSaved).toHaveBeenCalledWith(expect.anything(), 'recipe-id', false);
+    expect(repo.dbSetSaved).toHaveBeenCalledWith(expect.anything(), 'recipe-id', 'user-aaa', false);
   });
 });
 
 describe('deleteRecipe', () => {
-  it('calls dbDeleteRecipe', async () => {
+  it('calls dbDeleteRecipe with userId', async () => {
     vi.mocked(repo.dbDeleteRecipe).mockResolvedValueOnce(undefined);
     await deleteRecipe('recipe-id');
-    expect(repo.dbDeleteRecipe).toHaveBeenCalledOnce();
+    expect(repo.dbDeleteRecipe).toHaveBeenCalledWith(expect.anything(), 'recipe-id', 'user-aaa');
   });
 });
 

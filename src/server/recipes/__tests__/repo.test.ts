@@ -102,19 +102,25 @@ describe('dbListSavedRecipes', () => {
 describe('dbSetSaved', () => {
   it('resolves without throwing', async () => {
     const supabase = makeSupabase(null);
-    await expect(dbSetSaved(supabase, FAKE_RECIPE.id, false)).resolves.toBeUndefined();
+    await expect(
+      dbSetSaved(supabase, FAKE_RECIPE.id, FAKE_RECIPE.user_id, false),
+    ).resolves.toBeUndefined();
   });
 
   it('throws on error', async () => {
     const supabase = makeSupabase(null, { message: 'rls violation' });
-    await expect(dbSetSaved(supabase, FAKE_RECIPE.id, false)).rejects.toThrow('dbSetSaved failed');
+    await expect(dbSetSaved(supabase, FAKE_RECIPE.id, FAKE_RECIPE.user_id, false)).rejects.toThrow(
+      'dbSetSaved failed',
+    );
   });
 });
 
 describe('dbDeleteRecipe', () => {
   it('resolves without throwing', async () => {
     const supabase = makeSupabase(null);
-    await expect(dbDeleteRecipe(supabase, FAKE_RECIPE.id)).resolves.toBeUndefined();
+    await expect(
+      dbDeleteRecipe(supabase, FAKE_RECIPE.id, FAKE_RECIPE.user_id),
+    ).resolves.toBeUndefined();
   });
 });
 

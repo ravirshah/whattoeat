@@ -10,6 +10,11 @@ vi.mock('@/server/auth', () => ({
   requireUser: vi.fn().mockResolvedValue({ userId: 'user-test-abc', email: 'test@example.com' }),
 }));
 
+// Bypass Upstash entirely so the test doesn't pay for ECONNREFUSED retries.
+vi.mock('@/lib/rate-limit/assert-daily-cap', () => ({
+  assertWithinDailyCap: vi.fn().mockResolvedValue({ ok: true, remaining: -1 }),
+}));
+
 vi.mock('@/db/client', () => ({
   db: {
     insert: vi.fn().mockReturnThis(),
