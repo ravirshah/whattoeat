@@ -6,12 +6,14 @@ import {
   IntegrationProvider,
   type IntegrationSummary,
 } from '@/contracts/zod/integrations';
+import { type Adjustment, describeSignalAdjustments } from '@/engine/signal-adjustments';
 import { EightSleepClient, EightSleepError } from '@/server/adapters/eight-sleep/client';
 import { requireUser } from '@/server/auth';
 import { type ActionResult, ServerError } from '@/server/contracts';
 import { z } from 'zod';
 import { sealCredentials } from './credentials';
 import { deleteIntegration, listIntegrationsByUser, upsertIntegration } from './repo';
+import { getLatestSnapshot, runProviderSync } from './sync';
 
 const ConnectEightSleepInput = z.object({
   email: z.string().email(),
@@ -113,6 +115,93 @@ export async function disconnectIntegration(rawInput: unknown): Promise<ActionRe
       error: new ServerError(
         'internal',
         err instanceof Error ? err.message : 'Failed to disconnect',
+        err,
+      ),
+    };
+  }
+}
+
+const ProviderInput = z.object({ provider: IntegrationProvider });
+
+export interface ProviderDebug {
+  observed_at: string;
+  created_at: string;
+  raw: unknown;
+  mapped: Partial<import('@/contracts/zod').HealthSignals>;
+  adjustments: Adjustment[];
+}
+
+/**
+ * Returns the latest stored snapshot for (current user, provider) along with
+ * its mapped HealthSignals and the deterministic adjustments those signals
+ * will apply when Feed Me runs. Lets the user preview "what is the engine
+ * actually going to do with my Eight Sleep data?" before spending an LLM call.
+ */
+export async function getProviderDebug(
+  rawInput: unknown,
+): Promise<ActionResult<ProviderDebug | null>> {
+  try {
+    const { userId } = await requireUser();
+    const { provider } = ProviderInput.parse(rawInput);
+    const latest = await getLatestSnapshot(userId, provider);
+    if (!latest) return { ok: true, value: null };
+    const adjustments = describeSignalAdjustments(
+      latest.mapped as import('@/contracts/zod').HealthSignals,
+    );
+    return { ok: true, value: { ...latest, adjustments } };
+  } catch (err) {
+    if (err instanceof ServerError) return { ok: false, error: err };
+    if (err instanceof z.ZodError) {
+      return {
+        ok: false,
+        error: new ServerError('validation_failed', 'Invalid provider', err),
+      };
+    }
+    return {
+      ok: false,
+      error: new ServerError(
+        'internal',
+        err instanceof Error ? err.message : 'Failed to load debug',
+        err,
+      ),
+    };
+  }
+}
+
+/**
+ * Trigger an on-demand sync for the given provider. Useful when the user
+ * wants to refresh the debug view without waiting for the daily cron.
+ */
+export async function syncProviderNow(rawInput: unknown): Promise<ActionResult<void>> {
+  try {
+    const { userId } = await requireUser();
+    const { provider } = ProviderInput.parse(rawInput);
+    const today = new Date();
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    const result = await runProviderSync(userId, provider, {
+      from: yesterday.toISOString().slice(0, 10),
+      to: today.toISOString().slice(0, 10),
+    });
+    if (!result.ok) {
+      return {
+        ok: false,
+        error: new ServerError('internal', result.error ?? 'Sync failed'),
+      };
+    }
+    return { ok: true, value: undefined };
+  } catch (err) {
+    if (err instanceof ServerError) return { ok: false, error: err };
+    if (err instanceof z.ZodError) {
+      return {
+        ok: false,
+        error: new ServerError('validation_failed', 'Invalid provider', err),
+      };
+    }
+    return {
+      ok: false,
+      error: new ServerError(
+        'internal',
+        err instanceof Error ? err.message : 'Failed to sync',
         err,
       ),
     };

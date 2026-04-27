@@ -107,6 +107,38 @@ function mapSnapshotPayload(
   return {};
 }
 
+export interface LatestSnapshot {
+  observed_at: string;
+  created_at: string;
+  raw: unknown;
+  mapped: Partial<HealthSignals>;
+}
+
+/**
+ * Read the most recent snapshot for (user, provider) and return both the
+ * raw provider payload and the mapped HealthSignals. Returns null when no
+ * snapshot exists yet — caller can prompt a manual sync.
+ */
+export async function getLatestSnapshot(
+  userId: string,
+  provider: IntegrationProvider,
+): Promise<LatestSnapshot | null> {
+  const rows = await db
+    .select()
+    .from(signal_snapshots)
+    .where(and(eq(signal_snapshots.user_id, userId), eq(signal_snapshots.source, provider)))
+    .orderBy(desc(signal_snapshots.observed_at))
+    .limit(1);
+  const latest = rows[0];
+  if (!latest) return null;
+  return {
+    observed_at: latest.observed_at.toISOString(),
+    created_at: latest.created_at.toISOString(),
+    raw: latest.payload,
+    mapped: mapSnapshotPayload(provider, latest.payload),
+  };
+}
+
 /**
  * Fan out across the user's connected integrations and merge their signals
  * into a single HealthSignals object. Errors per provider are swallowed so

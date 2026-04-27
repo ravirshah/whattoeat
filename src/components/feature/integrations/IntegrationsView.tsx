@@ -6,11 +6,14 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toast';
 import type { IntegrationProvider, IntegrationSummary } from '@/contracts/zod/integrations';
 import {
+  type ProviderDebug,
   connectEightSleep,
   disconnectIntegration,
+  getProviderDebug,
   listMyIntegrations,
+  syncProviderNow,
 } from '@/server/integrations/actions';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 
 interface IntegrationsViewProps {
   initialIntegrations: IntegrationSummary[];
@@ -143,7 +146,162 @@ function ProviderCard({
       {meta.available && open && !isConnected && (
         <ConnectForm provider={meta.provider} onClose={() => setOpen(false)} onChange={onChange} />
       )}
+
+      {isConnected && <DebugPanel provider={meta.provider} onSynced={onChange} />}
     </div>
+  );
+}
+
+function DebugPanel({
+  provider,
+  onSynced,
+}: {
+  provider: IntegrationProvider;
+  onSynced: () => Promise<void>;
+}) {
+  const [debug, setDebug] = useState<ProviderDebug | null | undefined>(undefined);
+  const [showRaw, setShowRaw] = useState(false);
+  const [syncing, startSync] = useTransition();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const r = await getProviderDebug({ provider });
+      if (!cancelled && r.ok) setDebug(r.value);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [provider]);
+
+  const sync = () => {
+    startSync(async () => {
+      const r = await syncProviderNow({ provider });
+      if (!r.ok) {
+        toast.error(r.error.message);
+        return;
+      }
+      toast.success('Synced');
+      const debugRes = await getProviderDebug({ provider });
+      if (debugRes.ok) setDebug(debugRes.value);
+      await onSynced();
+    });
+  };
+
+  if (debug === undefined) {
+    return <div className="mt-4 border-t border-border pt-4 text-xs text-text-muted">Loading…</div>;
+  }
+
+  if (debug === null) {
+    return (
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
+        <p className="text-xs text-text-muted">
+          No data yet. Run a sync to pull last night's snapshot.
+        </p>
+        <Button size="sm" variant="outline" onClick={sync} disabled={syncing}>
+          {syncing ? 'Syncing…' : 'Sync now'}
+        </Button>
+      </div>
+    );
+  }
+
+  const { mapped, adjustments, observed_at, raw } = debug;
+  const sleep = mapped.sleep;
+  const recovery = mapped.recovery;
+
+  return (
+    <div className="mt-4 flex flex-col gap-4 border-t border-border pt-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            Latest snapshot
+          </p>
+          <p className="text-xs text-text-muted">
+            Observed {new Date(observed_at).toLocaleString()}
+          </p>
+        </div>
+        <Button size="sm" variant="outline" onClick={sync} disabled={syncing}>
+          {syncing ? 'Syncing…' : 'Sync now'}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <SignalTile
+          label="Last night"
+          value={sleep ? `${sleep.lastNightHours.toFixed(1)}h` : '—'}
+        />
+        <SignalTile label="Quality" value={sleep?.quality ?? '—'} />
+        <SignalTile
+          label="Resting HR"
+          value={recovery?.restingHr !== undefined ? `${recovery.restingHr} bpm` : '—'}
+        />
+        <SignalTile
+          label="HRV"
+          value={recovery?.hrvMs !== undefined ? `${recovery.hrvMs} ms` : '—'}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+          How recipes will adjust
+        </p>
+        {adjustments.length === 0 ? (
+          <p className="text-xs italic text-text-muted">
+            No active adjustments — signals are in a neutral range.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {adjustments.map((a) => (
+              <li
+                key={a.id}
+                className="rounded-lg border border-border bg-surface px-3 py-2 text-xs"
+              >
+                <p className="font-medium text-text">
+                  <SeverityDot severity={a.severity} />
+                  {a.title}
+                </p>
+                <p className="mt-0.5 text-text-muted">{a.effect}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div>
+        <button
+          type="button"
+          className="text-[11px] font-medium uppercase tracking-wide text-text-muted hover:text-text"
+          onClick={() => setShowRaw((v) => !v)}
+        >
+          {showRaw ? 'Hide' : 'Show'} raw payload
+        </button>
+        {showRaw && (
+          <pre className="mt-2 max-h-72 overflow-auto rounded-lg bg-surface p-3 text-[10px] leading-snug text-text-muted">
+            {JSON.stringify(raw, null, 2)}
+          </pre>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SignalTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface px-3 py-2">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">{label}</p>
+      <p className="mt-0.5 text-sm font-semibold text-text">{value}</p>
+    </div>
+  );
+}
+
+function SeverityDot({ severity }: { severity: 'tilt' | 'prefer' | 'inform' }) {
+  const color =
+    severity === 'tilt' ? 'bg-warn' : severity === 'prefer' ? 'bg-accent' : 'bg-text-muted';
+  return (
+    <span
+      className={`mr-2 inline-block h-1.5 w-1.5 rounded-full align-middle ${color}`}
+      aria-hidden
+    />
   );
 }
 

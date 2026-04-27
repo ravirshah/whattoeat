@@ -45,7 +45,7 @@ if (!found) {
     console.error('createUser failed:', error.message);
     process.exit(1);
   }
-  console.log(`Created ${email} with password set.`);
+  console.info(`Created ${email} with password set.`);
   process.exit(0);
 }
 
@@ -57,4 +57,4 @@ if (error) {
   console.error('updateUserById failed:', error.message);
   process.exit(1);
 }
-console.log(`Updated password for ${email}.`);
+console.info(`Updated password for ${email}.`);
