@@ -13,6 +13,8 @@
 
 import { PantryCategory } from '@/contracts/zod/pantry';
 import { resolveClient } from '@/lib/feed-me/resolveClient';
+import { assertWithinDailyCap } from '@/lib/rate-limit/assert-daily-cap';
+import { requireUser } from '@/server/auth';
 import type { ActionResult } from '@/server/contracts';
 import { ServerError } from '@/server/contracts';
 import { z } from 'zod';
@@ -83,6 +85,10 @@ function fallbackParse(text: string): ParsedPantryItem[] {
 }
 
 export async function parsePantryFreeform(text: string): Promise<ActionResult<ParsedPantryItem[]>> {
+  // Require auth before validating — an unauthenticated caller should redirect
+  // to /auth/login, not get a "your input is empty" message.
+  const { userId } = await requireUser();
+
   const trimmed = text.trim();
   if (!trimmed) {
     return { ok: false, error: new ServerError('validation_failed', 'Enter at least one item.') };
@@ -95,8 +101,16 @@ export async function parsePantryFreeform(text: string): Promise<ActionResult<Pa
   }
 
   // If the user explicitly asked for a fake client (tests/dev), or no key, fall back.
+  // No rate limit needed — deterministic local parse, no LLM call.
   if (process.env.RECOMMEND_LLM_CLIENT === 'fake' || !process.env.GEMINI_API_KEY) {
     return { ok: true, value: fallbackParse(trimmed) };
+  }
+
+  // Rate-limit the LLM-backed path so a hostile authenticated user can't burn
+  // through Gemini quota. Same shape as engine:recommend.
+  const cap = await assertWithinDailyCap(userId, 'pantry:parse');
+  if (!cap.ok) {
+    return { ok: false, error: new ServerError('rate_limited', cap.friendlyMessage) };
   }
 
   try {

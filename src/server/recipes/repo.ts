@@ -44,23 +44,33 @@ export async function dbListSavedRecipes(
   return (data ?? []) as Recipe[];
 }
 
+// userId filters here are application-layer defense-in-depth. RLS already
+// scopes recipes to the owner via auth.uid(), but if an RLS policy ever
+// regresses (e.g. someone widens it during a migration), the explicit filter
+// stops a cross-user mutation cold.
 export async function dbSetSaved(
   supabase: SupabaseClient,
   id: string,
+  userId: string,
   saved: boolean,
 ): Promise<void> {
   const { error } = await supabase
     .from('recipes')
     .update({ saved, updated_at: new Date().toISOString() })
-    .eq('id', id);
+    .eq('id', id)
+    .eq('user_id', userId);
   if (error) throw new Error(`dbSetSaved failed: ${error.message}`);
 }
 
 // TODO: confirm with user — hard delete chosen for now. If soft-delete is preferred,
 // add a `deleted_at timestamptz` column in a Track 0 migration and flip to
 // `.update({ deleted_at: new Date().toISOString() })` here.
-export async function dbDeleteRecipe(supabase: SupabaseClient, id: string): Promise<void> {
-  const { error } = await supabase.from('recipes').delete().eq('id', id);
+export async function dbDeleteRecipe(
+  supabase: SupabaseClient,
+  id: string,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase.from('recipes').delete().eq('id', id).eq('user_id', userId);
   if (error) throw new Error(`dbDeleteRecipe failed: ${error.message}`);
 }
 

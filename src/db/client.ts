@@ -3,6 +3,18 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
+// ⚠️  RLS BYPASS — DEFENSE-IN-DEPTH REQUIRED ⚠️
+// SUPABASE_DB_URL is a direct Postgres connection (service-role / db owner)
+// that does NOT enforce row-level security. Every query made through this
+// `db` export must explicitly filter by `userId` in its WHERE clause —
+// there is no second line of defense if a filter is forgotten.
+//
+// Use the @supabase/ssr client (`createServerClient()` from
+// `@/lib/supabase/server`) for any code path where RLS is the appropriate
+// boundary. Reach for `db` only when you specifically need direct schema
+// access (Drizzle query builder, transactions) and you're willing to own
+// the user-scoping yourself.
+
 // Lazy-init so Next.js page-data collection at build time doesn't crash when
 // SUPABASE_DB_URL isn't set (CI build with placeholder env, prerender pass).
 //

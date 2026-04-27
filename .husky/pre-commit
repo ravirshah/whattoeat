@@ -1,2 +1,14 @@
 #!/usr/bin/env sh
+# Refuse to commit .env files. Real values live in .env.local (gitignored)
+# and Vercel; the only env file in version control should be .env.example.
+# Catching this in pre-commit prevents service-role keys / DB URLs from
+# leaking via a stray `git add .`.
+staged_env=$(git diff --cached --name-only --diff-filter=A | grep -E '(^|/)\.env($|\.)' | grep -v '^\.env\.example$' || true)
+if [ -n "$staged_env" ]; then
+  echo "✗ refusing to commit env files (use .env.local + Vercel for real values):"
+  echo "$staged_env" | sed 's/^/    /'
+  echo "  if intentional, run: git commit --no-verify  (only after rotating any keys exposed)"
+  exit 1
+fi
+
 bunx lint-staged

@@ -89,21 +89,19 @@ export async function saveRecipe(
  * Use deleteRecipe for a hard delete.
  */
 export async function unsaveRecipe(id: string): Promise<void> {
-  await requireUser();
+  const { userId } = await requireUser();
   const supabase = await createServerClient();
-  await dbSetSaved(supabase, id, false);
+  await dbSetSaved(supabase, id, userId, false);
 }
 
 /**
- * Hard-delete a recipe row. RLS enforces ownership.
- *
- * TODO: confirm with user — if soft-delete is preferred, replace with dbSetSaved or
- * a dedicated dbSoftDeleteRecipe that sets deleted_at. Requires a schema column.
+ * Hard-delete a recipe row. RLS enforces ownership; the userId filter in the
+ * repo is defense-in-depth.
  */
 export async function deleteRecipe(id: string): Promise<void> {
-  await requireUser();
+  const { userId } = await requireUser();
   const supabase = await createServerClient();
-  await dbDeleteRecipe(supabase, id);
+  await dbDeleteRecipe(supabase, id, userId);
 }
 
 /** Fetch a single recipe. Returns null if not found or not owned by current user (RLS). */

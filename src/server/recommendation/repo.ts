@@ -71,17 +71,18 @@ export async function getRecommendationRun(
   runId: string,
   userId: string,
 ): Promise<GetRunResult | null> {
+  // userId is part of the WHERE clause (not just a post-fetch check) because
+  // `db` bypasses RLS — see warning in src/db/client.ts.
   const [row] = await db
     .select({
       candidates: recommendation_runs.candidates,
       context_snapshot: recommendation_runs.context_snapshot,
-      user_id: recommendation_runs.user_id,
     })
     .from(recommendation_runs)
-    .where(eq(recommendation_runs.id, runId))
+    .where(and(eq(recommendation_runs.id, runId), eq(recommendation_runs.user_id, userId)))
     .limit(1);
 
-  if (!row || row.user_id !== userId) return null;
+  if (!row) return null;
   return { candidates: row.candidates, context: row.context_snapshot };
 }
 

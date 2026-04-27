@@ -6,6 +6,7 @@ import { healthExtractions } from '@/db/schema/health-extractions';
 import { buildHealthDocExtractionPrompt } from '@/engine/health-prompt';
 import type { LlmClient } from '@/engine/ports/llm';
 import { resolveClient } from '@/lib/feed-me/resolveClient';
+import { assertWithinDailyCap } from '@/lib/rate-limit/assert-daily-cap';
 import { requireUser } from '@/server/auth';
 import type { ActionResult } from '@/server/contracts';
 import { ServerError } from '@/server/contracts';
@@ -42,6 +43,13 @@ export async function extractHealthDoc(
         `Document is too long. Paste up to ${MAX_TEXT_LENGTH} characters.`,
       ),
     };
+  }
+
+  // Rate-limit LLM-backed extraction — health docs are 8k chars and use the
+  // quality model, so abuse here is the most expensive surface in the app.
+  const cap = await assertWithinDailyCap(userId, 'profile:extract-health');
+  if (!cap.ok) {
+    return { ok: false, error: new ServerError('rate_limited', cap.friendlyMessage) };
   }
 
   const client = resolveClient(clientOverride);
