@@ -5,3 +5,4 @@ export * from './recipe';
 export * from './signals';
 export * from './recommendation';
 export * from './health';
+export * from './integrations';
