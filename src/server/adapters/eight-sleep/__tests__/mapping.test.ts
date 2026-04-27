@@ -46,7 +46,7 @@ describe('mapSleepDayToSignals', () => {
 });
 
 describe('pickLatestUsableDay', () => {
-  it('returns the most recent day with score + duration', () => {
+  it('returns the most recent day with sleep duration', () => {
     const days = [
       { day: '2026-04-23', score: 70, sleepDurationSeconds: 25000 },
       { day: '2026-04-24', score: 75, sleepDurationSeconds: 26000 },
@@ -55,10 +55,18 @@ describe('pickLatestUsableDay', () => {
     expect(pickLatestUsableDay(days)?.day).toBe('2026-04-25');
   });
 
-  it('skips trailing incomplete days', () => {
+  it('returns days with duration even when score is missing', () => {
     const days = [
       { day: '2026-04-24', score: 75, sleepDurationSeconds: 26000 },
-      { day: '2026-04-25' }, // no score, no duration
+      { day: '2026-04-25', sleepDurationSeconds: 25200 }, // duration but no score yet
+    ];
+    expect(pickLatestUsableDay(days)?.day).toBe('2026-04-25');
+  });
+
+  it('skips trailing days with no duration', () => {
+    const days = [
+      { day: '2026-04-24', score: 75, sleepDurationSeconds: 26000 },
+      { day: '2026-04-25' }, // no duration
     ];
     expect(pickLatestUsableDay(days)?.day).toBe('2026-04-24');
   });

@@ -180,14 +180,46 @@ describe('EightSleepSignalProvider', () => {
     expect(markSuccess).not.toHaveBeenCalled();
   });
 
-  it('marks success and returns empty when no usable day is in trends', async () => {
-    const getTrends = vi.fn(async () => [{ day: '2026-04-25' }]); // no score, no duration
+  it('marks an error and returns empty when trends has no days at all', async () => {
+    const getTrends = vi.fn(async () => []);
     const client = buildClient(getTrends);
-    const { deps, markSuccess, insertSnapshot } = buildDeps({ client, row: buildRow() });
+    const { deps, markSuccess, markError, insertSnapshot } = buildDeps({
+      client,
+      row: buildRow(),
+    });
+    const provider = new EightSleepSignalProvider(deps);
+    const out = await provider.getSignals(USER_ID, { from: '2026-04-19', to: '2026-04-26' });
+    expect(out).toEqual({});
+    expect(markSuccess).not.toHaveBeenCalled();
+    expect(markError).toHaveBeenCalledWith(USER_ID, expect.stringContaining('no sleep days'));
+    expect(insertSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('marks an error when days are returned but none have sleep duration', async () => {
+    const getTrends = vi.fn(async () => [{ day: '2026-04-25' }]); // no duration
+    const client = buildClient(getTrends);
+    const { deps, markSuccess, markError, insertSnapshot } = buildDeps({
+      client,
+      row: buildRow(),
+    });
     const provider = new EightSleepSignalProvider(deps);
     const out = await provider.getSignals(USER_ID, { from: '2026-04-25', to: '2026-04-26' });
     expect(out).toEqual({});
-    expect(markSuccess).toHaveBeenCalledWith(USER_ID);
+    expect(markSuccess).not.toHaveBeenCalled();
+    expect(markError).toHaveBeenCalledWith(USER_ID, expect.stringContaining('1 day(s)'));
     expect(insertSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('still inserts a snapshot for a day with duration but no score yet', async () => {
+    const getTrends = vi.fn(async () => [
+      { day: '2026-04-25', sleepDurationSeconds: 25200, heartRate: 60 },
+    ]);
+    const client = buildClient(getTrends);
+    const { deps, insertSnapshot, markSuccess } = buildDeps({ client, row: buildRow() });
+    const provider = new EightSleepSignalProvider(deps);
+    const out = await provider.getSignals(USER_ID, { from: '2026-04-25', to: '2026-04-26' });
+    expect(out.sleep).toEqual({ lastNightHours: 7 });
+    expect(insertSnapshot).toHaveBeenCalledTimes(1);
+    expect(markSuccess).toHaveBeenCalledWith(USER_ID);
   });
 });

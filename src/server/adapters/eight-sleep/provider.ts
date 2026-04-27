@@ -75,7 +75,11 @@ export class EightSleepSignalProvider implements SignalProvider {
 
       const latest = pickLatestUsableDay(days);
       if (!latest) {
-        await this.deps.markSuccess(userId);
+        const detail =
+          days.length === 0
+            ? `Eight Sleep returned no sleep days for ${range.from}→${range.to}. Sleep on the bed and re-sync, or widen the range.`
+            : `Eight Sleep returned ${days.length} day(s) but none had a recorded sleep duration.`;
+        await this.deps.markError(userId, detail);
         return {};
       }
 

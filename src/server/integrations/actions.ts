@@ -176,10 +176,13 @@ export async function syncProviderNow(rawInput: unknown): Promise<ActionResult<v
   try {
     const { userId } = await requireUser();
     const { provider } = ProviderInput.parse(rawInput);
+    // 7-day window: Eight Sleep day strings are user-TZ-keyed and a tight
+    // UTC window can miss the latest completed sleep. The provider picks the
+    // most recent day that has data anyway.
     const today = new Date();
-    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
     const result = await runProviderSync(userId, provider, {
-      from: yesterday.toISOString().slice(0, 10),
+      from: weekAgo.toISOString().slice(0, 10),
       to: today.toISOString().slice(0, 10),
     });
     if (!result.ok) {

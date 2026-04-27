@@ -36,18 +36,17 @@ export function mapSleepDayToSignals(day: EightSleepDay): Partial<HealthSignals>
 }
 
 /**
- * From a list of trend days (oldest→newest), return the most recent one that
- * has a usable sleep score. Returns null when none qualify.
+ * From a list of trend days (oldest→newest), return the most recent one with
+ * any recorded sleep duration. The `score` field is optional — Eight Sleep
+ * sometimes returns days with duration but no score (still in processing, or
+ * a partial session). Quality just won't be set in the mapped signals.
+ * Returns null when none qualify.
  */
 export function pickLatestUsableDay(days: EightSleepDay[]): EightSleepDay | null {
   for (let i = days.length - 1; i >= 0; i--) {
     const d = days[i];
     if (!d) continue;
-    if (
-      typeof d.sleepDurationSeconds === 'number' &&
-      d.sleepDurationSeconds > 0 &&
-      typeof d.score === 'number'
-    ) {
+    if (typeof d.sleepDurationSeconds === 'number' && d.sleepDurationSeconds > 0) {
       return d;
     }
   }
